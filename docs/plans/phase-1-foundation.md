@@ -115,12 +115,13 @@ Create `packages/shared` with currency constants, wallet type constants, and tra
 
 ## Dependencies
 
-- Neon Postgres database (free tier) — need a `DATABASE_URL`
+- Local PostgreSQL database (localhost:5432)
 - All npm packages listed in Step 1
 - Node.js 18+
 
-## Open Questions
+## Decisions
 
-- **Neon project:** Do you already have a Neon project, or should I include setup instructions?
-- **API port:** Using 3001 to avoid conflict with Next.js web on 3000. OK?
-- **API prefix:** `/api/v1` for all routes? Or just `/v1`?
+- **Database:** Local Postgres for dev. Neon for production (swap via DATABASE_URL).
+- **API port:** 4000
+- **API prefix:** `/api/v1` for all routes
+- **DB driver:** `pg` (node-postgres) for local dev. Can swap to `@neondatabase/serverless` for production via adapter.
