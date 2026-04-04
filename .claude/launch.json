@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "PATH=/opt/homebrew/bin:/usr/local/bin:$PATH pnpm --filter api run start:dev"],
+      "port": 4000
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "PATH=/opt/homebrew/bin:/usr/local/bin:$PATH pnpm --filter web run dev"],
+      "port": 3000
+    },
+    {
+      "name": "mobile",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "PATH=/opt/homebrew/bin:/usr/local/bin:$PATH pnpm --filter mobile run start"],
+      "port": 8081
+    }
+  ]
+}
