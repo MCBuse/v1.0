@@ -66,7 +66,15 @@ export function validate(config: Record<string, unknown>) {
   });
 
   if (errors.length > 0) {
-    throw new Error(errors.toString());
+    const messages = errors.map((error) => {
+      const constraints = error.constraints
+        ? Object.values(error.constraints).join(', ')
+        : 'unknown constraint';
+      return `  - ${error.property}: ${constraints}`;
+    });
+    throw new Error(
+      `Configuration validation failed:\n${messages.join('\n')}`,
+    );
   }
   return validatedConfig;
 }
