@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
+import helmet from 'helmet';
+import { globalValidationPipe } from './common/pipes/validation.pipe';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -11,7 +14,12 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('API_PREFIX') ?? 'api/v1';
 
   app.useLogger(app.get(Logger));
+  app.use(helmet());
   app.setGlobalPrefix(apiPrefix);
+  app.useGlobalPipes(globalValidationPipe);
+
+  const logger = app.get(Logger);
+  app.useGlobalFilters(new HttpExceptionFilter(logger));
 
   await app.listen(port);
 }
