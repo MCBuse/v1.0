@@ -1,5 +1,11 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNumber, IsString, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  validateSync,
+} from 'class-validator';
 
 export enum Environment {
   Development = 'development',
@@ -35,11 +41,23 @@ export class EnvironmentVariables {
   @IsString()
   JWT_SECRET: string;
 
+  @IsOptional()
+  @IsString()
+  JWT_EXPIRATION?: string;
+
+  @IsOptional()
+  @IsString()
+  JWT_REFRESH_EXPIRATION?: string;
+
   @IsString()
   SOLANA_RPC_URL: string;
 
   @IsString()
   SOLANA_NETWORK: string;
+
+  @IsOptional()
+  @IsString()
+  SOLANA_KEYPAIR_ENCRYPTION_KEY?: string;
 
   @IsString()
   ONRAMP_PROVIDER: string;
@@ -49,6 +67,10 @@ export class EnvironmentVariables {
 
   @IsString()
   SWAP_PROVIDER: string;
+
+  @IsOptional()
+  @IsString()
+  CIRCLE_API_KEY?: string;
 
   @IsNumber()
   THROTTLE_TTL: number;
@@ -66,7 +88,15 @@ export function validate(config: Record<string, unknown>) {
   });
 
   if (errors.length > 0) {
-    throw new Error(errors.toString());
+    const messages = errors.map((error) => {
+      const constraints = error.constraints
+        ? Object.values(error.constraints).join(', ')
+        : 'unknown constraint';
+      return `  - ${error.property}: ${constraints}`;
+    });
+    throw new Error(
+      `Configuration validation failed:\n${messages.join('\n')}`,
+    );
   }
   return validatedConfig;
 }

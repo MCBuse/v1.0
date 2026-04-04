@@ -10,8 +10,9 @@ import { DatabaseModule } from './database/database.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate,
-      envFilePath: '.env',
+      envFilePath: process.env.NODE_ENV === 'test' ? undefined : '.env',
+      ignoreEnvFile: process.env.NODE_ENV === 'test',
+      validate: process.env.NODE_ENV === 'test' ? (config) => config : validate,
     }),
     LoggingModule,
     DatabaseModule,
