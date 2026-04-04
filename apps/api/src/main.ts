@@ -1,15 +1,18 @@
 import { NestFactory } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { ConfigService } from '@nestjs/config';
+import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
-  const apiPrefix = configService.get<string>('API_PREFIX', 'api/v1');
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('PORT') ?? 4000;
+  const apiPrefix = configService.get<string>('API_PREFIX') ?? 'api/v1';
+
+  app.useLogger(app.get(Logger));
   app.setGlobalPrefix(apiPrefix);
 
-  const port = configService.get<number>('PORT', 4000);
   await app.listen(port);
 }
 bootstrap();
