@@ -21,8 +21,9 @@ Read the plan file. Check what's already done (\`git log --oneline -20\`). Repor
 **Dispatch a sub-agent** with the prompt template below. One step per sub-agent, always.
 
 **Verify** after the sub-agent finishes — lightweight only:
-- \`npm run build\` passes
-- \`npm run dev\` starts
+
+- \`pnpm build\` passes
+- \`pnpm start:dev\` or \`pnpm start\` starts
 - Do NOT read source files the sub-agent wrote
 
 **Commit** progress:
@@ -58,20 +59,25 @@ Run \`npm run build\` and \`npm run dev\`. Report: steps completed, summary, sug
 You are implementing Step [N] of the project plan: [step title].
 
 ## What to Build
+
 [Step description from the plan]
 
 ## Tech Stack
+
 [From plan header or CLAUDE.md]
 
 ## What Already Exists
+
 [Key files from previous steps this step depends on — brief]
 
 ## Files to Create or Modify
+
 [Explicit list from the plan]
 
 ## When You're Done
+
 1. All files listed above are created
 2. \`npm run build\` passes
 3. \`npm run dev\` starts
 4. Describe what you built and confirm verification passed
-\`\`\`
+   \`\`\`
