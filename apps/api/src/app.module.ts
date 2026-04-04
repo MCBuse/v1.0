@@ -8,8 +8,9 @@ import { validate } from './config/config.validation';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
-      validate,
+      envFilePath: process.env.NODE_ENV === 'test' ? undefined : '.env',
+      ignoreEnvFile: process.env.NODE_ENV === 'test',
+      validate: process.env.NODE_ENV === 'test' ? (config) => config : validate,
     }),
   ],
   controllers: [AppController],
