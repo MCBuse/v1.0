@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { validate } from './config/config.validation';
 import { LoggingModule } from './logging/logging.module';
 import { DatabaseModule } from './database/database.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { DatabaseModule } from './database/database.module';
     }),
     LoggingModule,
     DatabaseModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
