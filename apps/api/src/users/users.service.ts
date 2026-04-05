@@ -74,7 +74,7 @@ export class UsersService {
         'code' in err &&
         (err as { code: string }).code === '23505'
       ) {
-        throw new ConflictException('Email already in use');
+        throw new ConflictException('Email or phone already in use');
       }
       throw err;
     }
