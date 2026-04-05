@@ -1,12 +1,12 @@
 import {
   Injectable,
   Inject,
+  Logger,
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, gt, isNull } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
@@ -27,9 +27,9 @@ export interface AuthTokens {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
-    @InjectPinoLogger(AuthService.name)
-    private readonly logger: PinoLogger,
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
@@ -44,12 +44,12 @@ export class AuthService {
       passwordHash,
       phone: dto.phone,
     });
-    this.logger.info({ userId: user.id }, 'User registered');
+    this.logger.log('User registered: ' + user.id);
     return this.issueTokens(user.id, user.email as string);
   }
 
   async login(user: { id: string; email: string }): Promise<AuthTokens> {
-    this.logger.info({ userId: user.id }, 'User logged in');
+    this.logger.log('User logged in: ' + user.id);
     return this.issueTokens(user.id, user.email);
   }
 
@@ -124,13 +124,13 @@ export class AuthService {
         break;
       }
     }
-    this.logger.info({ userId }, 'User logged out');
+    this.logger.log('User logged out: ' + userId);
   }
 
   async sendOtp(userId: string, phone: string): Promise<void> {
     const code = String(randomInt(100000, 999999));
     await this.otpProvider.sendOtp(phone, code);
-    this.logger.info({ userId, phone: phone.slice(-4) }, 'OTP sent');
+    this.logger.log('OTP sent to ' + phone.slice(-4) + ' for user: ' + userId);
   }
 
   async verifyOtp(userId: string, phone: string, code: string): Promise<void> {
@@ -139,7 +139,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired OTP');
     }
     await this.usersService.markPhoneVerified(userId);
-    this.logger.info({ userId }, 'Phone verified');
+    this.logger.log('Phone verified for user: ' + userId);
   }
 
   private async issueTokens(userId: string, email: string): Promise<AuthTokens> {

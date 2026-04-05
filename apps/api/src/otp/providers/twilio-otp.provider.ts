@@ -14,13 +14,22 @@ export class TwilioOtpProvider implements OtpProvider {
   private readonly baseUrl: string;
 
   constructor(private readonly config: ConfigService) {
-    this.accountSid = config.getOrThrow('TWILIO_ACCOUNT_SID');
-    this.authToken = config.getOrThrow('TWILIO_AUTH_TOKEN');
-    this.serviceSid = config.getOrThrow('TWILIO_VERIFY_SERVICE_SID');
+    this.accountSid = config.get('TWILIO_ACCOUNT_SID') ?? '';
+    this.authToken = config.get('TWILIO_AUTH_TOKEN') ?? '';
+    this.serviceSid = config.get('TWILIO_VERIFY_SERVICE_SID') ?? '';
     this.baseUrl = `https://verify.twilio.com/v2/Services/${this.serviceSid}`;
   }
 
+  private assertConfigured() {
+    if (!this.accountSid || !this.authToken || !this.serviceSid) {
+      throw new Error(
+        'Twilio OTP provider requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID',
+      );
+    }
+  }
+
   async sendOtp(phone: string, _code: string): Promise<void> {
+    this.assertConfigured();
     // Twilio Verify generates and sends the code — we don't pass our own
     const res = await fetch(`${this.baseUrl}/Verifications`, {
       method: 'POST',
@@ -42,6 +51,7 @@ export class TwilioOtpProvider implements OtpProvider {
   }
 
   async verifyOtp(phone: string, code: string): Promise<boolean> {
+    this.assertConfigured();
     const res = await fetch(`${this.baseUrl}/VerificationCheck`, {
       method: 'POST',
       headers: {
