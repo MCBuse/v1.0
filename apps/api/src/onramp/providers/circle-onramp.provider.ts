@@ -1,4 +1,4 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import { Injectable, NotImplementedException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { OnRampProvider, OnRampParams, OnRampResult } from '../onramp-provider.interface';
 
@@ -14,12 +14,16 @@ import type { OnRampProvider, OnRampParams, OnRampResult } from '../onramp-provi
  */
 @Injectable()
 export class CircleOnRampProvider implements OnRampProvider {
+  readonly providerName = 'circle';
+
   constructor(private readonly config: ConfigService) {}
 
   async initiateOnRamp(_params: OnRampParams): Promise<OnRampResult> {
     const apiKey = this.config.get<string>('CIRCLE_API_KEY');
     if (!apiKey) {
-      throw new Error('CIRCLE_API_KEY is required when ONRAMP_PROVIDER=circle');
+      throw new ServiceUnavailableException(
+        'On-ramp service is not configured. CIRCLE_API_KEY is required when ONRAMP_PROVIDER=circle.',
+      );
     }
     // TODO: Phase 9 — implement Circle Payments API integration
     throw new NotImplementedException(

@@ -9,7 +9,7 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, lt, inArray, desc, isNull } from 'drizzle-orm';
+import { eq, and, lt, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
@@ -66,8 +66,8 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
       .values({
         creatorWalletId: routine.id,
         type: dto.type,
-        amount: dto.amount ? BigInt(dto.amount) : null,
-        currency: dto.currency?.toUpperCase() ?? null,
+        amount: dto.type === 'dynamic' && dto.amount ? BigInt(dto.amount) : null,
+        currency: dto.type === 'dynamic' ? dto.currency?.toUpperCase() ?? null : null,
         description: dto.description ?? null,
         nonce,
         status: 'pending',
@@ -108,12 +108,15 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
     const walletRows = await this.db
       .select({ id: schema.wallets.id, solanaPubkey: schema.wallets.solanaPubkey, type: schema.wallets.type })
       .from(schema.wallets)
-      .where(eq(schema.wallets.id, pr.creatorWalletId))
+      .where(and(eq(schema.wallets.id, pr.creatorWalletId), eq(schema.wallets.isActive, true)))
       .limit(1);
+
+    const creatorWallet = walletRows[0];
+    if (!creatorWallet) throw new NotFoundException('Creator wallet not found');
 
     return {
       ...this.sanitize(pr),
-      creatorWallet: walletRows[0] ?? null,
+      creatorWallet,
     };
   }
 
@@ -145,13 +148,24 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
 
   async cancel(userId: string, id: string) {
     const pr = await this.loadAndOwn(userId, id);
-    if (pr.status !== 'pending') {
-      throw new BadRequestException(`Cannot cancel a ${pr.status} payment request`);
-    }
-    await this.db
+
+    // Atomic conditional UPDATE — prevents race with concurrent completion/expiry
+    const result = await this.db
       .update(schema.paymentRequests)
       .set({ status: 'cancelled' })
-      .where(eq(schema.paymentRequests.id, id));
+      .where(
+        and(
+          eq(schema.paymentRequests.id, id),
+          eq(schema.paymentRequests.creatorWalletId, pr.creatorWalletId),
+          eq(schema.paymentRequests.status, 'pending'),
+        ),
+      )
+      .returning({ id: schema.paymentRequests.id });
+
+    if (result.length === 0) {
+      const current = await this.loadAndOwn(userId, id);
+      throw new BadRequestException(`Cannot cancel a ${current.status} payment request`);
+    }
 
     this.logger.log(`Payment request cancelled: ${id}`);
     return { id, status: 'cancelled' };
@@ -159,10 +173,21 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
 
   /** Called by Phase 6 (P2P transfer) to mark a dynamic request completed. */
   async markCompleted(id: string, ledgerEntryId: string) {
-    await this.db
+    const result = await this.db
       .update(schema.paymentRequests)
       .set({ status: 'completed', completedAt: new Date(), ledgerEntryId })
-      .where(eq(schema.paymentRequests.id, id));
+      .where(
+        and(
+          eq(schema.paymentRequests.id, id),
+          eq(schema.paymentRequests.type, 'dynamic'),
+          eq(schema.paymentRequests.status, 'pending'),
+        ),
+      )
+      .returning({ id: schema.paymentRequests.id });
+
+    if (result.length !== 1) {
+      throw new BadRequestException('Payment request cannot be completed in its current state');
+    }
   }
 
   /** Background job: expire stale dynamic requests. */

@@ -45,7 +45,7 @@ export class OnRampService {
     // For completed (mock) or synchronous on-ramps, credit balance immediately
     if (result.status === 'completed') {
       await this.db.transaction(async (tx) => {
-        await tx
+        const updated = await tx
           .update(schema.balances)
           .set({ available: sql`${schema.balances.available} + ${result.amount}` })
           .where(
@@ -53,7 +53,12 @@ export class OnRampService {
               eq(schema.balances.walletId, savings.id),
               eq(schema.balances.currency, currency),
             ),
-          );
+          )
+          .returning({ id: schema.balances.id });
+
+        if (updated.length !== 1) {
+          throw new BadRequestException('Balance record not found for savings wallet');
+        }
 
         await tx.insert(schema.ledgerEntries).values({
           // On-ramp has no debit wallet — use savings as both sides to track the credit
@@ -64,7 +69,7 @@ export class OnRampService {
           type: 'on_ramp',
           status: 'completed',
           idempotencyKey,
-          metadata: JSON.stringify({ externalId: result.externalId, provider: 'mock' }),
+          metadata: JSON.stringify({ externalId: result.externalId, provider: this.provider.providerName }),
         });
       });
 
