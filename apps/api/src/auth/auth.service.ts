@@ -128,7 +128,7 @@ export class AuthService {
   }
 
   async sendOtp(userId: string, phone: string): Promise<void> {
-    const code = String(randomInt(100000, 999999));
+    const code = String(randomInt(100000, 1000000));
     await this.otpProvider.sendOtp(phone, code);
     this.logger.log('OTP sent to ' + phone.slice(-4) + ' for user: ' + userId);
   }
