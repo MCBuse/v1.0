@@ -19,6 +19,8 @@ import { PaymentRequestsModule } from './payment-requests/payment-requests.modul
 import { PaymentsModule } from './payments/payments.module';
 import { SwapModule } from './swap/swap.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { OffRampModule } from './offramp/offramp.module';
+import { NfcModule } from './nfc/nfc.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -53,6 +55,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     PaymentsModule,
     SwapModule,
     TransactionsModule,
+    OffRampModule,
+    NfcModule,
   ],
   controllers: [AppController],
   providers: [
