@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { VerifiedEmailGuard } from './guards/verified-email.guard';
 import { UsersModule } from '../users/users.module';
 import { OtpModule } from '../otp/otp.module';
 
@@ -18,8 +19,8 @@ import { OtpModule } from '../otp/otp.module';
     UsersModule,
     OtpModule,
   ],
-  providers: [AuthService, JwtStrategy, LocalStrategy, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, LocalStrategy, JwtAuthGuard, VerifiedEmailGuard],
   controllers: [AuthController],
-  exports: [JwtAuthGuard],
+  exports: [JwtAuthGuard, VerifiedEmailGuard],
 })
 export class AuthModule {}

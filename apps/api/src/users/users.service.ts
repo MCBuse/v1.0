@@ -78,4 +78,35 @@ export class UsersService {
       .set({ isPhoneVerified: true })
       .where(eq(schema.users.id, userId));
   }
+
+  /** Increment failed login counter; lock account after MAX_ATTEMPTS. */
+  async recordFailedLogin(userId: string): Promise<void> {
+    const MAX_ATTEMPTS = 10;
+    const LOCK_MINUTES = 30;
+
+    const rows = await this.db
+      .select({ failedLoginAttempts: schema.users.failedLoginAttempts })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    const attempts = (rows[0]?.failedLoginAttempts ?? 0) + 1;
+    const lockedUntil =
+      attempts >= MAX_ATTEMPTS
+        ? new Date(Date.now() + LOCK_MINUTES * 60 * 1000)
+        : null;
+
+    await this.db
+      .update(schema.users)
+      .set({ failedLoginAttempts: attempts, lockedUntil })
+      .where(eq(schema.users.id, userId));
+  }
+
+  /** Reset counter and lock on successful login. */
+  async resetFailedLogins(userId: string): Promise<void> {
+    await this.db
+      .update(schema.users)
+      .set({ failedLoginAttempts: 0, lockedUntil: null })
+      .where(eq(schema.users.id, userId));
+  }
 }

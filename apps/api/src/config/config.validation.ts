@@ -113,6 +113,15 @@ export class EnvironmentVariables {
   THROTTLE_LIMIT: number;
 }
 
+const KNOWN_PLACEHOLDER_SECRETS = [
+  'change_me_in_production_min_32_chars',
+  'change_me_in_production_different_min_32_chars',
+  'change-me-in-production',
+  'your_jwt_secret_here',
+  'secret',
+  'mysecret',
+];
+
 export function validate(config: Record<string, unknown>) {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,
@@ -132,5 +141,19 @@ export function validate(config: Record<string, unknown>) {
       `Configuration validation failed:\n${messages.join('\n')}`,
     );
   }
+
+  // In production, reject known placeholder secrets that pass length checks
+  if (validatedConfig.NODE_ENV === 'production') {
+    const secretFields = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const;
+    for (const field of secretFields) {
+      const value = config[field] as string;
+      if (KNOWN_PLACEHOLDER_SECRETS.includes(value)) {
+        throw new Error(
+          `SECURITY: ${field} is set to a known placeholder value. Generate a proper secret before deploying to production.`,
+        );
+      }
+    }
+  }
+
   return validatedConfig;
 }
