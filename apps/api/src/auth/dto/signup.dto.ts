@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
+  IsNotEmpty,
   IsString,
   MinLength,
   Matches,
@@ -26,10 +27,12 @@ export class SignupDto {
 
   @ApiProperty({ example: 'Jane' })
   @IsString()
+  @IsNotEmpty()
   firstName: string;
 
   @ApiProperty({ example: 'Doe' })
   @IsString()
+  @IsNotEmpty()
   lastName: string;
 
   @ApiPropertyOptional({ example: '+447911123456' })
