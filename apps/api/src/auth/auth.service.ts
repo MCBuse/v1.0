@@ -16,6 +16,7 @@ import * as schema from '../database/schema';
 import { UsersService } from '../users/users.service';
 import type { OtpProvider } from '../otp/otp-provider.interface';
 import { OTP_PROVIDER } from '../otp/otp-provider.interface';
+import { WalletsService } from '../wallets/wallets.service';
 import { SignupDto } from './dto/signup.dto';
 
 const BCRYPT_ROUNDS = 12;
@@ -31,6 +32,7 @@ export class AuthService {
 
   constructor(
     private readonly usersService: UsersService,
+    private readonly walletsService: WalletsService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
@@ -44,6 +46,7 @@ export class AuthService {
       passwordHash,
       phone: dto.phone,
     });
+    await this.walletsService.createWalletPair(user.id);
     this.logger.log('User registered: ' + user.id);
     return this.issueTokens(user.id, user.email as string);
   }

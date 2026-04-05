@@ -11,6 +11,9 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { OtpModule } from './otp/otp.module';
+import { SolanaModule } from './solana/solana.module';
+import { WalletsModule } from './wallets/wallets.module';
+import { LedgerModule } from './ledger/ledger.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -34,6 +37,9 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     LoggingModule,
     DatabaseModule,
     HealthModule,
+    SolanaModule,
+    LedgerModule,
+    WalletsModule,
     AuthModule,
     UsersModule,
     OtpModule,

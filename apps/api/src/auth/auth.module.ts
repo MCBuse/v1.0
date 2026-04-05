@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from './guards/verified-email.guard';
 import { UsersModule } from '../users/users.module';
 import { OtpModule } from '../otp/otp.module';
+import { WalletsModule } from '../wallets/wallets.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { OtpModule } from '../otp/otp.module';
     JwtModule.register({}), // secrets injected at sign/verify time via ConfigService
     UsersModule,
     OtpModule,
+    WalletsModule,
   ],
   providers: [AuthService, JwtStrategy, LocalStrategy, JwtAuthGuard, VerifiedEmailGuard],
   controllers: [AuthController],
