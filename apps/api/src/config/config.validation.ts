@@ -39,18 +39,6 @@ export class EnvironmentVariables {
   @IsString()
   DATABASE_NAME: string;
 
-  @IsOptional()
-  @IsString()
-  JWT_SECRET?: string;
-
-  @IsOptional()
-  @IsString()
-  JWT_EXPIRATION?: string;
-
-  @IsOptional()
-  @IsString()
-  JWT_REFRESH_EXPIRATION?: string;
-
   @IsString()
   @MinLength(32)
   JWT_ACCESS_SECRET: string;
@@ -141,9 +129,7 @@ export function validate(config: Record<string, unknown>) {
         : 'unknown constraint';
       return `  - ${error.property}: ${constraints}`;
     });
-    throw new Error(
-      `Configuration validation failed:\n${messages.join('\n')}`,
-    );
+    throw new Error(`Configuration validation failed:\n${messages.join('\n')}`);
   }
 
   // In production, reject known placeholder secrets that pass length checks
