@@ -52,11 +52,14 @@ export class OffRampService {
 
     // Atomic DB transaction: deduct balance + record ledger entry
     await this.db.transaction(async (tx) => {
-      // Conditional deduct: only succeeds if available >= amount (prevents overdraft)
+      // For pending off-ramps, move funds to `pending` balance to reflect in-flight state.
+      // For completed off-ramps, reduce `available` only.
+      const isPending = result.status === 'pending';
       const deducted = await tx
         .update(schema.balances)
         .set({
           available: sql`${schema.balances.available} - ${result.amount}`,
+          ...(isPending ? { pending: sql`${schema.balances.pending} + ${result.amount}` } : {}),
         })
         .where(
           and(

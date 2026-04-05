@@ -39,6 +39,15 @@ export class SolanaTransferProvider implements TransferProvider {
     const payeePubkey = new PublicKey(params.payeePubkey);
     const mint = new PublicKey(mintAddress);
 
+    if (!payerKeypair.publicKey.equals(payerPubkey)) {
+      this.logger.error(
+        `[SolanaTransfer] Payer key mismatch: params.payerPubkey does not match decrypted keypair public key`,
+      );
+      throw new InternalServerErrorException(
+        'Payer public key does not match decrypted payer keypair',
+      );
+    }
+
     this.logger.log(
       `[SolanaTransfer] Initiating ${params.amount} ${params.currency}: ` +
       `${params.payerPubkey.slice(0, 8)}… → ${params.payeePubkey.slice(0, 8)}…`,

@@ -46,7 +46,7 @@ export class PaymentsService {
     const payerWallet = payerWalletRows[0];
     if (!payerWallet) throw new BadRequestException('Routine wallet not found');
 
-    // 3. Load payee wallet from the payment request
+    // 3. Load payee wallet from the payment request (solanaPubkey already included)
     const payeeWallet = resolved.creatorWallet;
     if (!payeeWallet) throw new BadRequestException('Payee wallet not found');
 
@@ -76,20 +76,29 @@ export class PaymentsService {
 
     if (amount <= 0n) throw new BadRequestException('Amount must be positive');
 
-    // 6. Load payee encryptedKeypair (for Solana transfer)
-    const payeeFullRows = await this.db
-      .select()
-      .from(schema.wallets)
-      .where(eq(schema.wallets.id, payeeWallet.id))
-      .limit(1);
-    const payeeFullWallet = payeeFullRows[0];
-    if (!payeeFullWallet) throw new BadRequestException('Payee wallet not found');
-
     const idempotencyKey = randomUUID();
 
-    // 7. DB transaction: atomic deduct + credit + ledger
-    let txSignature: string | null = null;
+    // 6. Execute the on-chain transfer BEFORE opening the DB transaction.
+    //    This avoids holding a DB transaction open during slow RPC calls, and ensures
+    //    that if the transfer fails we never mutate DB state at all.
+    const transferResult = await this.transferProvider.execute({
+      payerWalletId: payerWallet.id,
+      payerPubkey: payerWallet.solanaPubkey,
+      payerEncryptedKeypair: payerWallet.encryptedKeypair,
+      payeeWalletId: payeeWallet.id,
+      payeePubkey: payeeWallet.solanaPubkey,
+      amount,
+      currency,
+      idempotencyKey,
+    });
 
+    if (transferResult.status === 'failed') {
+      throw new InternalServerErrorException('Transfer failed — no DB state was mutated');
+    }
+
+    const txSignature = transferResult.txSignature;
+
+    // 7. DB transaction: atomic deduct + credit + ledger + mark payment request complete
     await this.db.transaction(async (tx) => {
       // Atomic deduct from payer (fails if insufficient)
       const deducted = await tx
@@ -108,8 +117,8 @@ export class PaymentsService {
         throw new BadRequestException('Insufficient balance');
       }
 
-      // Credit payee
-      await tx
+      // Credit payee — assert the balance row exists
+      const credited = await tx
         .update(schema.balances)
         .set({ available: sql`${schema.balances.available} + ${amount}` })
         .where(
@@ -117,25 +126,12 @@ export class PaymentsService {
             eq(schema.balances.walletId, payeeWallet.id),
             eq(schema.balances.currency, currency),
           ),
-        );
+        )
+        .returning({ id: schema.balances.id });
 
-      // Execute transfer (mock: no-op on Solana; real: SPL token transfer)
-      const result = await this.transferProvider.execute({
-        payerWalletId: payerWallet.id,
-        payerPubkey: payerWallet.solanaPubkey,
-        payerEncryptedKeypair: payerWallet.encryptedKeypair,
-        payeeWalletId: payeeWallet.id,
-        payeePubkey: payeeFullWallet.solanaPubkey,
-        amount,
-        currency,
-        idempotencyKey,
-      });
-
-      if (result.status === 'failed') {
-        throw new InternalServerErrorException('Transfer failed — transaction rolled back');
+      if (credited.length !== 1) {
+        throw new BadRequestException(`Payee balance record not found for currency ${currency}`);
       }
-
-      txSignature = result.txSignature;
 
       // Double-entry ledger
       const ledgerRows = await tx
@@ -155,12 +151,23 @@ export class PaymentsService {
 
       const ledgerEntryId = ledgerRows[0].id;
 
-      // Mark dynamic requests complete
+      // Mark dynamic requests complete — conditional to prevent race/double-complete
       if (pr.type === 'dynamic') {
-        await tx
+        const completed = await tx
           .update(schema.paymentRequests)
           .set({ status: 'completed', completedAt: new Date(), ledgerEntryId })
-          .where(eq(schema.paymentRequests.id, pr.id));
+          .where(
+            and(
+              eq(schema.paymentRequests.id, pr.id),
+              eq(schema.paymentRequests.type, 'dynamic'),
+              eq(schema.paymentRequests.status, 'pending'),
+            ),
+          )
+          .returning({ id: schema.paymentRequests.id });
+
+        if (completed.length === 0) {
+          throw new BadRequestException('Payment request is no longer pending');
+        }
       }
     });
 

@@ -79,6 +79,12 @@ export class SwapService {
       throw new BadRequestException('Swap failed at provider level');
     }
 
+    if (swapResult.status === 'pending') {
+      throw new BadRequestException(
+        'Swap is pending provider finalization and cannot be settled yet',
+      );
+    }
+
     // Atomic DB transaction: deduct source, credit target, record ledger
     await this.db.transaction(async (tx) => {
       // Deduct fromCurrency (gte guard prevents overdraft — no race condition)

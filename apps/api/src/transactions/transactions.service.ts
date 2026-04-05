@@ -1,11 +1,6 @@
-import {
-  Injectable,
-  Inject,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, or, desc, gte, lte, inArray, sql } from 'drizzle-orm';
+import { eq, and, desc, inArray, lte, or, sql, gte } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { ListTransactionsDto } from './dto/list-transactions.dto';
@@ -27,7 +22,7 @@ export class TransactionsService {
     const walletIds = await this.resolveWalletIds(userId, query.walletType);
 
     if (walletIds.length === 0) {
-      return { data: [], total: 0, limit: query.limit ?? 20, offset: query.offset ?? 0 };
+      return { data: [], limit: query.limit ?? 20, offset: query.offset ?? 0 };
     }
 
     const conditions = [
@@ -76,7 +71,7 @@ export class TransactionsService {
     const walletIds = await this.resolveWalletIds(userId, walletType);
 
     if (walletIds.length === 0) {
-      return { wallets: [], summary: {} };
+      return { summary: {} };
     }
 
     // One query: group by currency and direction
@@ -143,8 +138,16 @@ export class TransactionsService {
       solanaTxSignature: row.solanaTxSignature,
       paymentRequestId: row.paymentRequestId,
       idempotencyKey: row.idempotencyKey,
-      metadata: row.metadata ? (JSON.parse(row.metadata) as unknown) : null,
+      metadata: row.metadata ? this.safeParseJson(row.metadata) : null,
       createdAt: row.createdAt,
     };
+  }
+
+  private safeParseJson(raw: string): unknown {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return raw;
+    }
   }
 }
