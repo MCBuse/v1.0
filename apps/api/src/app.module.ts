@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
@@ -7,6 +8,13 @@ import { validate } from './config/config.validation';
 import { LoggingModule } from './logging/logging.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { OtpModule } from './otp/otp.module';
+import { SolanaModule } from './solana/solana.module';
+import { WalletsModule } from './wallets/wallets.module';
+import { LedgerModule } from './ledger/ledger.module';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -29,8 +37,20 @@ import { HealthModule } from './health/health.module';
     LoggingModule,
     DatabaseModule,
     HealthModule,
+    SolanaModule,
+    LedgerModule,
+    WalletsModule,
+    AuthModule,
+    UsersModule,
+    OtpModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}
