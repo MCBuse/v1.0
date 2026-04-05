@@ -13,8 +13,10 @@ export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
   async validate(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
 
-    // Always run bcrypt even when user not found to prevent timing attacks
-    const dummyHash = '$2b$12$invalidhashfortimingprotectiononly000000000000000000000';
+    // Always run bcrypt even when user not found to prevent timing attacks.
+    // This is a precomputed cost-12 hash of 'TIMING_PROTECTION_DUMMY'.
+    const dummyHash =
+      '$2b$12$8.IVpgqn2SK6YkloJm3W2eDHtboPy7iFg6Cxl5NXNShGBK7rfQtB2';
     const passwordHash = user?.passwordHash ?? dummyHash;
 
     if (!user || !user.isActive) {

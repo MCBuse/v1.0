@@ -1,4 +1,4 @@
-import { Injectable, Inject, ConflictException } from '@nestjs/common';
+import { Injectable, Inject, ConflictException, NotFoundException } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, isNull } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.provider';
@@ -24,6 +24,7 @@ export class UsersService {
         id: schema.users.id,
         email: schema.users.email,
         phone: schema.users.phone,
+        pendingPhone: schema.users.pendingPhone,
         firstName: schema.users.firstName,
         lastName: schema.users.lastName,
         isEmailVerified: schema.users.isEmailVerified,
@@ -80,11 +81,26 @@ export class UsersService {
     }
   }
 
-  async markPhoneVerified(userId: string) {
-    await this.db
+  async setPendingPhone(userId: string, phone: string): Promise<void> {
+    const rows = await this.db
       .update(schema.users)
-      .set({ isPhoneVerified: true })
-      .where(eq(schema.users.id, userId));
+      .set({ pendingPhone: phone })
+      .where(eq(schema.users.id, userId))
+      .returning({ id: schema.users.id });
+    if (rows.length === 0) {
+      throw new NotFoundException('User not found');
+    }
+  }
+
+  async markPhoneVerified(userId: string, phone: string): Promise<void> {
+    const rows = await this.db
+      .update(schema.users)
+      .set({ phone, isPhoneVerified: true, pendingPhone: null })
+      .where(eq(schema.users.id, userId))
+      .returning({ id: schema.users.id });
+    if (rows.length === 0) {
+      throw new NotFoundException('User not found');
+    }
   }
 
   /** Increment failed login counter; lock account after MAX_ATTEMPTS. */

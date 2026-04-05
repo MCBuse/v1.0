@@ -9,6 +9,7 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash'),
   isEmailVerified: boolean('is_email_verified').default(false).notNull(),
   isPhoneVerified: boolean('is_phone_verified').default(false).notNull(),
+  pendingPhone: varchar('pending_phone', { length: 20 }), // phone awaiting OTP verification
   isActive: boolean('is_active').default(true).notNull(),
   failedLoginAttempts: integer('failed_login_attempts').default(0).notNull(),
   lockedUntil: timestamp('locked_until'), // null = not locked

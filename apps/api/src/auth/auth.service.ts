@@ -4,6 +4,7 @@ import {
   Logger,
   UnauthorizedException,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -122,16 +123,25 @@ export class AuthService {
 
   async sendOtp(userId: string, phone: string): Promise<void> {
     const code = String(randomInt(100000, 1000000));
+    // Persist the phone being verified so verifyOtp can cross-check it
+    await this.usersService.setPendingPhone(userId, phone);
     await this.otpProvider.sendOtp(phone, code);
     this.logger.log('OTP sent to ' + phone.slice(-4) + ' for user: ' + userId);
   }
 
   async verifyOtp(userId: string, phone: string, code: string): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    if (user.pendingPhone !== phone) {
+      throw new BadRequestException('Invalid verification request');
+    }
     const valid = await this.otpProvider.verifyOtp(phone, code);
     if (!valid) {
       throw new BadRequestException('Invalid or expired OTP');
     }
-    await this.usersService.markPhoneVerified(userId);
+    await this.usersService.markPhoneVerified(userId, phone);
     this.logger.log('Phone verified for user: ' + userId);
   }
 
