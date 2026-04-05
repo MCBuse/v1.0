@@ -17,7 +17,18 @@ import { OTP_PROVIDER } from './otp-provider.interface';
         twilio: TwilioOtpProvider,
       ) => {
         const provider = config.get<string>('OTP_PROVIDER') ?? 'mock';
-        return provider === 'twilio' ? twilio : mock;
+
+        if (provider === 'twilio') {
+          return twilio;
+        }
+
+        if (provider === 'mock') {
+          return mock;
+        }
+
+        throw new Error(
+          `Invalid OTP_PROVIDER: "${provider}". Supported values are "mock" and "twilio".`,
+        );
       },
       inject: [ConfigService, MockOtpProvider, TwilioOtpProvider],
     },
