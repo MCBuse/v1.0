@@ -104,6 +104,10 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  TRANSFER_PROVIDER?: string;
+
+  @IsOptional()
+  @IsString()
   CIRCLE_API_KEY?: string;
 
   @IsNumber()
