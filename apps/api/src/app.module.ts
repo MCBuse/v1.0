@@ -17,6 +17,8 @@ import { LedgerModule } from './ledger/ledger.module';
 import { OnRampModule } from './onramp/onramp.module';
 import { PaymentRequestsModule } from './payment-requests/payment-requests.module';
 import { PaymentsModule } from './payments/payments.module';
+import { SwapModule } from './swap/swap.module';
+import { TransactionsModule } from './transactions/transactions.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -49,6 +51,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     OnRampModule,
     PaymentRequestsModule,
     PaymentsModule,
+    SwapModule,
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [
