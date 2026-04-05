@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { LocalAuthGuard } from './guards/local-auth.guard';
 import { VerifiedEmailGuard } from './guards/verified-email.guard';
 import { UsersModule } from '../users/users.module';
 import { OtpModule } from '../otp/otp.module';
@@ -21,8 +22,8 @@ import { WalletsModule } from '../wallets/wallets.module';
     OtpModule,
     WalletsModule,
   ],
-  providers: [AuthService, JwtStrategy, LocalStrategy, JwtAuthGuard, VerifiedEmailGuard],
+  providers: [AuthService, JwtStrategy, LocalStrategy, JwtAuthGuard, LocalAuthGuard, VerifiedEmailGuard],
   controllers: [AuthController],
-  exports: [JwtAuthGuard, VerifiedEmailGuard],
+  exports: [JwtAuthGuard, LocalAuthGuard, VerifiedEmailGuard],
 })
 export class AuthModule {}

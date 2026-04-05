@@ -1,4 +1,4 @@
-import { Injectable, Inject, ConflictException } from '@nestjs/common';
+import { Injectable, Inject, ConflictException, NotFoundException } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, isNull } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.provider';
@@ -24,6 +24,9 @@ export class UsersService {
         id: schema.users.id,
         email: schema.users.email,
         phone: schema.users.phone,
+        pendingPhone: schema.users.pendingPhone,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
         isEmailVerified: schema.users.isEmailVerified,
         isPhoneVerified: schema.users.isPhoneVerified,
         isActive: schema.users.isActive,
@@ -38,6 +41,8 @@ export class UsersService {
   async create(data: {
     email: string;
     passwordHash: string;
+    firstName: string;
+    lastName: string;
     phone?: string;
   }) {
     try {
@@ -46,12 +51,16 @@ export class UsersService {
         .values({
           email: data.email,
           passwordHash: data.passwordHash,
+          firstName: data.firstName,
+          lastName: data.lastName,
           phone: data.phone ?? null,
         })
         .returning({
           id: schema.users.id,
           email: schema.users.email,
           phone: schema.users.phone,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
           isEmailVerified: schema.users.isEmailVerified,
           isPhoneVerified: schema.users.isPhoneVerified,
           isActive: schema.users.isActive,
@@ -66,17 +75,32 @@ export class UsersService {
         'code' in err &&
         (err as { code: string }).code === '23505'
       ) {
-        throw new ConflictException('Email already in use');
+        throw new ConflictException('Email or phone already in use');
       }
       throw err;
     }
   }
 
-  async markPhoneVerified(userId: string) {
-    await this.db
+  async setPendingPhone(userId: string, phone: string): Promise<void> {
+    const rows = await this.db
       .update(schema.users)
-      .set({ isPhoneVerified: true })
-      .where(eq(schema.users.id, userId));
+      .set({ pendingPhone: phone })
+      .where(eq(schema.users.id, userId))
+      .returning({ id: schema.users.id });
+    if (rows.length === 0) {
+      throw new NotFoundException('User not found');
+    }
+  }
+
+  async markPhoneVerified(userId: string, phone: string): Promise<void> {
+    const rows = await this.db
+      .update(schema.users)
+      .set({ phone, isPhoneVerified: true, pendingPhone: null })
+      .where(eq(schema.users.id, userId))
+      .returning({ id: schema.users.id });
+    if (rows.length === 0) {
+      throw new NotFoundException('User not found');
+    }
   }
 
   /** Increment failed login counter; lock account after MAX_ATTEMPTS. */
