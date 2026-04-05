@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Public } from '../auth/decorators/public.decorator';
 import { DatabaseProvider } from '../database/database.provider';
 import { sql } from 'drizzle-orm';
 
@@ -8,6 +9,7 @@ import { sql } from 'drizzle-orm';
 export class HealthController {
   constructor(private readonly dbProvider: DatabaseProvider) {}
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Health check — DB connectivity, uptime, version' })
   async check() {
