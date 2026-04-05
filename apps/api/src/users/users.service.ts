@@ -85,7 +85,7 @@ export class UsersService {
     const rows = await this.db
       .update(schema.users)
       .set({ pendingPhone: phone })
-      .where(eq(schema.users.id, userId))
+      .where(and(eq(schema.users.id, userId), isNull(schema.users.deletedAt)))
       .returning({ id: schema.users.id });
     if (rows.length === 0) {
       throw new NotFoundException('User not found');
@@ -96,7 +96,7 @@ export class UsersService {
     const rows = await this.db
       .update(schema.users)
       .set({ phone, isPhoneVerified: true, pendingPhone: null })
-      .where(eq(schema.users.id, userId))
+      .where(and(eq(schema.users.id, userId), isNull(schema.users.deletedAt)))
       .returning({ id: schema.users.id });
     if (rows.length === 0) {
       throw new NotFoundException('User not found');
@@ -117,7 +117,7 @@ export class UsersService {
                               THEN NOW() + (${LOCK_MINUTES} * INTERVAL '1 minute')
                               ELSE NULL END`,
       })
-      .where(eq(schema.users.id, userId));
+      .where(and(eq(schema.users.id, userId), isNull(schema.users.deletedAt)));
   }
 
   /** Reset counter and lock on successful login. */
@@ -125,6 +125,6 @@ export class UsersService {
     await this.db
       .update(schema.users)
       .set({ failedLoginAttempts: 0, lockedUntil: null })
-      .where(eq(schema.users.id, userId));
+      .where(and(eq(schema.users.id, userId), isNull(schema.users.deletedAt)));
   }
 }

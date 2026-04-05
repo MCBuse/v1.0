@@ -49,7 +49,18 @@ export class AuthService {
       lastName: dto.lastName,
       phone: dto.phone,
     });
-    await this.walletsService.createWalletPair(user.id);
+
+    try {
+      await this.walletsService.createWalletPair(user.id);
+    } catch (error) {
+      this.logger.error(
+        'Wallet creation failed during signup, rolling back user: ' + user.id,
+        error instanceof Error ? error.stack : undefined,
+      );
+      await this.db.delete(schema.users).where(eq(schema.users.id, user.id));
+      throw error;
+    }
+
     this.logger.log('User registered: ' + user.id);
     return this.issueTokens(user.id, user.email as string);
   }

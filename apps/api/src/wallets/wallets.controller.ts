@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { WalletsService } from './wallets.service';
 import { InternalTransferDto } from './dto/internal-transfer.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -21,11 +21,16 @@ export class WalletsController {
   @Get(':type/balance')
   @ApiOperation({ summary: 'Get balance for a specific wallet type and currency' })
   @ApiParam({ name: 'type', enum: ['savings', 'routine'] })
+  @ApiQuery({ name: 'currency', enum: ['USDC', 'EURC'], required: true })
   getBalance(
     @CurrentUser() user: { id: string },
     @Param('type') type: string,
+    @Query('currency') currency: string,
   ) {
-    return this.walletsService.findByUserId(user.id).then((w) => w[type]?.balances ?? []);
+    if (!currency) {
+      throw new BadRequestException('currency query parameter is required');
+    }
+    return this.walletsService.getBalance(user.id, type, currency);
   }
 
   @Post('transfer')

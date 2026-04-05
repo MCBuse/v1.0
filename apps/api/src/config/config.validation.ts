@@ -90,9 +90,8 @@ export class EnvironmentVariables {
   @IsString()
   SOLANA_NETWORK: string;
 
-  @IsOptional()
   @IsString()
-  SOLANA_KEYPAIR_ENCRYPTION_KEY?: string;
+  SOLANA_KEYPAIR_ENCRYPTION_KEY: string;
 
   @IsString()
   ONRAMP_PROVIDER: string;
