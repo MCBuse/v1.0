@@ -39,8 +39,9 @@ export class EnvironmentVariables {
   @IsString()
   DATABASE_NAME: string;
 
+  @IsOptional()
   @IsString()
-  JWT_SECRET: string;
+  JWT_SECRET?: string;
 
   @IsOptional()
   @IsString()

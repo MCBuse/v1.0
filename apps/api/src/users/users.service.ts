@@ -1,6 +1,6 @@
 import { Injectable, Inject, ConflictException, NotFoundException } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 
@@ -103,26 +103,20 @@ export class UsersService {
     }
   }
 
-  /** Increment failed login counter; lock account after MAX_ATTEMPTS. */
+  /** Atomically increment failed login counter; lock account after MAX_ATTEMPTS. */
   async recordFailedLogin(userId: string): Promise<void> {
     const MAX_ATTEMPTS = 10;
     const LOCK_MINUTES = 30;
 
-    const rows = await this.db
-      .select({ failedLoginAttempts: schema.users.failedLoginAttempts })
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
-
-    const attempts = (rows[0]?.failedLoginAttempts ?? 0) + 1;
-    const lockedUntil =
-      attempts >= MAX_ATTEMPTS
-        ? new Date(Date.now() + LOCK_MINUTES * 60 * 1000)
-        : null;
-
+    // Single atomic UPDATE — avoids read-then-write race under concurrent logins
     await this.db
       .update(schema.users)
-      .set({ failedLoginAttempts: attempts, lockedUntil })
+      .set({
+        failedLoginAttempts: sql`${schema.users.failedLoginAttempts} + 1`,
+        lockedUntil: sql`CASE WHEN ${schema.users.failedLoginAttempts} + 1 >= ${MAX_ATTEMPTS}
+                              THEN NOW() + (${LOCK_MINUTES} * INTERVAL '1 minute')
+                              ELSE NULL END`,
+      })
       .where(eq(schema.users.id, userId));
   }
 

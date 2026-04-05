@@ -29,38 +29,40 @@ export class WalletsService {
     const savings = this.solanaService.generateKeypair();
     const routine = this.solanaService.generateKeypair();
 
-    const walletRows = await this.db
-      .insert(schema.wallets)
-      .values([
-        {
-          userId,
-          type: 'savings',
-          solanaPubkey: savings.publicKey,
-          encryptedKeypair: savings.encryptedKeypair,
-        },
-        {
-          userId,
-          type: 'routine',
-          solanaPubkey: routine.publicKey,
-          encryptedKeypair: routine.encryptedKeypair,
-        },
-      ])
-      .returning({
-        id: schema.wallets.id,
-        userId: schema.wallets.userId,
-        type: schema.wallets.type,
-        solanaPubkey: schema.wallets.solanaPubkey,
-        isActive: schema.wallets.isActive,
-        createdAt: schema.wallets.createdAt,
-      });
+    return this.db.transaction(async (tx) => {
+      const walletRows = await tx
+        .insert(schema.wallets)
+        .values([
+          {
+            userId,
+            type: 'savings',
+            solanaPubkey: savings.publicKey,
+            encryptedKeypair: savings.encryptedKeypair,
+          },
+          {
+            userId,
+            type: 'routine',
+            solanaPubkey: routine.publicKey,
+            encryptedKeypair: routine.encryptedKeypair,
+          },
+        ])
+        .returning({
+          id: schema.wallets.id,
+          userId: schema.wallets.userId,
+          type: schema.wallets.type,
+          solanaPubkey: schema.wallets.solanaPubkey,
+          isActive: schema.wallets.isActive,
+          createdAt: schema.wallets.createdAt,
+        });
 
-    // Initialise zero balances for each wallet × each currency
-    const balanceValues = walletRows.flatMap((w) =>
-      CURRENCIES.map((currency) => ({ walletId: w.id, currency })),
-    );
-    await this.db.insert(schema.balances).values(balanceValues);
+      // Initialise zero balances for each wallet × each currency
+      const balanceValues = walletRows.flatMap((w) =>
+        CURRENCIES.map((currency) => ({ walletId: w.id, currency })),
+      );
+      await tx.insert(schema.balances).values(balanceValues);
 
-    return walletRows;
+      return walletRows;
+    });
   }
 
   /** Return both wallets (with balances) for a user. Never returns encryptedKeypair. */
