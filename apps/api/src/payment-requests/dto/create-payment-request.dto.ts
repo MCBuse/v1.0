@@ -20,13 +20,13 @@ export class CreatePaymentRequestDto {
     description: 'Required for dynamic. Amount in base units (6 decimals). E.g. "5000000" = 5 USDC',
     example: '5000000',
   })
-  @ValidateIf((o) => o.type === 'dynamic')
+  @ValidateIf((o) => o.type === 'dynamic' || o.amount !== undefined)
   @IsString()
   @Matches(/^\d+$/, { message: 'amount must be a non-negative integer string' })
   amount?: string;
 
   @ApiPropertyOptional({ enum: ['USDC', 'EURC'], example: 'USDC' })
-  @ValidateIf((o) => o.type === 'dynamic')
+  @ValidateIf((o) => o.type === 'dynamic' || o.currency !== undefined)
   @IsIn(['USDC', 'EURC'])
   currency?: string;
 

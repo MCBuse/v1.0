@@ -8,6 +8,7 @@ import type { OnRampProvider, OnRampParams, OnRampResult } from '../onramp-provi
  */
 @Injectable()
 export class MockOnRampProvider implements OnRampProvider {
+  readonly providerName = 'mock';
   private readonly logger = new Logger(MockOnRampProvider.name);
 
   async initiateOnRamp(params: OnRampParams): Promise<OnRampResult> {

@@ -14,6 +14,7 @@ export interface OnRampResult {
 }
 
 export interface OnRampProvider {
+  readonly providerName: string;
   initiateOnRamp(params: OnRampParams): Promise<OnRampResult>;
 }
 
