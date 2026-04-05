@@ -14,6 +14,8 @@ import { OtpModule } from './otp/otp.module';
 import { SolanaModule } from './solana/solana.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { LedgerModule } from './ledger/ledger.module';
+import { OnRampModule } from './onramp/onramp.module';
+import { PaymentRequestsModule } from './payment-requests/payment-requests.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -43,6 +45,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     AuthModule,
     UsersModule,
     OtpModule,
+    OnRampModule,
+    PaymentRequestsModule,
   ],
   controllers: [AppController],
   providers: [
