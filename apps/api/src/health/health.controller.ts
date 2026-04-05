@@ -1,13 +1,16 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
-import { DatabaseProvider } from '../database/database.provider';
+import * as databaseProvider from '../database/database.provider';
 import { sql } from 'drizzle-orm';
 
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
-  constructor(private readonly dbProvider: DatabaseProvider) {}
+  constructor(
+    @Inject(databaseProvider.DRIZZLE)
+    private readonly db: databaseProvider.DrizzleDB,
+  ) {}
 
   @Public()
   @Get()
@@ -15,7 +18,7 @@ export class HealthController {
   async check() {
     let dbStatus = 'ok';
     try {
-      await this.dbProvider.getDb().execute(sql`SELECT 1`);
+      await this.db.execute(sql`SELECT 1`);
     } catch {
       dbStatus = 'error';
     }
