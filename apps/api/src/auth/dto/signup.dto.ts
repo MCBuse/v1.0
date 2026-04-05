@@ -24,6 +24,14 @@ export class SignupDto {
   })
   password: string;
 
+  @ApiProperty({ example: 'Jane' })
+  @IsString()
+  firstName: string;
+
+  @ApiProperty({ example: 'Doe' })
+  @IsString()
+  lastName: string;
+
   @ApiPropertyOptional({ example: '+447911123456' })
   @IsOptional()
   @IsString()

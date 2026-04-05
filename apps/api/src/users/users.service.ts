@@ -24,6 +24,8 @@ export class UsersService {
         id: schema.users.id,
         email: schema.users.email,
         phone: schema.users.phone,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
         isEmailVerified: schema.users.isEmailVerified,
         isPhoneVerified: schema.users.isPhoneVerified,
         isActive: schema.users.isActive,
@@ -38,6 +40,8 @@ export class UsersService {
   async create(data: {
     email: string;
     passwordHash: string;
+    firstName: string;
+    lastName: string;
     phone?: string;
   }) {
     try {
@@ -46,12 +50,16 @@ export class UsersService {
         .values({
           email: data.email,
           passwordHash: data.passwordHash,
+          firstName: data.firstName,
+          lastName: data.lastName,
           phone: data.phone ?? null,
         })
         .returning({
           id: schema.users.id,
           email: schema.users.email,
           phone: schema.users.phone,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
           isEmailVerified: schema.users.isEmailVerified,
           isPhoneVerified: schema.users.isPhoneVerified,
           isActive: schema.users.isActive,

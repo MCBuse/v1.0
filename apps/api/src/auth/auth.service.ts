@@ -42,6 +42,8 @@ export class AuthService {
     const user = await this.usersService.create({
       email: dto.email,
       passwordHash,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
       phone: dto.phone,
     });
     this.logger.log('User registered: ' + user.id);
