@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MinLength,
   validateSync,
 } from 'class-validator';
 
@@ -48,6 +49,39 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   JWT_REFRESH_EXPIRATION?: string;
+
+  @IsString()
+  @MinLength(32)
+  JWT_ACCESS_SECRET: string;
+
+  @IsString()
+  @MinLength(32)
+  JWT_REFRESH_SECRET: string;
+
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_EXPIRES_IN: string = '15m';
+
+  @IsString()
+  @IsOptional()
+  JWT_REFRESH_EXPIRES_IN: string = '7d';
+
+  @IsString()
+  @IsOptional()
+  OTP_PROVIDER: string = 'mock';
+
+  // Twilio vars — only required when OTP_PROVIDER=twilio
+  @IsString()
+  @IsOptional()
+  TWILIO_ACCOUNT_SID?: string;
+
+  @IsString()
+  @IsOptional()
+  TWILIO_AUTH_TOKEN?: string;
+
+  @IsString()
+  @IsOptional()
+  TWILIO_VERIFY_SERVICE_SID?: string;
 
   @IsString()
   SOLANA_RPC_URL: string;
