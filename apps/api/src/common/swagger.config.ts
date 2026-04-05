@@ -22,6 +22,7 @@ export function setupSwagger(app: INestApplication): void {
     .addTag('health', 'Service health and status')
     .addTag('auth', 'Authentication — signup, login, token refresh')
     .addTag('wallets', 'Wallet management and balances')
+    .addTag('onramp', 'Fiat → stablecoin on-ramp (fund savings wallet)')
     .addTag('transfers', 'Internal transfers between savings and routine wallets')
     .addTag('payment-requests', 'QR payment request creation and management')
     .addTag('payments', 'P2P payment execution')
