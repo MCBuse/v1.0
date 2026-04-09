@@ -13,6 +13,7 @@
     "**/*.tsx",
     "next-env.d.ts",
     "next.config.js",
+    "svg.d.ts",
     ".next/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
