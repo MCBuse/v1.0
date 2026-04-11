@@ -1,9 +1,9 @@
 import { useTheme } from '@shopify/restyle';
 import { Tabs } from 'expo-router';
+import { Clock, Home2, ProfileCircle } from 'iconsax-react-native';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { Icon } from '@/components/ui';
 import type { Theme } from '@/theme';
 
 export default function TabLayout() {
@@ -32,7 +32,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => (
-            <Icon name="home" size={24} color={color} />
+            <Home2 size={24} color={color} variant="Linear" />
           ),
         }}
       />
@@ -41,7 +41,7 @@ export default function TabLayout() {
         options={{
           title: 'Activity',
           tabBarIcon: ({ color }) => (
-            <Icon name="time" size={24} color={color} />
+            <Clock size={24} color={color} variant="Linear" />
           ),
         }}
       />
@@ -50,7 +50,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => (
-            <Icon name="user-circle" size={24} color={color} />
+            <ProfileCircle size={24} color={color} variant="Linear" />
           ),
         }}
       />

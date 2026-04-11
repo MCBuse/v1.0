@@ -1,5 +1,6 @@
 import { useTheme } from "@shopify/restyle";
 import { router } from "expo-router";
+import { ArrowSwapHorizontal, Scan, Wallet3 } from "iconsax-react-native";
 import React, { useRef, useState } from "react";
 import {
   Pressable,
@@ -17,21 +18,21 @@ import { useAppStore } from "@/store/app-store";
 
 const SLIDES: SlideData[] = [
   {
-    icon: "transaction",
+    Icon: ArrowSwapHorizontal,
     accentColor: "brand",
     title: "Send & receive instantly",
     description:
       "Transfer money to anyone in seconds, powered by Solana. Zero waiting, zero friction.",
   },
   {
-    icon: "scan",
+    Icon: Scan,
     accentColor: "brand",
     title: "Tap or scan to pay",
     description:
       "Pay with a QR code scan or NFC tap. No card needed — just your phone.",
   },
   {
-    icon: "wallet",
+    Icon: Wallet3,
     accentColor: "brand",
     title: "Your wallet, your money",
     description:

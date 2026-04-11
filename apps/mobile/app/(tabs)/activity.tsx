@@ -1,10 +1,10 @@
 import { useTheme } from '@shopify/restyle';
+import { Clock } from 'iconsax-react-native';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Theme } from '@/theme';
 import { Box, Text } from '@/components/ui';
-import { Icon } from '@/components/ui';
 
 export default function ActivityScreen() {
   const { colors } = useTheme<Theme>();
@@ -27,7 +27,7 @@ export default function ActivityScreen() {
         alignItems="center"
         justifyContent="center"
       >
-        <Icon name="time" size={28} color={colors.textTertiary} />
+        <Clock size={28} color={colors.textTertiary} variant="Linear" />
       </Box>
       <Box alignItems="center" gap="xs">
         <Text variant="h3">Activity</Text>

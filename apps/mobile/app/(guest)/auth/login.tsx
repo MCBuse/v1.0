@@ -14,9 +14,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { LoginFormValues } from '@/lib/validation/auth';
 import { loginSchema } from '@/lib/validation/auth';
+import { Eye, EyeSlash } from 'iconsax-react-native';
+
 import type { Theme } from '@/theme';
 import { Box, Button, Input, Text } from '@/components/ui';
-import { Icon } from '@/components/ui';
 
 type Mode = 'email' | 'phone';
 
@@ -136,11 +137,10 @@ export default function LoginScreen() {
                 error={errors.password?.message}
                 suffix={
                   <Pressable onPress={() => setShowPassword((v) => !v)}>
-                    <Icon
-                      name={showPassword ? 'eye-off' : 'eye'}
-                      size={20}
-                      color={colors.textTertiary}
-                    />
+                    {showPassword
+                      ? <EyeSlash size={20} color={colors.textTertiary} variant="Linear" />
+                      : <Eye     size={20} color={colors.textTertiary} variant="Linear" />
+                    }
                   </Pressable>
                 }
               />

@@ -1,13 +1,13 @@
 import { useTheme } from "@shopify/restyle";
+import type { Icon as IconType } from "iconsax-react-native";
 import React from "react";
 import { StyleSheet, type ViewStyle } from "react-native";
 
 import type { Theme } from "@/theme";
-import type { IconName } from "@repo/icons";
-import { Box, Icon, Text } from "@/components/ui";
+import { Box, Text } from "@/components/ui";
 
 export interface SlideData {
-  icon: IconName;
+  Icon: IconType;
   accentColor?: keyof Theme["colors"];
   title: string;
   description: string;
@@ -18,7 +18,7 @@ interface OnboardingSlideProps extends SlideData {
 }
 
 export function OnboardingSlide({
-  icon,
+  Icon,
   accentColor = "bgInverse",
   title,
   description,
@@ -36,7 +36,7 @@ export function OnboardingSlide({
             { backgroundColor: colors[accentColor] as string },
           ]}
         >
-          <Icon name={icon} size={52} color={colors.textInverse} />
+          <Icon size={52} color={colors.textInverse} variant="Linear" />
         </Box>
       </Box>
 

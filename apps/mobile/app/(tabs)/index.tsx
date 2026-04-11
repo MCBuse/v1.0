@@ -1,22 +1,32 @@
 import { useTheme } from "@shopify/restyle";
+import {
+  AddCircle,
+  ArrowCircleDown,
+  ArrowSwapHorizontal,
+  Notification,
+  Scan,
+  Send2,
+  Wallet3,
+  Wifi,
+  type Icon as IconType,
+} from "iconsax-react-native";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Theme } from "@/theme";
 import { Box, Text } from "@/components/ui";
-import { Icon } from "@/components/ui";
 
 type QuickAction = {
-  icon: "arrow-send" | "circle-arrow-down" | "scan" | "plus-circle";
+  Icon: IconType;
   label: string;
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { icon: "arrow-send", label: "Send" },
-  { icon: "circle-arrow-down", label: "Receive" },
-  { icon: "scan", label: "Scan" },
-  { icon: "plus-circle", label: "Top Up" },
+  { Icon: Send2,           label: "Send"    },
+  { Icon: ArrowCircleDown, label: "Receive" },
+  { Icon: Scan,            label: "Scan"    },
+  { Icon: AddCircle,       label: "Top Up"  },
 ];
 
 export default function HomeScreen() {
@@ -51,7 +61,7 @@ export default function HomeScreen() {
           <Pressable
             style={[styles.iconBtn, { backgroundColor: colors.bgSecondary }]}
           >
-            <Icon name="notification" size={20} color={colors.textPrimary} />
+            <Notification size={20} color={colors.textPrimary} variant="Linear" />
           </Pressable>
           <Box
             width={36}
@@ -88,7 +98,7 @@ export default function HomeScreen() {
           </Text>
 
           <Box flexDirection="row" alignItems="center" gap="xs" marginTop="s">
-            <Icon name="network" size={14} color="rgba(255,255,255,0.5)" />
+            <Wifi size={14} color="rgba(255,255,255,0.5)" variant="Linear" />
             <Text variant="caption" style={styles.dimText}>
               Solana Mainnet
             </Text>
@@ -101,7 +111,7 @@ export default function HomeScreen() {
             marginTop="xl"
             style={styles.addressPill}
           >
-            <Icon name="wallet" size={14} color="rgba(255,255,255,0.6)" />
+            <Wallet3 size={14} color="rgba(255,255,255,0.6)" variant="Linear" />
             <Text variant="caption" style={styles.dimText}>
               Not connected
             </Text>
@@ -124,7 +134,7 @@ export default function HomeScreen() {
                 { backgroundColor: colors.bgSecondary },
               ]}
             >
-              <Icon name={action.icon} size={22} color={colors.textPrimary} />
+              <action.Icon size={22} color={colors.textPrimary} variant="Linear" />
             </Pressable>
             <Text variant="label" color="textSecondary">
               {action.label}
@@ -161,7 +171,7 @@ export default function HomeScreen() {
             alignItems="center"
             justifyContent="center"
           >
-            <Icon name="transaction" size={24} color={colors.textTertiary} />
+            <ArrowSwapHorizontal size={24} color={colors.textTertiary} variant="Linear" />
           </Box>
           <Box alignItems="center" gap="xs">
             <Text variant="bodyMedium">No transactions yet</Text>
