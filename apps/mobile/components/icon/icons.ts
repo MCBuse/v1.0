@@ -20,7 +20,7 @@ import SettingIcon from "@repo/icons/assets/setting/settings-cog.svg";
 import NotificationIcon from "@repo/icons/assets/notification/bell-notifications.svg";
 import NotificationDotIcon from "@repo/icons/assets/notification/bell-notifications-dot.svg";
 import TimeIcon from "@repo/icons/assets/time/clock-time-arrow.svg";
-import BookmarkIcon from "@repo/icons/assets/bookmark/bookmark.svg";
+import BookmarkIcon from "@repo/icons/assets/bookmark/save-bookmark.svg";
 
 // ── Arrows ───────────────────────────────────────────────────────────────────
 import ArrowLeftIcon from "@repo/icons/assets/arrow/arrow-left.svg";
@@ -62,18 +62,18 @@ import CrossIcon from "@repo/icons/assets/cross/cross-remove-close.svg";
 import CrossCircleIcon from "@repo/icons/assets/cross/cross-circle-remove-close.svg";
 import CheckIcon from "@repo/icons/assets/check/checkmark.svg";
 import CheckCircleIcon from "@repo/icons/assets/check/check-circle.svg";
-import EditIcon from "@repo/icons/assets/edit/edit-pencil.svg";
-import DeleteIcon from "@repo/icons/assets/delete/delete-trash.svg";
+import EditIcon from "@repo/icons/assets/edit/edit-pen.svg";
+import DeleteIcon from "@repo/icons/assets/delete/delete-remove-cross.svg";
 import ShareIcon from "@repo/icons/assets/share/share.svg";
 import DownloadIcon from "@repo/icons/assets/download/download.svg";
 import FilterIcon from "@repo/icons/assets/filter.svg";
 import FlagIcon from "@repo/icons/assets/flag.svg";
 
 // ── Communication ─────────────────────────────────────────────────────────────
-import MessageIcon from "@repo/icons/assets/message/message-chat.svg";
-import EnvelopeIcon from "@repo/icons/assets/envelope/envelope-email.svg";
-import PhoneIcon from "@repo/icons/assets/phone/phone.svg";
-import SupportIcon from "@repo/icons/assets/support/support-headset.svg";
+import MessageIcon from "@repo/icons/assets/message/chat-messages-bubble-plain.svg";
+import EnvelopeIcon from "@repo/icons/assets/envelope/email-mail-envelope.svg";
+import PhoneIcon from "@repo/icons/assets/phone/phone-call-plain.svg";
+import SupportIcon from "@repo/icons/assets/support/headphone-customer-support.svg";
 
 // ── Security & Identity ───────────────────────────────────────────────────────
 import ShieldIcon from "@repo/icons/assets/security/shield-protection-secure-check.svg";
@@ -84,19 +84,19 @@ import FaceIdIcon from "@repo/icons/assets/security/face-id-bio.svg";
 import KeyIcon from "@repo/icons/assets/security/key-simple.svg";
 import EyeIcon from "@repo/icons/assets/eye/eye-open-show-visible.svg";
 import EyeOffIcon from "@repo/icons/assets/eye/eye-closed-remove.svg";
-import IdIcon from "@repo/icons/assets/id/id-card.svg";
+import IdIcon from "@repo/icons/assets/id/batch.svg";
 
 // ── Scanning & Connectivity ───────────────────────────────────────────────────
-import ScanIcon from "@repo/icons/assets/scan/scan-qr-code.svg";
-import NfcIcon from "@repo/icons/assets/nfc/nfc-signal.svg";
-import NetworkIcon from "@repo/icons/assets/network/network-wifi.svg";
+import ScanIcon from "@repo/icons/assets/scan/shopping-ecommerce-qr.svg";
+import NfcIcon from "@repo/icons/assets/nfc/signals.svg";
+import NetworkIcon from "@repo/icons/assets/network/wifi-network-internet.svg";
 import LinkIcon from "@repo/icons/assets/link/link.svg";
 
 // ── Status & Feedback ─────────────────────────────────────────────────────────
 import InfoIcon from "@repo/icons/assets/info/info-circle.svg";
 import WarningIcon from "@repo/icons/assets/warning/warning-triangle.svg";
-import QuestionIcon from "@repo/icons/assets/question/question-circle.svg";
-import ForbidIcon from "@repo/icons/assets/forbid/forbid-circle.svg";
+import QuestionIcon from "@repo/icons/assets/question/ask-circle.svg";
+import ForbidIcon from "@repo/icons/assets/forbid/forbidden-remove-circle.svg";
 import TargetIcon from "@repo/icons/assets/target/target.svg";
 
 // ── Analytics & Reporting ─────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ import ReportIcon from "@repo/icons/assets/report/doc-page-paper.svg";
 import LogOutIcon from "@repo/icons/assets/log/logout-arrow.svg";
 
 // ── Misc ──────────────────────────────────────────────────────────────────────
-import CalendarIcon from "@repo/icons/assets/calendar/calendar.svg";
+import CalendarIcon from "@repo/icons/assets/calendar/calendar-schedule.svg";
 import LocationIcon from "@repo/icons/assets/location/location-pin.svg";
 import CloudIcon from "@repo/icons/assets/cloud/cloud-storage.svg";
 import DeviceIcon from "@repo/icons/assets/device/mobile-phone.svg";
