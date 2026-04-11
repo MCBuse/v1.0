@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "MCBuse",
+    "slug": "mcbuse",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "mcbuse",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.f-o-nyarko.mobile"
+      "bundleIdentifier": "com.f-o-nyarko.mcbuse"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +21,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.f_o_nyarko.mobile"
+      "package": "com.f_o_nyarko.mcbuse"
     },
     "web": {
       "output": "static",
