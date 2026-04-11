@@ -13,6 +13,7 @@ import type { Theme } from "@/theme";
 import type { SlideData } from "@/components/auth/OnboardingSlide";
 import { OnboardingSlide } from "@/components/auth/OnboardingSlide";
 import { Box, Button, Text } from "@/components/ui";
+import { useAppStore } from "@/store/app-store";
 
 const SLIDES: SlideData[] = [
   {
@@ -24,7 +25,7 @@ const SLIDES: SlideData[] = [
   },
   {
     icon: "scan",
-    accentColor: "bgInverse",
+    accentColor: "brand",
     title: "Tap or scan to pay",
     description:
       "Pay with a QR code scan or NFC tap. No card needed — just your phone.",
@@ -44,12 +45,18 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const setHasSeenOnboarding = useAppStore((s) => s.setHasSeenOnboarding);
 
   const isLast = activeIndex === SLIDES.length - 1;
 
+  const finishOnboarding = () => {
+    setHasSeenOnboarding(true);
+    router.replace("/(guest)/auth");
+  };
+
   const goToNext = () => {
     if (isLast) {
-      router.replace("/(guest)/auth");
+      finishOnboarding();
     } else {
       const next = activeIndex + 1;
       scrollRef.current?.scrollTo({ x: next * width, animated: true });
@@ -71,7 +78,7 @@ export default function OnboardingScreen() {
       {/* Skip */}
       {!isLast && (
         <Box alignItems="flex-end" paddingHorizontal="2xl" paddingTop="l">
-          <Pressable onPress={() => router.replace("/(guest)/auth")}>
+          <Pressable onPress={finishOnboarding}>
             <Text variant="bodyMedium" color="textSecondary">
               Skip
             </Text>
@@ -118,7 +125,7 @@ export default function OnboardingScreen() {
 
         <Button
           label={isLast ? "Get Started" : "Next"}
-          variant={isLast ? "primaryGreen" : "primary"}
+          variant="primary"
           onPress={goToNext}
         />
       </Box>

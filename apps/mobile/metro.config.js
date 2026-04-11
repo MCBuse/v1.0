@@ -8,6 +8,15 @@ module.exports = (() => {
     config.transformer = {
         ...transformer,
         babelTransformerPath: require.resolve("react-native-svg-transformer/expo"),
+        // Convert hardcoded white fills → currentColor so the Icon `color` prop works.
+        svgoConfig: {
+            plugins: [
+                {
+                    name: 'convertColors',
+                    params: { currentColor: /^(white|#fff|#ffffff|#FFF|#FFFFFF)$/ },
+                },
+            ],
+        },
     };
     config.resolver = {
         ...resolver,

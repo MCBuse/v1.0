@@ -9,7 +9,7 @@ interface IconProps extends Omit<SvgProps, 'width' | 'height'> {
   color?: string;
 }
 
-export function Icon({ name, size = 24, color, ...props }: IconProps) {
+export function Icon({ name, size = 24, color = '#000000', ...props }: IconProps) {
   const SvgIcon = icons[name] as React.ComponentType<SvgProps>;
   return <SvgIcon width={size} height={size} color={color} {...props} />;
 }

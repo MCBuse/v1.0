@@ -1,25 +1,48 @@
 import { ThemeProvider as RestyleProvider } from '@shopify/restyle';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import {
+  IBMPlexSans_400Regular,
+  IBMPlexSans_500Medium,
+  IBMPlexSans_600SemiBold,
+  IBMPlexSans_700Bold,
+} from '@expo-google-fonts/ibm-plex-sans';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { theme, darkTheme } from '@/theme';
 
-// App starts at (guest) so users see onboarding → auth before the main tabs
-export const unstable_settings = {
-  anchor: '(guest)',
-};
+// Hold the splash until fonts are ready
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
+  const [fontsLoaded] = useFonts({
+    IBMPlexSans_400Regular,
+    IBMPlexSans_500Medium,
+    IBMPlexSans_600SemiBold,
+    IBMPlexSans_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
+
+  // Keep splash visible while fonts load
+  if (!fontsLoaded) return null;
+
   return (
     <RestyleProvider theme={isDark ? darkTheme : theme}>
       <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
         <Stack>
+          {/* index.tsx handles the boot redirect */}
+          <Stack.Screen name="index"   options={{ headerShown: false }} />
           <Stack.Screen name="(guest)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)"  options={{ headerShown: false }} />
           <Stack.Screen name="modal"   options={{ presentation: 'modal', title: 'Modal' }} />

@@ -1,21 +1,21 @@
 import { createTheme } from '@shopify/restyle';
-import { palette } from './tokens';
+import { fonts, palette } from './tokens';
 
 const theme = createTheme({
   // ── Colors ────────────────────────────────────────────────────────────────
   colors: {
-    // Brand
-    brand:          palette.green,
-    brandDark:      palette.greenDark,
-    brandLight:     palette.greenLight,
-    brandMuted:     palette.greenMuted,
+    // Brand — black/white/gray only
+    brand:          palette.black,
+    brandDark:      palette.gray900,
+    brandLight:     palette.gray100,
+    brandMuted:     'rgba(0,0,0,0.08)',
 
     // Backgrounds
     bgPrimary:      palette.white,
     bgSecondary:    palette.gray50,
     bgTertiary:     palette.gray100,
     bgInverse:      palette.black,
-    bgBrand:        palette.green,
+    bgBrand:        palette.black,
     bgOverlay:      palette.overlay,
 
     // Text
@@ -23,7 +23,7 @@ const theme = createTheme({
     textSecondary:  palette.gray600,
     textTertiary:   palette.gray400,
     textInverse:    palette.white,
-    textBrand:      palette.green,
+    textBrand:      palette.black,
     textDisabled:   palette.gray400,
     textLink:       palette.black,
 
@@ -31,31 +31,31 @@ const theme = createTheme({
     borderDefault:  palette.gray200,
     borderStrong:   palette.black,
     borderFocus:    palette.black,
-    borderBrand:    palette.green,
+    borderBrand:    palette.black,
 
     // Interactive
-    btnPrimary:     palette.black,
-    btnPrimaryText: palette.white,
-    btnBrand:       palette.green,
-    btnBrandText:   palette.black,
-    btnSecondary:   palette.gray50,
+    btnPrimary:      palette.black,
+    btnPrimaryText:  palette.white,
+    btnBrand:        palette.black,
+    btnBrandText:    palette.white,
+    btnSecondary:    palette.gray50,
     btnSecondaryText: palette.black,
-    btnDisabled:    palette.gray100,
+    btnDisabled:     palette.gray100,
     btnDisabledText: palette.gray400,
 
-    // Status
-    success:  palette.green,
+    // Status — keep semantic colors for error/warning/info; success uses black
+    success:  palette.black,
     error:    palette.red,
     warning:  palette.orange,
     info:     palette.blue,
 
-    // Numpad (the full-screen green payment screen)
-    numpadBg:       palette.green,
-    numpadText:     palette.black,
-    numpadKeyBg:    palette.numpadKey,
-    numpadBtnBg:    'rgba(0,0,0,0.12)',
-    numpadPayBg:    palette.black,
-    numpadPayText:  palette.white,
+    // Numpad — black background, white keys
+    numpadBg:      palette.black,
+    numpadText:    palette.white,
+    numpadKeyBg:   palette.numpadKeyDark,  // rgba(255,255,255,0.15) on black bg
+    numpadBtnBg:   'rgba(255,255,255,0.12)',
+    numpadPayBg:   palette.white,
+    numpadPayText: palette.black,
 
     // Misc
     transparent:    palette.transparent,
@@ -91,16 +91,19 @@ const theme = createTheme({
     full:  9999,
   },
 
-  // ── Text Variants ─────────────────────────────────────────────────────────
+  // ── Text Variants — IBM Plex Sans ─────────────────────────────────────────
+  // fontFamily encodes the weight. Never combine with fontWeight on iOS —
+  // the OS picks the variant from the family name, not the numeric weight.
   textVariants: {
     defaults: {
-      color: 'textPrimary',
+      fontFamily: fonts.regular,
+      color:      'textPrimary',
     },
 
     // Large display number — used in NumPad
     display: {
+      fontFamily:    fonts.bold,
       fontSize:      52,
-      fontWeight:    '700',
       lineHeight:    56,
       letterSpacing: -1,
       color:         'textPrimary',
@@ -108,76 +111,73 @@ const theme = createTheme({
 
     // Page headlines
     h1: {
+      fontFamily:    fonts.bold,
       fontSize:      28,
-      fontWeight:    '700',
       lineHeight:    34,
       letterSpacing: -0.3,
       color:         'textPrimary',
     },
     h2: {
+      fontFamily:    fonts.semibold,
       fontSize:      22,
-      fontWeight:    '600',
       lineHeight:    28,
       letterSpacing: -0.2,
       color:         'textPrimary',
     },
     h3: {
-      fontSize:      18,
-      fontWeight:    '600',
-      lineHeight:    24,
-      color:         'textPrimary',
-    },
-
-    // Body
-    body: {
-      fontSize:   16,
-      fontWeight: '400',
-      lineHeight: 22,
+      fontFamily: fonts.semibold,
+      fontSize:   18,
+      lineHeight: 24,
       color:      'textPrimary',
     },
+
+    // Body — regular inherited from defaults
+    body: {
+      fontSize:  16,
+      lineHeight: 22,
+      color:     'textPrimary',
+    },
     bodyMedium: {
+      fontFamily: fonts.medium,
       fontSize:   16,
-      fontWeight: '500',
       lineHeight: 22,
       color:      'textPrimary',
     },
     bodySemibold: {
+      fontFamily: fonts.semibold,
       fontSize:   16,
-      fontWeight: '600',
       lineHeight: 22,
       color:      'textPrimary',
     },
 
-    // Small text
+    // Small text — regular inherited from defaults
     caption: {
-      fontSize:   13,
-      fontWeight: '400',
+      fontSize:  13,
       lineHeight: 18,
-      color:      'textSecondary',
+      color:     'textSecondary',
     },
     captionMedium: {
+      fontFamily: fonts.medium,
       fontSize:   13,
-      fontWeight: '500',
       lineHeight: 18,
       color:      'textSecondary',
     },
 
     // Tab bar, badges, labels
     label: {
+      fontFamily:    fonts.medium,
       fontSize:      11,
-      fontWeight:    '500',
       lineHeight:    13,
       letterSpacing: 0.1,
       color:         'textSecondary',
     },
 
-    // Underlined links
+    // Underlined links — regular inherited from defaults
     link: {
-      fontSize:            16,
-      fontWeight:          '400',
-      lineHeight:          22,
-      textDecorationLine:  'underline',
-      color:               'textLink',
+      fontSize:           16,
+      lineHeight:         22,
+      textDecorationLine: 'underline',
+      color:              'textLink',
     },
   },
 });

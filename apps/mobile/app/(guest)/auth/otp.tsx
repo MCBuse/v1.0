@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Theme } from '@/theme';
 import { OtpInput } from '@/components/auth/OtpInput';
 import { Box, Button, Text } from '@/components/ui';
+import { useAppStore } from '@/store/app-store';
 
 const RESEND_SECONDS = 60;
 
@@ -17,6 +18,8 @@ export default function OtpScreen() {
     identifier: string;
     flow: 'login' | 'register';
   }>();
+
+  const setIsAuthenticated = useAppStore((s) => s.setIsAuthenticated);
 
   const [code, setCode]           = useState('');
   const [error, setError]         = useState(false);
@@ -41,10 +44,10 @@ export default function OtpScreen() {
 
   const handleVerify = useCallback(() => {
     if (code.length < 6) return;
-    // TODO: verify code via API
-    // On success, navigate to the app
+    // Dummy auth — any 6-digit code succeeds
+    setIsAuthenticated(true);
     router.replace('/(tabs)');
-  }, [code]);
+  }, [code, setIsAuthenticated]);
 
   // Auto-verify when all 6 digits entered
   useEffect(() => {

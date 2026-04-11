@@ -1,11 +1,21 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Controller, useForm } from 'react-hook-form';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { LoginFormValues } from '@/lib/validation/auth';
+import { loginSchema } from '@/lib/validation/auth';
 import type { Theme } from '@/theme';
-import { Box, Button, Divider, Input, Text } from '@/components/ui';
+import { Box, Button, Input, Text } from '@/components/ui';
 import { Icon } from '@/components/ui';
 
 type Mode = 'email' | 'phone';
@@ -13,21 +23,31 @@ type Mode = 'email' | 'phone';
 export default function LoginScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
-
-  const [mode, setMode]           = useState<Mode>('email');
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword]   = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const isEmail = mode === 'email';
-  const canSubmit = identifier.trim().length > 0 && password.length >= 6;
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isValid },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { mode: 'email', identifier: '', password: '' },
+    mode: 'onBlur',
+  });
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
-    // Navigate to OTP — pass identifier so OTP screen knows where to send code
+  const mode = watch('mode');
+
+  const switchMode = (m: Mode) => {
+    setValue('mode', m, { shouldValidate: false });
+    setValue('identifier', '', { shouldValidate: false });
+  };
+
+  const onSubmit = (data: LoginFormValues) => {
     router.push({
       pathname: '/(guest)/auth/otp',
-      params: { identifier, flow: 'login' },
+      params: { identifier: data.identifier, flow: 'login' },
     });
   };
 
@@ -37,10 +57,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingBottom: insets.bottom + 24 },
-        ]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -63,19 +80,16 @@ export default function LoginScreen() {
           {(['email', 'phone'] as Mode[]).map((m) => (
             <Pressable
               key={m}
-              onPress={() => { setMode(m); setIdentifier(''); }}
+              onPress={() => switchMode(m)}
               style={[
                 styles.toggle,
-                {
-                  backgroundColor:
-                    mode === m ? colors.bgPrimary : colors.transparent,
-                },
+                { backgroundColor: mode === m ? colors.bgPrimary : colors.transparent },
               ]}
             >
               <Text
                 variant="captionMedium"
                 style={{
-                  color: mode === m ? colors.textPrimary : colors.textSecondary,
+                  color:      mode === m ? colors.textPrimary : colors.textSecondary,
                   fontWeight: mode === m ? '600' : '400',
                 }}
               >
@@ -87,34 +101,50 @@ export default function LoginScreen() {
 
         {/* Fields */}
         <Box gap="m">
-          <Input
-            label={isEmail ? 'Email address' : 'Phone number'}
-            placeholder={isEmail ? 'you@example.com' : '+1 555 000 0000'}
-            value={identifier}
-            onChangeText={setIdentifier}
-            keyboardType={isEmail ? 'email-address' : 'phone-pad'}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="next"
+          <Controller
+            control={control}
+            name="identifier"
+            render={({ field }) => (
+              <Input
+                label={mode === 'email' ? 'Email address' : 'Phone number'}
+                placeholder={mode === 'email' ? 'you@example.com' : '+1 555 000 0000'}
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                keyboardType={mode === 'email' ? 'email-address' : 'phone-pad'}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="next"
+                error={errors.identifier?.message}
+              />
+            )}
           />
 
-          <Input
-            label="Password"
-            placeholder="Min. 6 characters"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            returnKeyType="done"
-            onSubmitEditing={handleSubmit}
-            suffix={
-              <Pressable onPress={() => setShowPassword((v) => !v)}>
-                <Icon
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color={colors.textTertiary}
-                />
-              </Pressable>
-            }
+          <Controller
+            control={control}
+            name="password"
+            render={({ field }) => (
+              <Input
+                label="Password"
+                placeholder="Min. 6 characters"
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                secureTextEntry={!showPassword}
+                returnKeyType="done"
+                onSubmitEditing={handleSubmit(onSubmit)}
+                error={errors.password?.message}
+                suffix={
+                  <Pressable onPress={() => setShowPassword((v) => !v)}>
+                    <Icon
+                      name={showPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.textTertiary}
+                    />
+                  </Pressable>
+                }
+              />
+            )}
           />
         </Box>
 
@@ -130,12 +160,10 @@ export default function LoginScreen() {
           </Text>
         </Box>
 
-        {/* Submit */}
         <Button
           label="Sign in"
           variant="primary"
-          disabled={!canSubmit}
-          onPress={handleSubmit}
+          onPress={handleSubmit(onSubmit)}
         />
 
         {/* Switch to register */}
@@ -157,25 +185,21 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: 'transparent' },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-  },
+  flex:   { flex: 1, backgroundColor: 'transparent' },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 8 },
   toggle: {
-    flex: 1,
-    height: 34,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex:              1,
+    height:            34,
+    borderRadius:      9999,
+    alignItems:        'center',
+    justifyContent:    'center',
   },
   forgotLink: {
-    fontWeight: '500',
-    textDecorationLine: 'underline',
+    fontWeight:          '500',
+    textDecorationLine:  'underline',
   },
   switchLink: {
-    fontWeight: '600',
-    textDecorationLine: 'underline',
+    fontWeight:          '600',
+    textDecorationLine:  'underline',
   },
 });

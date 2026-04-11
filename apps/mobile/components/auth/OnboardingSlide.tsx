@@ -19,7 +19,7 @@ interface OnboardingSlideProps extends SlideData {
 
 export function OnboardingSlide({
   icon,
-  accentColor = "brand",
+  accentColor = "bgInverse",
   title,
   description,
   width,

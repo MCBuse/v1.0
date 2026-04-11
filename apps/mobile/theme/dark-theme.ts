@@ -27,17 +27,31 @@ const darkTheme = createTheme({
     borderStrong:  palette.white,
     borderFocus:   palette.white,
 
+    // Brand — white in dark mode
+    brand:      palette.white,
+    brandDark:  palette.gray100,
+    brandLight: palette.gray800,
+    brandMuted: 'rgba(255,255,255,0.08)',
+    bgBrand:    palette.white,
+    textBrand:  palette.white,
+    borderBrand: palette.white,
+    success:    palette.white,
+
     // Interactive
     btnPrimary:       palette.white,
     btnPrimaryText:   palette.black,
+    btnBrand:         palette.white,
+    btnBrandText:     palette.black,
     btnSecondary:     palette.gray900,
     btnSecondaryText: palette.white,
     btnDisabled:      palette.gray800,
     btnDisabledText:  palette.gray700,
 
-    // Numpad (same green, black text)
-    numpadBg:      palette.green,
-    numpadKeyBg:   palette.numpadKey,
+    // Numpad — white background in dark mode
+    numpadBg:      palette.white,
+    numpadText:    palette.black,
+    numpadKeyBg:   palette.numpadKey,   // rgba(0,0,0,0.08) on white bg
+    numpadBtnBg:   'rgba(0,0,0,0.12)',
     numpadPayBg:   palette.black,
     numpadPayText: palette.white,
   },

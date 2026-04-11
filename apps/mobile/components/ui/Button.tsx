@@ -10,7 +10,7 @@ import {
 import type { Theme } from '@/theme';
 import Text from './Text';
 
-export type ButtonVariant = 'primary' | 'primaryGreen' | 'secondary' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends Omit<PressableProps, 'style'> {
@@ -48,19 +48,17 @@ export function Button({
   const bgColor = isDisabled
     ? colors.btnDisabled
     : {
-        primary:      colors.btnPrimary,
-        primaryGreen: colors.btnBrand,
-        secondary:    colors.btnSecondary,
-        ghost:        colors.transparent,
+        primary:   colors.btnPrimary,
+        secondary: colors.btnSecondary,
+        ghost:     colors.transparent,
       }[variant];
 
   const textColor = isDisabled
     ? colors.btnDisabledText
     : {
-        primary:      colors.btnPrimaryText,
-        primaryGreen: colors.btnBrandText,
-        secondary:    colors.btnSecondaryText,
-        ghost:        colors.textPrimary,
+        primary:   colors.btnPrimaryText,
+        secondary: colors.btnSecondaryText,
+        ghost:     colors.textPrimary,
       }[variant];
 
   return (

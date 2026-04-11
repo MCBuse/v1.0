@@ -1,0 +1,29 @@
+import { create } from 'zustand';
+
+/**
+ * App-level navigation state.
+ *
+ * hasSeenOnboarding — false on every cold boot (no persistence).
+ *   The user always sees onboarding when the app starts fresh.
+ *   Flip to true when they tap "Get Started" or "Skip".
+ *
+ * isAuthenticated — true once OTP is verified.
+ *   Flip to false on sign-out.
+ */
+type AppStore = {
+  hasSeenOnboarding: boolean;
+  isAuthenticated:   boolean;
+
+  setHasSeenOnboarding: (value: boolean) => void;
+  setIsAuthenticated:   (value: boolean) => void;
+  signOut:              () => void;
+};
+
+export const useAppStore = create<AppStore>((set) => ({
+  hasSeenOnboarding: false,
+  isAuthenticated:   false,
+
+  setHasSeenOnboarding: (value) => set({ hasSeenOnboarding: value }),
+  setIsAuthenticated:   (value) => set({ isAuthenticated: value }),
+  signOut:              ()      => set({ isAuthenticated: false }),
+}));

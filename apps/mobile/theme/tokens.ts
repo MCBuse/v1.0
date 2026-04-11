@@ -4,12 +4,6 @@
  */
 
 export const palette = {
-  // ── Brand ──────────────────────────────────────────────────────────────────
-  green:       '#00D632',
-  greenDark:   '#00B82B',
-  greenLight:  '#E6FFF0',
-  greenMuted:  'rgba(0, 214, 50, 0.12)',
-
   // ── Neutrals ───────────────────────────────────────────────────────────────
   black:   '#000000',
   white:   '#FFFFFF',
@@ -99,6 +93,17 @@ export const lineHeights = {
   body:    22,
   caption: 18,
   label:   13,
+} as const;
+
+/**
+ * Font family names — must match the keys loaded via useFonts() in _layout.tsx.
+ * Each name encodes its own weight, so never combine with fontWeight in text styles.
+ */
+export const fonts = {
+  regular:  'IBMPlexSans_400Regular',
+  medium:   'IBMPlexSans_500Medium',
+  semibold: 'IBMPlexSans_600SemiBold',
+  bold:     'IBMPlexSans_700Bold',
 } as const;
 
 export const componentSizes = {
