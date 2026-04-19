@@ -77,7 +77,7 @@ export default function ReceiveScreen() {
             </Text>
             <Box marginTop="2xl" style={styles.qrContainer}>
               <QRDisplay
-                qrString={data.qrString}
+                qrString={data.qrString ?? ''}
                 address={routineAddress}
                 shareLabel="Share my address"
                 shareMessage={`Pay me on MCBuse:\n${data.qrString}`}

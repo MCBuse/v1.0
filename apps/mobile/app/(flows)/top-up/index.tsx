@@ -42,7 +42,7 @@ export default function TopUpScreen() {
         alignItems="center"
         gap="m"
         paddingHorizontal="2xl"
-        paddingTop={insets.top + 8}
+        style={{ paddingTop: insets.top + 8 }}
         paddingBottom="xl"
       >
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
