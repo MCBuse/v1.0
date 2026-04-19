@@ -10,7 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.f-o-nyarko.mcbuse"
+      "bundleIdentifier": "com.f-o-nyarko.mcbuse",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan QR codes and process transactions.",
+        "NSPhotoLibraryUsageDescription": "Allow access to upload payment proofs or profile images.",
+        "NSMicrophoneUsageDescription": "Used for voice-based features (optional)."
+      }
     },
     "android": {
       "adaptiveIcon": {
