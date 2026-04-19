@@ -9439,7 +9439,7 @@ snapshots:
       terminal-link: 2.1.1
       undici: 6.24.1
       wrap-ansi: 7.0.0
-      ws: 8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.20.0(bufferutil@4.1.0)
     optionalDependencies:
       expo-router: 6.0.23(56449de9ff0db2926ff838a6f5cb1f9d)
       react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.2.0)(bufferutil@4.1.0)(react@19.1.0)
@@ -14869,7 +14869,7 @@ snapshots:
       serialize-error: 2.1.0
       source-map: 0.5.7
       throat: 5.0.0
-      ws: 7.5.10(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 7.5.10(bufferutil@4.1.0)
       yargs: 17.7.2
     transitivePeerDependencies:
       - bufferutil
@@ -14916,7 +14916,7 @@ snapshots:
       serialize-error: 2.1.0
       source-map: 0.5.7
       throat: 5.0.0
-      ws: 7.5.10(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 7.5.10(bufferutil@4.1.0)
       yargs: 17.7.2
     transitivePeerDependencies:
       - bufferutil
@@ -15544,7 +15544,7 @@ snapshots:
   react-devtools-core@6.1.5(bufferutil@4.1.0):
     dependencies:
       shell-quote: 1.8.3
-      ws: 7.5.10(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 7.5.10(bufferutil@4.1.0)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -16918,10 +16918,18 @@ snapshots:
     optionalDependencies:
       bufferutil: 4.1.0
 
+  ws@7.5.10(bufferutil@4.1.0):
+    optionalDependencies:
+      bufferutil: 4.1.0
+
   ws@7.5.10(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     optionalDependencies:
       bufferutil: 4.1.0
       utf-8-validate: 6.0.6
+
+  ws@8.20.0(bufferutil@4.1.0):
+    optionalDependencies:
+      bufferutil: 4.1.0
 
   ws@8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     optionalDependencies:

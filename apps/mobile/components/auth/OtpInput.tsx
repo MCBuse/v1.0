@@ -1,5 +1,5 @@
 import { useTheme } from "@shopify/restyle";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import type { Theme } from "@/theme";
@@ -9,6 +9,7 @@ interface OtpInputProps {
   length?: number;
   value: string;
   onChange: (value: string) => void;
+  onFilled?: (value: string) => void;
   error?: boolean;
 }
 
@@ -16,18 +17,27 @@ export function OtpInput({
   length = 6,
   value,
   onChange,
+  onFilled,
   error = false,
 }: OtpInputProps) {
   const { colors } = useTheme<Theme>();
   const inputRef = useRef<TextInput>(null);
-  const [focused, setFocused] = useState(false);
+  // Start as true — autoFocus fires before first paint on most devices;
+  // onBlur will set it back to false if the user dismisses.
+  const [focused, setFocused] = useState(true);
 
-  const digits = value.padEnd(length, "").split("").slice(0, length);
+  const digits = Array.from({ length }, (_, i) => value[i] ?? "");
+  // Cursor sits on the next empty slot, capped at last box
   const activeIndex = Math.min(value.length, length - 1);
+
+  // Trigger onFilled when last digit lands
+  useEffect(() => {
+    if (value.length === length) onFilled?.(value);
+  }, [value, length, onFilled]);
 
   return (
     <Pressable style={styles.wrapper} onPress={() => inputRef.current?.focus()}>
-      {/* Hidden real input — keyboard target */}
+      {/* Hidden real input — actual keyboard target */}
       <TextInput
         ref={inputRef}
         value={value}
@@ -40,17 +50,20 @@ export function OtpInput({
         style={styles.hidden}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
+        // iOS: pulls OTP from SMS / email suggestion bar
+        textContentType="oneTimeCode"
+        // Android: SMS autofill
+        autoComplete="sms-otp"
         caretHidden
         autoFocus
       />
 
-      {/* Visual boxes */}
+      {/* Visual digit boxes */}
       <View style={styles.boxes}>
         {digits.map((digit, i) => {
           const isActive =
             focused && i === activeIndex && value.length < length;
           const isFilled = i < value.length;
-          const isError = error;
 
           return (
             <View
@@ -58,24 +71,25 @@ export function OtpInput({
               style={[
                 styles.box,
                 {
-                  borderColor: isError
+                  backgroundColor: colors.bgSecondary,
+                  borderColor: error
                     ? colors.error
                     : isActive
                       ? colors.borderFocus
                       : isFilled
                         ? colors.borderStrong
-                        : colors.borderDefault,
-                  borderWidth: isActive || isError ? 1.5 : 1,
-                  backgroundColor: colors.bgSecondary,
+                        : colors.borderSubtle,
+                  borderWidth: isActive || error ? 1.5 : 1,
                 },
               ]}
             >
               <Text
                 variant="h2"
-                style={{ color: isError ? colors.error : colors.textPrimary }}
+                style={{ color: error ? colors.error : colors.textPrimary }}
               >
-                {digit || ""}
+                {digit}
               </Text>
+
               {/* Cursor blink when active and empty */}
               {isActive && !digit && (
                 <View
@@ -94,9 +108,7 @@ export function OtpInput({
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    alignItems: "center",
-  },
+  wrapper: { alignItems: "center" },
   hidden: {
     position: "absolute",
     width: 1,

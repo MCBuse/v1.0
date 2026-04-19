@@ -23,7 +23,8 @@ const darkTheme = createTheme({
     textDisabled:  palette.gray700,
 
     // Borders
-    borderDefault: palette.gray800,
+    borderSubtle:  palette.gray700,
+    borderDefault: palette.gray600,
     borderStrong:  palette.white,
     borderFocus:   palette.white,
 

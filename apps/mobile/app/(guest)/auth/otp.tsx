@@ -42,17 +42,13 @@ export default function OtpScreen() {
     // TODO: trigger resend API call
   };
 
-  const handleVerify = useCallback(() => {
-    if (code.length < 6) return;
+  const handleVerify = useCallback((val?: string) => {
+    const otp = val ?? code;
+    if (otp.length < 6) return;
     // Dummy auth — any 6-digit code succeeds
     setIsAuthenticated(true);
     router.replace('/(tabs)');
   }, [code, setIsAuthenticated]);
-
-  // Auto-verify when all 6 digits entered
-  useEffect(() => {
-    if (code.length === 6) handleVerify();
-  }, [code, handleVerify]);
 
   const handleChange = (val: string) => {
     setCode(val);
@@ -89,6 +85,7 @@ export default function OtpScreen() {
           <OtpInput
             value={code}
             onChange={handleChange}
+            onFilled={handleVerify}
             error={error}
           />
           {error && (
@@ -109,7 +106,7 @@ export default function OtpScreen() {
         {/* Resend */}
         <Box flexDirection="row" justifyContent="center" gap="xs" marginTop="2xl">
           <Text variant="caption" color="textSecondary">
-            Didn't receive it?{' '}
+            Didn&apos;t receive it?{' '}
           </Text>
           {canResend ? (
             <Text

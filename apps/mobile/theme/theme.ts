@@ -28,7 +28,8 @@ const theme = createTheme({
     textLink:       palette.black,
 
     // Borders
-    borderDefault:  palette.gray200,
+    borderSubtle:   palette.gray200,
+    borderDefault:  palette.gray300,
     borderStrong:   palette.black,
     borderFocus:    palette.black,
     borderBrand:    palette.black,
