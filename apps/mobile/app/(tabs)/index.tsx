@@ -1,4 +1,5 @@
-import { useTheme } from "@shopify/restyle";
+import { useTheme } from '@shopify/restyle';
+import { router } from 'expo-router';
 import {
   AddCircle,
   ArrowCircleDown,
@@ -9,29 +10,52 @@ import {
   Wallet3,
   Wifi,
   type Icon as IconType,
-} from "iconsax-react-native";
-import React from "react";
-import { Pressable, ScrollView, StyleSheet } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+} from 'iconsax-react-native';
+import React from 'react';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { Theme } from "@/theme";
-import { Box, Text } from "@/components/ui";
+import { Box, ListItem, Text } from '@/components/ui';
+import { useTransactions } from '@/features/transactions';
+import { useWallets } from '@/features/wallets';
+import { formatAmount, formatCurrency, truncateAddress } from '@/lib/currency';
+import type { Theme } from '@/theme';
 
 type QuickAction = {
-  Icon: IconType;
+  Icon:  IconType;
   label: string;
+  route: string;
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { Icon: Send2,           label: "Send"    },
-  { Icon: ArrowCircleDown, label: "Receive" },
-  { Icon: Scan,            label: "Scan"    },
-  { Icon: AddCircle,       label: "Top Up"  },
+  { Icon: Send2,           label: 'Send',    route: '/(flows)/scan'    },
+  { Icon: ArrowCircleDown, label: 'Receive', route: '/(flows)/receive' },
+  { Icon: Scan,            label: 'Scan',    route: '/(flows)/scan'    },
+  { Icon: AddCircle,       label: 'Top Up',  route: '/(flows)/top-up'  },
 ];
+
+function txTypeLabel(type: string): string {
+  switch (type) {
+    case 'p2p':      return 'Transfer';
+    case 'on_ramp':  return 'Top Up';
+    case 'off_ramp': return 'Withdrawal';
+    case 'internal': return 'Internal';
+    case 'swap':     return 'Swap';
+    default:         return type;
+  }
+}
 
 export default function HomeScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
+
+  const wallets = useWallets();
+  const txs = useTransactions({ limit: 5 });
+
+  const routine = wallets.data?.routine;
+  const usdcBalance = routine?.balances.find((b) => b.currency === 'USDC');
+  const balanceDisplay = usdcBalance ? `$${formatAmount(usdcBalance.available)}` : '$0.00';
+  const addressDisplay = routine ? truncateAddress(routine.solanaPubkey) : 'Not connected';
 
   return (
     <ScrollView
@@ -94,7 +118,7 @@ export default function HomeScreen() {
             Total Balance
           </Text>
           <Text variant="display" style={styles.balanceAmount}>
-            $0.00
+            {balanceDisplay}
           </Text>
 
           <Box flexDirection="row" alignItems="center" gap="xs" marginTop="s">
@@ -113,7 +137,7 @@ export default function HomeScreen() {
           >
             <Wallet3 size={14} color="rgba(255,255,255,0.6)" variant="Linear" />
             <Text variant="caption" style={styles.dimText}>
-              Not connected
+              {addressDisplay}
             </Text>
           </Box>
         </Box>
@@ -129,6 +153,7 @@ export default function HomeScreen() {
         {QUICK_ACTIONS.map((action) => (
           <Box key={action.label} alignItems="center" gap="s">
             <Pressable
+              onPress={() => router.push(action.route as any)}
               style={[
                 styles.actionBtn,
                 { backgroundColor: colors.bgSecondary },
@@ -152,38 +177,58 @@ export default function HomeScreen() {
           marginBottom="l"
         >
           <Text variant="h3">Recent Activity</Text>
-          <Text variant="caption" color="textBrand">
-            See all
-          </Text>
+          <Pressable onPress={() => router.push('/(tabs)/activity')}>
+            <Text variant="caption" color="textBrand">
+              See all
+            </Text>
+          </Pressable>
         </Box>
 
-        <Box
-          alignItems="center"
-          justifyContent="center"
-          paddingVertical="5xl"
-          gap="m"
-        >
+        {txs.data && txs.data.data.length > 0 ? (
+          <Box backgroundColor="bgSecondary" borderRadius="xl" overflow="hidden">
+            {txs.data.data.map((tx, i) => (
+              <ListItem
+                key={tx.id}
+                title={txTypeLabel(tx.type)}
+                subtitle={new Date(tx.createdAt).toLocaleDateString()}
+                rightElement={
+                  <Text variant="captionMedium">
+                    {formatCurrency(tx.amount, tx.currency as 'USDC' | 'EURC')}
+                  </Text>
+                }
+                showChevron={false}
+              />
+            ))}
+          </Box>
+        ) : (
           <Box
-            width={56}
-            height={56}
-            borderRadius="full"
-            backgroundColor="bgSecondary"
             alignItems="center"
             justifyContent="center"
+            paddingVertical="5xl"
+            gap="m"
           >
-            <ArrowSwapHorizontal size={24} color={colors.textTertiary} variant="Linear" />
-          </Box>
-          <Box alignItems="center" gap="xs">
-            <Text variant="bodyMedium">No transactions yet</Text>
-            <Text
-              variant="caption"
-              color="textSecondary"
-              style={styles.emptyCaption}
+            <Box
+              width={56}
+              height={56}
+              borderRadius="full"
+              backgroundColor="bgSecondary"
+              alignItems="center"
+              justifyContent="center"
             >
-              Send or receive money to see your activity here.
-            </Text>
+              <ArrowSwapHorizontal size={24} color={colors.textTertiary} variant="Linear" />
+            </Box>
+            <Box alignItems="center" gap="xs">
+              <Text variant="bodyMedium">No transactions yet</Text>
+              <Text
+                variant="caption"
+                color="textSecondary"
+                style={styles.emptyCaption}
+              >
+                Send or receive money to see your activity here.
+              </Text>
+            </Box>
           </Box>
-        </Box>
+        )}
       </Box>
     </ScrollView>
   );
@@ -194,36 +239,36 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1 },
 
   balanceCard: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor:   '#000',
+    shadowOffset:  { width: 0, height: 4 },
     shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowRadius:  12,
+    elevation:     6,
   },
-  dimText: { color: "rgba(255,255,255,0.55)" },
-  balanceAmount: { color: "#fff", marginTop: 8 },
+  dimText:       { color: 'rgba(255,255,255,0.55)' },
+  balanceAmount: { color: '#fff', marginTop: 8 },
   addressPill: {
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: 'rgba(255,255,255,0.1)',
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 99,
-    alignSelf: "flex-start",
+    paddingVertical:   6,
+    borderRadius:      99,
+    alignSelf:         'flex-start',
   },
 
   actionBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
+    width:          56,
+    height:         56,
+    borderRadius:   16,
+    alignItems:     'center',
+    justifyContent: 'center',
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+    width:          36,
+    height:         36,
+    borderRadius:   10,
+    alignItems:     'center',
+    justifyContent: 'center',
   },
   avatarLetter: { fontSize: 14 },
-  emptyCaption: { textAlign: "center", maxWidth: 220 },
+  emptyCaption: { textAlign: 'center', maxWidth: 220 },
 });

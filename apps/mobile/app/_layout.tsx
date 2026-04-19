@@ -46,8 +46,9 @@ export default function RootLayout() {
             {/* index.tsx handles the boot redirect */}
             <Stack.Screen name="index"   options={{ headerShown: false }} />
             <Stack.Screen name="(guest)" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)"  options={{ headerShown: false }} />
-            <Stack.Screen name="modal"   options={{ presentation: 'modal', title: 'Modal' }} />
+            <Stack.Screen name="(tabs)"   options={{ headerShown: false }} />
+            <Stack.Screen name="(flows)"  options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="modal"    options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>
           <StatusBar style={isDark ? 'light' : 'dark'} />
         </ApiProvider>
