@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ApiProvider } from '@/lib/api';
 import { theme, darkTheme } from '@/theme';
 
 // Hold the splash until fonts are ready
@@ -40,14 +41,16 @@ export default function RootLayout() {
   return (
     <RestyleProvider theme={isDark ? darkTheme : theme}>
       <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-        <Stack>
-          {/* index.tsx handles the boot redirect */}
-          <Stack.Screen name="index"   options={{ headerShown: false }} />
-          <Stack.Screen name="(guest)" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)"  options={{ headerShown: false }} />
-          <Stack.Screen name="modal"   options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <ApiProvider>
+          <Stack>
+            {/* index.tsx handles the boot redirect */}
+            <Stack.Screen name="index"   options={{ headerShown: false }} />
+            <Stack.Screen name="(guest)" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)"  options={{ headerShown: false }} />
+            <Stack.Screen name="modal"   options={{ presentation: 'modal', title: 'Modal' }} />
+          </Stack>
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+        </ApiProvider>
       </ThemeProvider>
     </RestyleProvider>
   );
