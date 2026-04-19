@@ -1,4 +1,5 @@
 import { useTheme } from '@shopify/restyle';
+import { router } from 'expo-router';
 import {
   AddCircle,
   ArrowCircleDown,
@@ -18,28 +19,27 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 
-import { formatAmount, formatRelativeTime, greetingForTime } from '@/lib/format';
-import type { Theme } from '@/theme';
 import { Box, Text } from '@/components/ui';
-import { useWallets } from '@/features/wallet';
 import { useTransactions } from '@/features/transactions';
 import type { LedgerEntry } from '@/features/transactions';
+import { useWallets } from '@/features/wallet';
+import { formatAmount, formatRelativeTime, greetingForTime } from '@/lib/format';
+import type { Theme } from '@/theme';
 
 // ── Quick actions ──────────────────────────────────────────────────────────────
 
 type QuickAction = {
-  Icon: IconType;
+  Icon:  IconType;
   label: string;
   route: string;
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { Icon: Send2,           label: 'Send',    route: '/scan'    },
-  { Icon: ArrowCircleDown, label: 'Receive', route: '/receive' },
-  { Icon: Scan,            label: 'Scan',    route: '/scan'    },
-  { Icon: AddCircle,       label: 'Top Up',  route: '/topup'   },
+  { Icon: Send2,           label: 'Send',    route: '/(flows)/scan'    },
+  { Icon: ArrowCircleDown, label: 'Receive', route: '/(flows)/receive' },
+  { Icon: Scan,            label: 'Scan',    route: '/(flows)/scan'    },
+  { Icon: AddCircle,       label: 'Top Up',  route: '/(flows)/top-up'  },
 ];
 
 // ── Transaction helpers ────────────────────────────────────────────────────────
@@ -353,24 +353,24 @@ const styles = StyleSheet.create({
     shadowRadius:  12,
     elevation:     6,
   },
-  dimText:         { color: 'rgba(255,255,255,0.55)' },
-  dimTextSm:       { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
-  subBalance:      { color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-  balanceAmount:   { color: '#fff', marginTop: 8 },
+  dimText:            { color: 'rgba(255,255,255,0.55)' },
+  dimTextSm:          { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+  subBalance:         { color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  balanceAmount:      { color: '#fff', marginTop: 8 },
   balancePlaceholder: {
     height:          56,
-    marginTop:        8,
-    borderRadius:     8,
+    marginTop:       8,
+    borderRadius:    8,
     backgroundColor: 'rgba(255,255,255,0.1)',
     width:           '60%',
   },
 
   actionBtn: {
-    width:            56,
-    height:           56,
-    borderRadius:     16,
-    alignItems:       'center',
-    justifyContent:   'center',
+    width:          56,
+    height:         56,
+    borderRadius:   16,
+    alignItems:     'center',
+    justifyContent: 'center',
   },
   iconBtn: {
     width:          36,

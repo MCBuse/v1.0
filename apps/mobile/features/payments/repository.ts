@@ -1,14 +1,17 @@
 import { http } from '@/lib/api';
+
 import {
-  paymentRequest,
   executePaymentResponse,
   onRampResponse,
+  paymentRequest,
+  resolveResponse,
   type CreatePaymentRequestInput,
   type ExecutePaymentInput,
-  type OnRampInput,
-  type PaymentRequest,
   type ExecutePaymentResponse,
+  type OnRampInput,
   type OnRampResponse,
+  type PaymentRequest,
+  type ResolveResponse,
 } from './models';
 
 export const paymentRepository = {
@@ -17,9 +20,9 @@ export const paymentRepository = {
     return paymentRequest.parse(raw);
   },
 
-  async resolveNonce(nonce: string): Promise<PaymentRequest> {
+  async resolveNonce(nonce: string): Promise<ResolveResponse> {
     const raw = await http.get<unknown>('/payment-requests/resolve', { params: { nonce } });
-    return paymentRequest.parse(raw);
+    return resolveResponse.parse(raw);
   },
 
   async executePayment(input: ExecutePaymentInput): Promise<ExecutePaymentResponse> {
