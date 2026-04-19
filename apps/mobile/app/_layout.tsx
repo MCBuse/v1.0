@@ -48,6 +48,10 @@ export default function RootLayout() {
             <Stack.Screen name="(guest)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)"  options={{ headerShown: false }} />
             <Stack.Screen name="modal"   options={{ presentation: 'modal', title: 'Modal' }} />
+            {/* Transaction flows — presented as modals over the tab bar */}
+            <Stack.Screen name="receive" options={{ presentation: 'modal',           headerShown: false }} />
+            <Stack.Screen name="topup"   options={{ presentation: 'modal',           headerShown: false }} />
+            <Stack.Screen name="scan"    options={{ presentation: 'fullScreenModal', headerShown: false }} />
           </Stack>
           <StatusBar style={isDark ? 'light' : 'dark'} />
         </ApiProvider>
