@@ -62,10 +62,10 @@ export class AuthService {
     }
 
     this.logger.log('User registered: ' + user.id);
-    return this.issueTokens(user.id, user.email as string);
+    return this.issueTokens(user.id, user.email ?? null);
   }
 
-  async login(user: { id: string; email: string }): Promise<AuthTokens> {
+  async login(user: { id: string; email: string | null }): Promise<AuthTokens> {
     this.logger.log('User logged in: ' + user.id);
     return this.issueTokens(user.id, user.email);
   }
@@ -110,8 +110,7 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    if (!user.email) throw new UnauthorizedException();
-    return this.issueTokens(user.id, user.email);
+    return this.issueTokens(user.id, user.email ?? null);
   }
 
   async logout(userId: string, rawRefreshToken: string): Promise<void> {
@@ -159,7 +158,7 @@ export class AuthService {
     this.logger.log('Phone verified for user: ' + userId);
   }
 
-  private async issueTokens(userId: string, email: string): Promise<AuthTokens> {
+  private async issueTokens(userId: string, email: string | null): Promise<AuthTokens> {
     const jti = randomUUID();
     const payload = { sub: userId, email, jti };
 

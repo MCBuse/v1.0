@@ -2,6 +2,7 @@ export { default as Box } from './Box';
 export { default as Text } from './Text';
 export { Button, type ButtonVariant, type ButtonSize } from './Button';
 export { Input } from './Input';
+export { PhoneInput, type PhoneInputChangeMeta } from './PhoneInput';
 export { Card, type CardVariant } from './Card';
 export { ListItem } from './ListItem';
 export { Badge } from './Badge';

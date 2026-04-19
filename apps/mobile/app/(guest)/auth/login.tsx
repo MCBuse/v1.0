@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,44 +13,70 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ApiError } from '@/lib/api';
 import type { LoginFormValues } from '@/lib/validation/auth';
 import { loginSchema } from '@/lib/validation/auth';
 import { Eye, EyeSlash } from 'iconsax-react-native';
 
+import { useLogin, useLoginPhone } from '@/features/auth/hooks';
+import { usePendingAuthStore } from '@/features/auth/pending-store';
+
 import type { Theme } from '@/theme';
-import { Box, Button, Input, Text } from '@/components/ui';
+import { Box, Button, Input, PhoneInput, Text } from '@/components/ui';
 
 type Mode = 'email' | 'phone';
 
 export default function LoginScreen() {
   const { colors } = useTheme<Theme>();
-  const insets = useSafeAreaInsets();
+  const insets     = useSafeAreaInsets();
   const [showPassword, setShowPassword] = useState(false);
+
+  const setPending = usePendingAuthStore((s) => s.set);
+  const login      = useLogin();
+  const loginPhone = useLoginPhone();
 
   const {
     control,
     handleSubmit,
     setValue,
     watch,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { mode: 'email', identifier: '', password: '' },
     mode: 'onBlur',
   });
 
-  const mode = watch('mode');
+  const mode      = watch('mode');
+  const submitting = login.isPending || loginPhone.isPending;
 
   const switchMode = (m: Mode) => {
-    setValue('mode', m, { shouldValidate: false });
+    setValue('mode', m,    { shouldValidate: false });
     setValue('identifier', '', { shouldValidate: false });
   };
 
-  const onSubmit = (data: LoginFormValues) => {
-    router.push({
-      pathname: '/(guest)/auth/otp',
-      params: { identifier: data.identifier, flow: 'login' },
-    });
+  const onSubmit = async (data: LoginFormValues) => {
+    try {
+      const tokens = data.mode === 'email'
+        ? await login.mutateAsync({ email: data.identifier, password: data.password })
+        : await loginPhone.mutateAsync({ phone: data.identifier, password: data.password });
+
+      setPending({
+        tokens,
+        identifier: data.identifier,
+        channel:    data.mode,
+        flow:       'login',
+      });
+
+      router.push({
+        pathname: '/(guest)/auth/otp',
+        params:   { identifier: data.identifier, flow: 'login' },
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
+      Alert.alert('Sign in failed', message);
+    }
   };
 
   return (
@@ -105,20 +132,28 @@ export default function LoginScreen() {
           <Controller
             control={control}
             name="identifier"
-            render={({ field }) => (
-              <Input
-                label={mode === 'email' ? 'Email address' : 'Phone number'}
-                placeholder={mode === 'email' ? 'you@example.com' : '+1 555 000 0000'}
-                value={field.value}
-                onChangeText={field.onChange}
-                onBlur={field.onBlur}
-                keyboardType={mode === 'email' ? 'email-address' : 'phone-pad'}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="next"
-                error={errors.identifier?.message}
-              />
-            )}
+            render={({ field }) =>
+              mode === 'email' ? (
+                <Input
+                  label="Email address"
+                  placeholder="you@example.com"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  onBlur={field.onBlur}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  error={errors.identifier?.message}
+                />
+              ) : (
+                <PhoneInput
+                  label="Phone number"
+                  onChange={(meta) => field.onChange(meta.e164)}
+                  error={errors.identifier?.message}
+                />
+              )
+            }
           />
 
           <Controller
@@ -161,15 +196,16 @@ export default function LoginScreen() {
         </Box>
 
         <Button
-          label="Sign in"
+          label={submitting ? 'Signing in…' : 'Sign in'}
           variant="primary"
+          disabled={submitting}
           onPress={handleSubmit(onSubmit)}
         />
 
         {/* Switch to register */}
         <Box flexDirection="row" justifyContent="center" gap="xs" marginTop="2xl">
           <Text variant="caption" color="textSecondary">
-            Don't have an account?
+            Don&apos;t have an account?
           </Text>
           <Text
             variant="caption"
@@ -188,18 +224,18 @@ const styles = StyleSheet.create({
   flex:   { flex: 1, backgroundColor: 'transparent' },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 8 },
   toggle: {
-    flex:              1,
-    height:            34,
-    borderRadius:      9999,
-    alignItems:        'center',
-    justifyContent:    'center',
+    flex:           1,
+    height:         34,
+    borderRadius:   9999,
+    alignItems:     'center',
+    justifyContent: 'center',
   },
   forgotLink: {
-    fontWeight:          '500',
-    textDecorationLine:  'underline',
+    fontWeight:         '500',
+    textDecorationLine: 'underline',
   },
   switchLink: {
-    fontWeight:          '600',
-    textDecorationLine:  'underline',
+    fontWeight:         '600',
+    textDecorationLine: 'underline',
   },
 });

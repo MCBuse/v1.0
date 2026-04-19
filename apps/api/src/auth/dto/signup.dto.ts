@@ -1,17 +1,29 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import {
   IsEmail,
   IsNotEmpty,
   IsString,
   MinLength,
   Matches,
-  IsOptional,
+  ValidateIf,
 } from 'class-validator';
 
+/**
+ * Signup supports either an email or a phone number (or both). `ValidateIf`
+ * only runs the field's other validators when the counterpart is missing, so
+ * the user must supply at least one identifier.
+ */
 export class SignupDto {
-  @ApiProperty({ example: 'user@example.com' })
-  @IsEmail()
-  email: string;
+  @ApiPropertyOptional({ example: 'user@example.com' })
+  @ValidateIf((o: SignupDto) => !o.phone)
+  @IsEmail({}, { message: 'email must be an email address' })
+  email?: string;
+
+  @ApiPropertyOptional({ example: '+447911123456' })
+  @ValidateIf((o: SignupDto) => !o.email)
+  @IsString()
+  @Matches(/^\+?[1-9]\d{6,14}$/, { message: 'phone must be a valid E.164 number' })
+  phone?: string;
 
   @ApiProperty({
     description: 'Min 8 chars, must include uppercase, lowercase, digit, and special char',
@@ -34,9 +46,4 @@ export class SignupDto {
   @IsString()
   @IsNotEmpty()
   lastName: string;
-
-  @ApiPropertyOptional({ example: '+447911123456' })
-  @IsOptional()
-  @IsString()
-  phone?: string;
 }

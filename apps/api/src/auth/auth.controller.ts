@@ -15,10 +15,12 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
+import { PhoneAuthGuard } from './guards/phone-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
+import { LoginPhoneDto } from './dto/login-phone.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -44,7 +46,20 @@ export class AuthController {
   @ApiOkResponse({ description: 'Returns access and refresh tokens' })
   login(
     @Body() _dto: LoginDto,
-    @CurrentUser() user: { id: string; email: string },
+    @CurrentUser() user: { id: string; email: string | null },
+  ) {
+    return this.authService.login(user);
+  }
+
+  @Public()
+  @Post('login/phone')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PhoneAuthGuard)
+  @ApiOperation({ summary: 'Login with phone number and password' })
+  @ApiOkResponse({ description: 'Returns access and refresh tokens' })
+  loginPhone(
+    @Body() _dto: LoginPhoneDto,
+    @CurrentUser() user: { id: string; email: string | null },
   ) {
     return this.authService.login(user);
   }

@@ -4,27 +4,38 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useCommitPendingAuth } from '@/features/auth/hooks';
+import { usePendingAuthStore } from '@/features/auth/pending-store';
+
 import type { Theme } from '@/theme';
 import { OtpInput } from '@/components/auth/OtpInput';
 import { Box, Button, Text } from '@/components/ui';
-import { useAppStore } from '@/store/app-store';
 
 const RESEND_SECONDS = 60;
+const DEV_OTP        = '123456';
 
 export default function OtpScreen() {
   const { colors } = useTheme<Theme>();
-  const insets = useSafeAreaInsets();
-  const { identifier = '', flow = 'login' } = useLocalSearchParams<{
+  const insets     = useSafeAreaInsets();
+  const { identifier = '' } = useLocalSearchParams<{
     identifier: string;
-    flow: 'login' | 'register';
+    flow:       'login' | 'register';
   }>();
 
-  const setIsAuthenticated = useAppStore((s) => s.setIsAuthenticated);
+  const pending       = usePendingAuthStore((s) => s.pending);
+  const clearPending  = usePendingAuthStore((s) => s.clear);
+  const commitPending = useCommitPendingAuth();
 
   const [code, setCode]           = useState('');
   const [error, setError]         = useState(false);
   const [countdown, setCountdown] = useState(RESEND_SECONDS);
   const [canResend, setCanResend] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+
+  // If user deep-links straight into OTP with no pending auth, bounce them back.
+  useEffect(() => {
+    if (!pending) router.replace('/(guest)/auth/login');
+  }, [pending]);
 
   // Countdown timer
   useEffect(() => {
@@ -39,24 +50,45 @@ export default function OtpScreen() {
     setError(false);
     setCountdown(RESEND_SECONDS);
     setCanResend(false);
-    // TODO: trigger resend API call
+    // TODO: trigger resend once backend OTP delivery is live (hardcoded 123456 for now)
   };
 
-  const handleVerify = useCallback((val?: string) => {
-    const otp = val ?? code;
-    if (otp.length < 6) return;
-    // Dummy auth — any 6-digit code succeeds
-    setIsAuthenticated(true);
-    router.replace('/(tabs)');
-  }, [code, setIsAuthenticated]);
+  const handleVerify = useCallback(
+    async (val?: string) => {
+      const otp = val ?? code;
+      if (otp.length < 6 || verifying) return;
+
+      if (otp !== DEV_OTP) {
+        setError(true);
+        return;
+      }
+
+      setVerifying(true);
+      const ok = await commitPending();
+      setVerifying(false);
+
+      if (!ok) {
+        router.replace('/(guest)/auth/login');
+        return;
+      }
+
+      router.replace('/(tabs)');
+    },
+    [code, verifying, commitPending],
+  );
 
   const handleChange = (val: string) => {
     setCode(val);
     if (error) setError(false);
   };
 
-  // Mask the identifier for display
-  const maskedIdentifier = identifier.includes('@')
+  const handleBack = () => {
+    clearPending();
+    router.back();
+  };
+
+  const isEmail          = identifier.includes('@');
+  const maskedIdentifier = isEmail
     ? identifier.replace(/(.{2}).+(@.+)/, '$1•••$2')
     : identifier.replace(/(\+?\d{1,3})\d+(\d{4})/, '$1•••••$2');
 
@@ -73,10 +105,13 @@ export default function OtpScreen() {
       >
         {/* Header */}
         <Box gap="xs" marginBottom="3xl">
-          <Text variant="h1">Check your {identifier.includes('@') ? 'email' : 'messages'}</Text>
+          <Text variant="h1">Check your {isEmail ? 'email' : 'messages'}</Text>
           <Text variant="body" color="textSecondary">
             We sent a 6-digit code to{'\n'}
             <Text variant="bodyMedium">{maskedIdentifier}</Text>
+          </Text>
+          <Text variant="caption" color="textTertiary" marginTop="s">
+            Dev mode — use code {DEV_OTP}.
           </Text>
         </Box>
 
@@ -97,10 +132,10 @@ export default function OtpScreen() {
 
         {/* Verify button */}
         <Button
-          label="Verify"
+          label={verifying ? 'Verifying…' : 'Verify'}
           variant="primary"
-          disabled={code.length < 6}
-          onPress={handleVerify}
+          disabled={code.length < 6 || verifying}
+          onPress={() => handleVerify()}
         />
 
         {/* Resend */}
@@ -129,9 +164,9 @@ export default function OtpScreen() {
             variant="caption"
             color="textSecondary"
             style={styles.changeLink}
-            onPress={() => router.back()}
+            onPress={handleBack}
           >
-            Change {identifier.includes('@') ? 'email' : 'phone number'}
+            Change {isEmail ? 'email' : 'phone number'}
           </Text>
         </Box>
       </Box>
@@ -142,7 +177,7 @@ export default function OtpScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   resendLink: {
-    fontWeight: '600',
+    fontWeight:         '600',
     textDecorationLine: 'underline',
   },
   changeLink: {

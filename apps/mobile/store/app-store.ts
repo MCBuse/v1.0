@@ -7,8 +7,9 @@ import { create } from 'zustand';
  *   The user always sees onboarding when the app starts fresh.
  *   Flip to true when they tap "Get Started" or "Skip".
  *
- * isAuthenticated — true once OTP is verified.
- *   Flip to false on sign-out.
+ * isAuthenticated — mirrors whether the session has valid tokens.
+ *   Kept in sync by ApiProvider on boot and by the auth hooks on sign-in/out.
+ *   Do not write directly from screens — always go through auth hooks.
  */
 type AppStore = {
   hasSeenOnboarding: boolean;

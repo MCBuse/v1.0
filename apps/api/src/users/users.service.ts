@@ -18,6 +18,14 @@ export class UsersService {
     return results[0] ?? null;
   }
 
+  async findByPhone(phone: string) {
+    const results = await this.db
+      .select()
+      .from(schema.users)
+      .where(and(eq(schema.users.phone, phone), isNull(schema.users.deletedAt)));
+    return results[0] ?? null;
+  }
+
   async findById(id: string) {
     const results = await this.db
       .select({
@@ -39,7 +47,7 @@ export class UsersService {
   }
 
   async create(data: {
-    email: string;
+    email?: string;
     passwordHash: string;
     firstName: string;
     lastName: string;
@@ -49,7 +57,7 @@ export class UsersService {
       const results = await this.db
         .insert(schema.users)
         .values({
-          email: data.email,
+          email: data.email ?? null,
           passwordHash: data.passwordHash,
           firstName: data.firstName,
           lastName: data.lastName,
