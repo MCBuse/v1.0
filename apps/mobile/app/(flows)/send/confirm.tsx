@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Box, Button, Text } from '@/components/ui';
 import { AmountInput } from '@/components/ui/AmountInput';
-import { useExecutePayment, type PaymentResponse } from '@/features/payments';
+import { useExecutePayment, type ExecutePaymentResponse } from '@/features/payments';
 import { formatCurrency, toBaseUnits, truncateAddress } from '@/lib/currency';
 import type { Theme } from '@/theme';
 
@@ -47,7 +47,7 @@ export default function SendConfirmScreen() {
         ...(isStatic && { amount: baseUnits, currency }),
       },
       {
-        onSuccess: (data: PaymentResponse) => {
+        onSuccess: (data: ExecutePaymentResponse) => {
           router.replace(
             `/(flows)/send/success?txSignature=${encodeURIComponent(data.txSignature ?? '')}&amount=${encodeURIComponent(data.amount)}&currency=${encodeURIComponent(data.currency)}&recipientAddress=${encodeURIComponent(params.recipientAddress)}`,
           );

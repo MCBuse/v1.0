@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, Text } from '@/components/ui';
 import { QRDisplay } from '@/components/ui/QRDisplay';
 import { useCreatePaymentRequest } from '@/features/payments';
-import { useWallets } from '@/features/wallets';
+import { useWallets } from '@/features/wallet';
 import type { Theme } from '@/theme';
 
 export default function ReceiveScreen() {
@@ -22,7 +22,7 @@ export default function ReceiveScreen() {
     createRequest({ type: 'static' });
   }, []);
 
-  const routineAddress = wallets.data?.routine.solanaPubkey ?? '';
+  const routineAddress = wallets.data?.routine?.solanaPubkey ?? '';
   const isLoading = isPending || wallets.isLoading;
 
   return (
