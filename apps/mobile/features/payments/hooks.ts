@@ -1,29 +1,38 @@
 import { useOperation } from '@/lib/api';
 
-import type {
-  CreatePaymentRequestInput,
-  ExecutePaymentInput,
-  PaymentRequest,
-  PaymentResponse,
-  ResolveResponse,
+import {
+  type CreatePaymentRequestInput,
+  type ExecutePaymentInput,
+  type ExecutePaymentResponse,
+  type OnRampInput,
+  type OnRampResponse,
+  type PaymentRequest,
+  type ResolveResponse,
 } from './models';
-import { paymentsRepository } from './repository';
+import { paymentRepository } from './repository';
 
 export function useCreatePaymentRequest() {
   return useOperation<CreatePaymentRequestInput, PaymentRequest>({
-    mutationFn: (input) => paymentsRepository.createPaymentRequest(input),
+    mutationFn: (input) => paymentRepository.createPaymentRequest(input),
   });
 }
 
 export function useResolvePaymentRequest() {
   return useOperation<string, ResolveResponse>({
-    mutationFn: (nonce) => paymentsRepository.resolvePaymentRequest(nonce),
+    mutationFn: (nonce) => paymentRepository.resolveNonce(nonce),
   });
 }
 
 export function useExecutePayment() {
-  return useOperation<ExecutePaymentInput, PaymentResponse>({
-    mutationFn:     (input) => paymentsRepository.executePayment(input),
+  return useOperation<ExecutePaymentInput, ExecutePaymentResponse>({
+    mutationFn:     (input) => paymentRepository.executePayment(input),
+    invalidateKeys: [['wallets'], ['transactions']],
+  });
+}
+
+export function useTopUp() {
+  return useOperation<OnRampInput, OnRampResponse>({
+    mutationFn:     (input) => paymentRepository.topUp(input),
     invalidateKeys: [['wallets'], ['transactions']],
   });
 }

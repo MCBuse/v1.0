@@ -3,23 +3,31 @@ import { router } from 'expo-router';
 import {
   AddCircle,
   ArrowCircleDown,
+  ArrowCircleUp,
   ArrowSwapHorizontal,
   Notification,
   Scan,
   Send2,
-  Wallet3,
-  Wifi,
   type Icon as IconType,
 } from 'iconsax-react-native';
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Box, ListItem, Text } from '@/components/ui';
+import { Box, Text } from '@/components/ui';
 import { useTransactions } from '@/features/transactions';
-import { useWallets } from '@/features/wallets';
-import { formatAmount, formatCurrency, truncateAddress } from '@/lib/currency';
+import type { LedgerEntry } from '@/features/transactions';
+import { useWallets } from '@/features/wallet';
+import { formatAmount, formatRelativeTime, greetingForTime } from '@/lib/format';
 import type { Theme } from '@/theme';
+
+// ── Quick actions ──────────────────────────────────────────────────────────────
 
 type QuickAction = {
   Icon:  IconType;
@@ -34,28 +42,68 @@ const QUICK_ACTIONS: QuickAction[] = [
   { Icon: AddCircle,       label: 'Top Up',  route: '/(flows)/top-up'  },
 ];
 
-function txTypeLabel(type: string): string {
-  switch (type) {
-    case 'p2p':      return 'Transfer';
+// ── Transaction helpers ────────────────────────────────────────────────────────
+
+type Direction = 'credit' | 'debit';
+
+function txDirection(entry: LedgerEntry, walletIds: Set<string>): Direction {
+  return walletIds.has(entry.creditWalletId) ? 'credit' : 'debit';
+}
+
+function txLabel(entry: LedgerEntry, dir: Direction): string {
+  switch (entry.type) {
     case 'on_ramp':  return 'Top Up';
     case 'off_ramp': return 'Withdrawal';
-    case 'internal': return 'Internal';
+    case 'p2p':      return dir === 'credit' ? 'Received' : 'Sent';
     case 'swap':     return 'Swap';
-    default:         return type;
+    case 'internal': return 'Transfer';
+    default:         return 'Transaction';
   }
 }
+
+function TxIcon({ type, dir, color }: { type: LedgerEntry['type']; dir: Direction; color: string }) {
+  const size = 20;
+  if (type === 'on_ramp')  return <ArrowCircleDown size={size} color={color} variant="Bold" />;
+  if (type === 'off_ramp') return <ArrowCircleUp   size={size} color={color} variant="Bold" />;
+  if (type === 'p2p')      return dir === 'credit'
+    ? <ArrowCircleDown size={size} color={color} variant="Bold" />
+    : <Send2           size={size} color={color} variant="Bold" />;
+  return <ArrowSwapHorizontal size={size} color={color} variant="Bold" />;
+}
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
+  const [refreshing, setRefreshing] = useState(false);
 
-  const wallets = useWallets();
-  const txs = useTransactions({ limit: 5 });
+  const walletsQuery = useWallets();
+  const txQuery = useTransactions({ limit: 5 });
 
-  const routine = wallets.data?.routine;
-  const usdcBalance = routine?.balances.find((b) => b.currency === 'USDC');
-  const balanceDisplay = usdcBalance ? `$${formatAmount(usdcBalance.available)}` : '$0.00';
-  const addressDisplay = routine ? truncateAddress(routine.solanaPubkey) : 'Not connected';
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([walletsQuery.reload(), txQuery.reload()]);
+    setRefreshing(false);
+  }, [walletsQuery, txQuery]);
+
+  // Sum USDC across savings + routine
+  const totalUsdc = useMemo(() => {
+    const w = walletsQuery.data;
+    if (!w) return null;
+    const s = BigInt(w.savings?.balances.find(b => b.currency === 'USDC')?.available ?? '0');
+    const r = BigInt(w.routine?.balances.find(b => b.currency === 'USDC')?.available ?? '0');
+    return (s + r).toString();
+  }, [walletsQuery.data]);
+
+  // Set of the user's own wallet IDs — used to determine tx direction
+  const ownWalletIds = useMemo<Set<string>>(() => {
+    const w = walletsQuery.data;
+    if (!w) return new Set();
+    return new Set([w.savings?.id, w.routine?.id].filter(Boolean) as string[]);
+  }, [walletsQuery.data]);
+
+  const transactions = txQuery.data?.data ?? [];
 
   return (
     <ScrollView
@@ -65,8 +113,15 @@ export default function HomeScreen() {
         { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 },
       ]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.textSecondary}
+        />
+      }
     >
-      {/* ── Top bar ───────────────────────────────────────────────── */}
+      {/* ── Top bar ─────────────────────────────────────────────────── */}
       <Box
         flexDirection="row"
         alignItems="center"
@@ -76,7 +131,7 @@ export default function HomeScreen() {
       >
         <Box>
           <Text variant="caption" color="textSecondary">
-            Good morning
+            {greetingForTime()}
           </Text>
           <Text variant="h3">MCBuse</Text>
         </Box>
@@ -95,18 +150,14 @@ export default function HomeScreen() {
             alignItems="center"
             justifyContent="center"
           >
-            <Text
-              variant="captionMedium"
-              color="textInverse"
-              style={styles.avatarLetter}
-            >
+            <Text variant="captionMedium" color="textInverse" style={styles.avatarLetter}>
               M
             </Text>
           </Box>
         </Box>
       </Box>
 
-      {/* ── Balance card ──────────────────────────────────────────── */}
+      {/* ── Balance card ──────────────────────────────────────────────── */}
       <Box paddingHorizontal="2xl" marginBottom="2xl">
         <Box
           backgroundColor="bgInverse"
@@ -117,33 +168,35 @@ export default function HomeScreen() {
           <Text variant="caption" style={styles.dimText}>
             Total Balance
           </Text>
-          <Text variant="display" style={styles.balanceAmount}>
-            {balanceDisplay}
-          </Text>
 
-          <Box flexDirection="row" alignItems="center" gap="xs" marginTop="s">
-            <Wifi size={14} color="rgba(255,255,255,0.5)" variant="Linear" />
-            <Text variant="caption" style={styles.dimText}>
-              Solana Mainnet
+          {walletsQuery.isLoading ? (
+            <View style={styles.balancePlaceholder} />
+          ) : (
+            <Text variant="display" style={styles.balanceAmount}>
+              {totalUsdc !== null ? formatAmount(totalUsdc) : '$—'}
             </Text>
-          </Box>
+          )}
 
-          <Box
-            flexDirection="row"
-            alignItems="center"
-            gap="xs"
-            marginTop="xl"
-            style={styles.addressPill}
-          >
-            <Wallet3 size={14} color="rgba(255,255,255,0.6)" variant="Linear" />
-            <Text variant="caption" style={styles.dimText}>
-              {addressDisplay}
-            </Text>
+          <Box flexDirection="row" gap="l" marginTop="m">
+            {(['savings', 'routine'] as const).map((type) => {
+              const wallet = walletsQuery.data?.[type];
+              const usdc = wallet?.balances.find(b => b.currency === 'USDC')?.available ?? '0';
+              return (
+                <Box key={type}>
+                  <Text variant="caption" style={styles.dimTextSm}>
+                    {type === 'savings' ? 'Savings' : 'Spending'}
+                  </Text>
+                  <Text variant="captionMedium" style={styles.subBalance}>
+                    {walletsQuery.isLoading ? '—' : formatAmount(usdc)}
+                  </Text>
+                </Box>
+              );
+            })}
           </Box>
         </Box>
       </Box>
 
-      {/* ── Quick actions ─────────────────────────────────────────── */}
+      {/* ── Quick actions ────────────────────────────────────────────── */}
       <Box
         flexDirection="row"
         justifyContent="space-between"
@@ -153,11 +206,14 @@ export default function HomeScreen() {
         {QUICK_ACTIONS.map((action) => (
           <Box key={action.label} alignItems="center" gap="s">
             <Pressable
-              onPress={() => router.push(action.route as any)}
-              style={[
+              style={({ pressed }) => [
                 styles.actionBtn,
-                { backgroundColor: colors.bgSecondary },
+                {
+                  backgroundColor: colors.bgSecondary,
+                  opacity: pressed ? 0.7 : 1,
+                },
               ]}
+              onPress={() => router.push(action.route as any)}
             >
               <action.Icon size={22} color={colors.textPrimary} variant="Linear" />
             </Pressable>
@@ -168,7 +224,7 @@ export default function HomeScreen() {
         ))}
       </Box>
 
-      {/* ── Recent activity ───────────────────────────────────────── */}
+      {/* ── Recent activity ──────────────────────────────────────────── */}
       <Box paddingHorizontal="2xl">
         <Box
           flexDirection="row"
@@ -184,49 +240,57 @@ export default function HomeScreen() {
           </Pressable>
         </Box>
 
-        {txs.data && txs.data.data.length > 0 ? (
-          <Box backgroundColor="bgSecondary" borderRadius="xl" overflow="hidden">
-            {txs.data.data.map((tx, i) => (
-              <ListItem
-                key={tx.id}
-                title={txTypeLabel(tx.type)}
-                subtitle={new Date(tx.createdAt).toLocaleDateString()}
-                rightElement={
-                  <Text variant="captionMedium">
-                    {formatCurrency(tx.amount, tx.currency as 'USDC' | 'EURC')}
-                  </Text>
-                }
-                showChevron={false}
-              />
-            ))}
-          </Box>
+        {txQuery.isLoading ? (
+          <TransactionSkeleton colors={colors} />
+        ) : transactions.length === 0 ? (
+          <EmptyTransactions colors={colors} />
         ) : (
-          <Box
-            alignItems="center"
-            justifyContent="center"
-            paddingVertical="5xl"
-            gap="m"
-          >
-            <Box
-              width={56}
-              height={56}
-              borderRadius="full"
-              backgroundColor="bgSecondary"
-              alignItems="center"
-              justifyContent="center"
-            >
-              <ArrowSwapHorizontal size={24} color={colors.textTertiary} variant="Linear" />
-            </Box>
-            <Box alignItems="center" gap="xs">
-              <Text variant="bodyMedium">No transactions yet</Text>
-              <Text
-                variant="caption"
-                color="textSecondary"
-                style={styles.emptyCaption}
-              >
-                Send or receive money to see your activity here.
-              </Text>
-            </Box>
+          <Box gap="xs">
+            {transactions.map((entry) => {
+              const dir = txDirection(entry, ownWalletIds);
+              const label = txLabel(entry, dir);
+              const isCredit = dir === 'credit';
+              return (
+                <Box
+                  key={entry.id}
+                  flexDirection="row"
+                  alignItems="center"
+                  gap="m"
+                  paddingVertical="m"
+                  style={[styles.txRow, { borderBottomColor: colors.borderSubtle }]}
+                >
+                  <Box
+                    width={40}
+                    height={40}
+                    borderRadius="m"
+                    backgroundColor="bgSecondary"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <TxIcon type={entry.type} dir={dir} color={colors.textPrimary} />
+                  </Box>
+
+                  <Box flex={1}>
+                    <Text variant="bodyMedium">{label}</Text>
+                    <Text variant="caption" color="textTertiary">
+                      {formatRelativeTime(entry.createdAt)}
+                    </Text>
+                  </Box>
+
+                  <Box alignItems="flex-end">
+                    <Text
+                      variant="bodySemibold"
+                      style={{ color: isCredit ? '#22C55E' : colors.textPrimary }}
+                    >
+                      {isCredit ? '+' : '-'}{formatAmount(entry.amount, entry.currency)}
+                    </Text>
+                    <Text variant="caption" color="textTertiary">
+                      {entry.status}
+                    </Text>
+                  </Box>
+                </Box>
+              );
+            })}
           </Box>
         )}
       </Box>
@@ -234,8 +298,52 @@ export default function HomeScreen() {
   );
 }
 
+// ── Subcomponents ──────────────────────────────────────────────────────────────
+
+function EmptyTransactions({ colors }: { colors: Theme['colors'] }) {
+  return (
+    <Box alignItems="center" justifyContent="center" paddingVertical="5xl" gap="m">
+      <Box
+        width={56}
+        height={56}
+        borderRadius="full"
+        backgroundColor="bgSecondary"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <ArrowSwapHorizontal size={24} color={colors.textTertiary} variant="Linear" />
+      </Box>
+      <Box alignItems="center" gap="xs">
+        <Text variant="bodyMedium">No transactions yet</Text>
+        <Text variant="caption" color="textSecondary" style={styles.emptyCaption}>
+          Send or receive money to see your activity here.
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+function TransactionSkeleton({ colors }: { colors: Theme['colors'] }) {
+  return (
+    <Box gap="xs">
+      {[0, 1, 2].map((i) => (
+        <Box key={i} flexDirection="row" alignItems="center" gap="m" paddingVertical="m">
+          <Box width={40} height={40} borderRadius="m" style={{ backgroundColor: colors.bgSecondary }} />
+          <Box flex={1} gap="xs">
+            <Box height={14} borderRadius="xs" width="50%" style={{ backgroundColor: colors.bgSecondary }} />
+            <Box height={11} borderRadius="xs" width="30%" style={{ backgroundColor: colors.bgSecondary }} />
+          </Box>
+          <Box height={14} borderRadius="xs" width={60} style={{ backgroundColor: colors.bgSecondary }} />
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root:    { flex: 1 },
   content: { flexGrow: 1 },
 
   balanceCard: {
@@ -245,14 +353,16 @@ const styles = StyleSheet.create({
     shadowRadius:  12,
     elevation:     6,
   },
-  dimText:       { color: 'rgba(255,255,255,0.55)' },
-  balanceAmount: { color: '#fff', marginTop: 8 },
-  addressPill: {
+  dimText:            { color: 'rgba(255,255,255,0.55)' },
+  dimTextSm:          { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+  subBalance:         { color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  balanceAmount:      { color: '#fff', marginTop: 8 },
+  balancePlaceholder: {
+    height:          56,
+    marginTop:       8,
+    borderRadius:    8,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 10,
-    paddingVertical:   6,
-    borderRadius:      99,
-    alignSelf:         'flex-start',
+    width:           '60%',
   },
 
   actionBtn: {
@@ -270,5 +380,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarLetter: { fontSize: 14 },
+
+  txRow:        { borderBottomWidth: StyleSheet.hairlineWidth },
   emptyCaption: { textAlign: 'center', maxWidth: 220 },
 });

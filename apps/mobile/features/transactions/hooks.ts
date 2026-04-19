@@ -1,11 +1,11 @@
 import { useDataScreen } from '@/lib/api';
 
-import type { TransactionListParams, TransactionListResponse } from './models';
-import { transactionsRepository } from './repository';
+import { transactionRepository } from './repository';
+import type { TransactionListResponse, TransactionQuery } from './models';
 
-export function useTransactions(params: TransactionListParams = {}) {
+export function useTransactions(query?: TransactionQuery) {
   return useDataScreen<TransactionListResponse>({
-    queryKey: ['transactions', params],
-    queryFn:  () => transactionsRepository.listTransactions(params),
+    queryKey: ['transactions', query ?? {}],
+    queryFn:  () => transactionRepository.list(query),
   });
 }
