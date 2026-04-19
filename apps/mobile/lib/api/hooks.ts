@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   useMutation,
   useQuery,
@@ -20,16 +20,18 @@ import { ApiError } from './errors';
 export function useDataScreen<TData, TError = ApiError>(
   options: UseQueryOptions<TData, TError, TData, QueryKey>,
 ) {
-  const queryClient = useQueryClient();
-  const query       = useQuery<TData, TError, TData, QueryKey>(options);
+  const queryClient  = useQueryClient();
+  const query        = useQuery<TData, TError, TData, QueryKey>(options);
+  const queryKeyRef  = useRef(options.queryKey);
+  useEffect(() => { queryKeyRef.current = options.queryKey; });
 
   useFocusEffect(
     useCallback(() => {
-      const state = queryClient.getQueryState(options.queryKey);
+      const state = queryClient.getQueryState(queryKeyRef.current);
       if (state?.isInvalidated || state?.status === 'error') {
-        query.refetch();
+        queryClient.refetchQueries({ queryKey: queryKeyRef.current });
       }
-    }, [queryClient, options.queryKey, query]),
+    }, [queryClient]),
   );
 
   const reload = useCallback(

@@ -25,18 +25,20 @@ import { useTransactions } from '@/features/transactions';
 import type { LedgerEntry } from '@/features/transactions';
 import { useWallets } from '@/features/wallet';
 import { formatAmount, formatRelativeTime, greetingForTime } from '@/lib/format';
+import { formatCurrency } from '@/lib/currency';
 import type { Theme } from '@/theme';
 
 // ── Quick actions ──────────────────────────────────────────────────────────────
 
 type QuickAction = {
-  Icon:  IconType;
-  label: string;
-  route: string;
+  Icon:     IconType;
+  label:    string;
+  route:    string;
+  primary?: boolean;
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { Icon: Send2,           label: 'Send',    route: '/(flows)/scan'    },
+  { Icon: Send2,           label: 'Send',    route: '/(flows)/send',    primary: true },
   { Icon: ArrowCircleDown, label: 'Receive', route: '/(flows)/receive' },
   { Icon: Scan,            label: 'Scan',    route: '/(flows)/scan'    },
   { Icon: AddCircle,       label: 'Top Up',  route: '/(flows)/top-up'  },
@@ -61,8 +63,17 @@ function txLabel(entry: LedgerEntry, dir: Direction): string {
   }
 }
 
-function TxIcon({ type, dir, color }: { type: LedgerEntry['type']; dir: Direction; color: string }) {
-  const size = 20;
+function TxIcon({
+  type,
+  dir,
+  isCredit,
+}: {
+  type: LedgerEntry['type'];
+  dir: Direction;
+  isCredit: boolean;
+}) {
+  const size  = 20;
+  const color = isCredit ? '#16A34A' : '#374151';
   if (type === 'on_ramp')  return <ArrowCircleDown size={size} color={color} variant="Bold" />;
   if (type === 'off_ramp') return <ArrowCircleUp   size={size} color={color} variant="Bold" />;
   if (type === 'p2p')      return dir === 'credit'
@@ -75,11 +86,11 @@ function TxIcon({ type, dir, color }: { type: LedgerEntry['type']; dir: Directio
 
 export default function HomeScreen() {
   const { colors } = useTheme<Theme>();
-  const insets = useSafeAreaInsets();
+  const insets     = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
   const walletsQuery = useWallets();
-  const txQuery = useTransactions({ limit: 5 });
+  const txQuery      = useTransactions({ limit: 5 });
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -87,16 +98,19 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [walletsQuery, txQuery]);
 
-  // Sum USDC across savings + routine
-  const totalUsdc = useMemo(() => {
+  const totals = useMemo(() => {
     const w = walletsQuery.data;
-    if (!w) return null;
-    const s = BigInt(w.savings?.balances.find(b => b.currency === 'USDC')?.available ?? '0');
-    const r = BigInt(w.routine?.balances.find(b => b.currency === 'USDC')?.available ?? '0');
-    return (s + r).toString();
+    if (!w) return { usdc: null, eurc: null };
+    const savingsUsdc = BigInt(w.savings?.balances.find(b => b.currency === 'USDC')?.available ?? '0');
+    const routineUsdc = BigInt(w.routine?.balances.find(b => b.currency === 'USDC')?.available ?? '0');
+    const savingsEurc = BigInt(w.savings?.balances.find(b => b.currency === 'EURC')?.available ?? '0');
+    const routineEurc = BigInt(w.routine?.balances.find(b => b.currency === 'EURC')?.available ?? '0');
+    return {
+      usdc: (savingsUsdc + routineUsdc).toString(),
+      eurc: (savingsEurc + routineEurc).toString(),
+    };
   }, [walletsQuery.data]);
 
-  // Set of the user's own wallet IDs — used to determine tx direction
   const ownWalletIds = useMemo<Set<string>>(() => {
     const w = walletsQuery.data;
     if (!w) return new Set();
@@ -127,7 +141,7 @@ export default function HomeScreen() {
         alignItems="center"
         justifyContent="space-between"
         paddingHorizontal="2xl"
-        marginBottom="2xl"
+        marginBottom="xl"
       >
         <Box>
           <Text variant="caption" color="textSecondary">
@@ -137,10 +151,8 @@ export default function HomeScreen() {
         </Box>
 
         <Box flexDirection="row" alignItems="center" gap="m">
-          <Pressable
-            style={[styles.iconBtn, { backgroundColor: colors.bgSecondary }]}
-          >
-            <Notification size={20} color={colors.textPrimary} variant="Linear" />
+          <Pressable style={[styles.iconBtn, { backgroundColor: colors.bgSecondary }]}>
+            <Notification size={18} color={colors.textPrimary} variant="Linear" />
           </Pressable>
           <Box
             width={36}
@@ -173,16 +185,28 @@ export default function HomeScreen() {
             <View style={styles.balancePlaceholder} />
           ) : (
             <Text variant="display" style={styles.balanceAmount}>
-              {totalUsdc !== null ? formatAmount(totalUsdc) : '$—'}
+              {totals.usdc !== null ? formatAmount(totals.usdc) : '$—'}
             </Text>
           )}
 
-          <Box flexDirection="row" gap="l" marginTop="m">
+          {/* EURC badge — only when non-zero */}
+          {totals.eurc !== null && totals.eurc !== '0' && !walletsQuery.isLoading && (
+            <View style={styles.eurcBadge}>
+              <Text variant="caption" style={styles.eurcText}>
+                {formatCurrency(totals.eurc, 'EURC')} available
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.divider} />
+
+          {/* Savings / Spending */}
+          <Box flexDirection="row" gap="xl">
             {(['savings', 'routine'] as const).map((type) => {
               const wallet = walletsQuery.data?.[type];
-              const usdc = wallet?.balances.find(b => b.currency === 'USDC')?.available ?? '0';
+              const usdc   = wallet?.balances.find(b => b.currency === 'USDC')?.available ?? '0';
               return (
-                <Box key={type}>
+                <Box key={type} flex={1}>
                   <Text variant="caption" style={styles.dimTextSm}>
                     {type === 'savings' ? 'Savings' : 'Spending'}
                   </Text>
@@ -208,16 +232,23 @@ export default function HomeScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.actionBtn,
-                {
-                  backgroundColor: colors.bgSecondary,
-                  opacity: pressed ? 0.7 : 1,
-                },
+                action.primary
+                  ? { backgroundColor: colors.brand }
+                  : { backgroundColor: colors.bgSecondary, borderWidth: 1, borderColor: colors.borderSubtle },
+                { opacity: pressed ? 0.72 : 1 },
               ]}
               onPress={() => router.push(action.route as any)}
             >
-              <action.Icon size={22} color={colors.textPrimary} variant="Linear" />
+              <action.Icon
+                size={22}
+                color={action.primary ? colors.textInverse : colors.textPrimary}
+                variant="Linear"
+              />
             </Pressable>
-            <Text variant="label" color="textSecondary">
+            <Text
+              variant="label"
+              style={{ color: action.primary ? colors.textPrimary : colors.textSecondary }}
+            >
               {action.label}
             </Text>
           </Box>
@@ -234,21 +265,19 @@ export default function HomeScreen() {
         >
           <Text variant="h3">Recent Activity</Text>
           <Pressable onPress={() => router.push('/(tabs)/activity')}>
-            <Text variant="caption" color="textBrand">
-              See all
-            </Text>
+            <Text variant="caption" color="textBrand">See all</Text>
           </Pressable>
         </Box>
 
         {txQuery.isLoading ? (
-          <TransactionSkeleton colors={colors} />
+          <TransactionSkeleton />
         ) : transactions.length === 0 ? (
-          <EmptyTransactions colors={colors} />
+          <EmptyTransactions />
         ) : (
           <Box gap="xs">
             {transactions.map((entry) => {
-              const dir = txDirection(entry, ownWalletIds);
-              const label = txLabel(entry, dir);
+              const dir      = txDirection(entry, ownWalletIds);
+              const label    = txLabel(entry, dir);
               const isCredit = dir === 'credit';
               return (
                 <Box
@@ -260,14 +289,18 @@ export default function HomeScreen() {
                   style={[styles.txRow, { borderBottomColor: colors.borderSubtle }]}
                 >
                   <Box
-                    width={40}
-                    height={40}
-                    borderRadius="m"
-                    backgroundColor="bgSecondary"
+                    width={44}
+                    height={44}
+                    borderRadius="l"
                     alignItems="center"
                     justifyContent="center"
+                    style={{
+                      backgroundColor: isCredit
+                        ? 'rgba(22,163,74,0.1)'
+                        : colors.bgSecondary,
+                    }}
                   >
-                    <TxIcon type={entry.type} dir={dir} color={colors.textPrimary} />
+                    <TxIcon type={entry.type} dir={dir} isCredit={isCredit} />
                   </Box>
 
                   <Box flex={1}>
@@ -280,13 +313,33 @@ export default function HomeScreen() {
                   <Box alignItems="flex-end">
                     <Text
                       variant="bodySemibold"
-                      style={{ color: isCredit ? '#22C55E' : colors.textPrimary }}
+                      style={{ color: isCredit ? '#16A34A' : colors.textPrimary }}
                     >
                       {isCredit ? '+' : '-'}{formatAmount(entry.amount, entry.currency)}
                     </Text>
-                    <Text variant="caption" color="textTertiary">
-                      {entry.status}
-                    </Text>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor:
+                            entry.status === 'completed' ? 'rgba(22,163,74,0.08)'
+                            : entry.status === 'failed'  ? 'rgba(239,68,68,0.08)'
+                            : 'rgba(0,0,0,0.05)',
+                        },
+                      ]}
+                    >
+                      <Text
+                        variant="label"
+                        style={{
+                          color:
+                            entry.status === 'completed' ? '#16A34A'
+                            : entry.status === 'failed'  ? '#EF4444'
+                            : colors.textTertiary,
+                        }}
+                      >
+                        {entry.status}
+                      </Text>
+                    </View>
                   </Box>
                 </Box>
               );
@@ -300,7 +353,8 @@ export default function HomeScreen() {
 
 // ── Subcomponents ──────────────────────────────────────────────────────────────
 
-function EmptyTransactions({ colors }: { colors: Theme['colors'] }) {
+function EmptyTransactions() {
+  const { colors } = useTheme<Theme>();
   return (
     <Box alignItems="center" justifyContent="center" paddingVertical="5xl" gap="m">
       <Box
@@ -323,12 +377,13 @@ function EmptyTransactions({ colors }: { colors: Theme['colors'] }) {
   );
 }
 
-function TransactionSkeleton({ colors }: { colors: Theme['colors'] }) {
+function TransactionSkeleton() {
+  const { colors } = useTheme<Theme>();
   return (
     <Box gap="xs">
       {[0, 1, 2].map((i) => (
         <Box key={i} flexDirection="row" alignItems="center" gap="m" paddingVertical="m">
-          <Box width={40} height={40} borderRadius="m" style={{ backgroundColor: colors.bgSecondary }} />
+          <Box width={44} height={44} borderRadius="l" style={{ backgroundColor: colors.bgSecondary }} />
           <Box flex={1} gap="xs">
             <Box height={14} borderRadius="xs" width="50%" style={{ backgroundColor: colors.bgSecondary }} />
             <Box height={11} borderRadius="xs" width="30%" style={{ backgroundColor: colors.bgSecondary }} />
@@ -347,16 +402,16 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1 },
 
   balanceCard: {
-    shadowColor:   '#000',
-    shadowOffset:  { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius:  12,
-    elevation:     6,
+    shadowColor:    '#000',
+    shadowOffset:   { width: 0, height: 4 },
+    shadowOpacity:  0.18,
+    shadowRadius:   16,
+    elevation:      8,
   },
-  dimText:            { color: 'rgba(255,255,255,0.55)' },
+  dimText:            { color: 'rgba(255,255,255,0.5)' },
   dimTextSm:          { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
-  subBalance:         { color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-  balanceAmount:      { color: '#fff', marginTop: 8 },
+  subBalance:         { color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  balanceAmount:      { color: '#fff', marginTop: 6 },
   balancePlaceholder: {
     height:          56,
     marginTop:       8,
@@ -364,11 +419,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     width:           '60%',
   },
+  eurcBadge: {
+    alignSelf:         'flex-start',
+    backgroundColor:   'rgba(255,255,255,0.12)',
+    paddingHorizontal: 10,
+    paddingVertical:   4,
+    borderRadius:      20,
+    marginTop:         8,
+  },
+  eurcText: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  divider: {
+    height:          1,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginVertical:  16,
+  },
 
   actionBtn: {
-    width:          56,
-    height:         56,
-    borderRadius:   16,
+    width:          60,
+    height:         60,
+    borderRadius:   20,
     alignItems:     'center',
     justifyContent: 'center',
   },
@@ -381,6 +450,12 @@ const styles = StyleSheet.create({
   },
   avatarLetter: { fontSize: 14 },
 
-  txRow:        { borderBottomWidth: StyleSheet.hairlineWidth },
+  txRow:       { borderBottomWidth: StyleSheet.hairlineWidth },
+  statusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical:   2,
+    borderRadius:      4,
+    marginTop:         2,
+  },
   emptyCaption: { textAlign: 'center', maxWidth: 220 },
 });

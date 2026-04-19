@@ -3,11 +3,11 @@ import axios, {
   type AxiosInstance,
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
-} from 'axios';
+} from "axios";
 
-import { env } from './env';
-import { toApiError } from './errors';
-import { authSession } from './session';
+import { env } from "./env";
+import { toApiError } from "./errors";
+import { authSession } from "./session";
 
 type RetriableRequest = InternalAxiosRequestConfig & { _retried?: boolean };
 
@@ -24,7 +24,7 @@ export function setOnAuthExpired(handler: (() => void) | null): void {
 export const api: AxiosInstance = axios.create({
   baseURL: env.apiBaseUrl,
   timeout: 15_000,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { "Content-Type": "application/json" },
 });
 
 // ── Request interceptor: attach Authorization header ────────────────────────
@@ -47,10 +47,10 @@ async function performRefresh(): Promise<string | null> {
     const res = await axios.post<{ accessToken: string; refreshToken: string }>(
       `${env.apiBaseUrl}/auth/refresh`,
       { refreshToken: tokens.refreshToken },
-      { headers: { 'Content-Type': 'application/json' } },
+      { headers: { "Content-Type": "application/json" } },
     );
     await authSession.set({
-      accessToken:  res.data.accessToken,
+      accessToken: res.data.accessToken,
       refreshToken: res.data.refreshToken,
     });
     return res.data.accessToken;
@@ -63,16 +63,19 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const original = error.config as RetriableRequest | undefined;
-    const status   = error.response?.status;
+    const status = error.response?.status;
 
     // The refresh endpoint itself failing should not trigger another refresh.
     const isRefreshCall =
-      typeof original?.url === 'string' && original.url.includes('/auth/refresh');
+      typeof original?.url === "string" &&
+      original.url.includes("/auth/refresh");
 
     if (status === 401 && original && !original._retried && !isRefreshCall) {
       original._retried = true;
 
-      refreshPromise ??= performRefresh().finally(() => { refreshPromise = null; });
+      refreshPromise ??= performRefresh().finally(() => {
+        refreshPromise = null;
+      });
       const newAccessToken = await refreshPromise;
 
       if (newAccessToken) {
@@ -103,14 +106,14 @@ async function request<T>(config: AxiosRequestConfig): Promise<T> {
 }
 
 export const http = {
-  get:    <T>(url: string, config?: AxiosRequestConfig) =>
-    request<T>({ ...config, method: 'GET', url }),
-  post:   <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
-    request<T>({ ...config, method: 'POST', url, data }),
-  put:    <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
-    request<T>({ ...config, method: 'PUT', url, data }),
-  patch:  <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
-    request<T>({ ...config, method: 'PATCH', url, data }),
+  get: <T>(url: string, config?: AxiosRequestConfig) =>
+    request<T>({ ...config, method: "GET", url }),
+  post: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
+    request<T>({ ...config, method: "POST", url, data }),
+  put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
+    request<T>({ ...config, method: "PUT", url, data }),
+  patch: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
+    request<T>({ ...config, method: "PATCH", url, data }),
   delete: <T>(url: string, config?: AxiosRequestConfig) =>
-    request<T>({ ...config, method: 'DELETE', url }),
+    request<T>({ ...config, method: "DELETE", url }),
 };
