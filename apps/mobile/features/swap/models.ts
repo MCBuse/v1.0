@@ -15,6 +15,7 @@ export const swapPreviewResponse = z.object({
   rate:         z.string(),
   fee:          z.string(),
   feeCurrency:  z.string(),
+  rateDisplay:  z.string().optional(),
 });
 export type SwapPreviewResponse = z.infer<typeof swapPreviewResponse>;
 

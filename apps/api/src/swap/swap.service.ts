@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { WalletsService } from '../wallets/wallets.service';
+import { RatesService } from '../rates/rates.service';
 import type { SwapProvider } from './swap-provider.interface';
 import { SWAP_PROVIDER } from './swap-provider.interface';
 import { PreviewSwapDto } from './dto/preview-swap.dto';
@@ -23,22 +24,40 @@ export class SwapService {
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     @Inject(SWAP_PROVIDER) private readonly provider: SwapProvider,
     private readonly walletsService: WalletsService,
+    private readonly ratesService: RatesService,
   ) {}
 
   /**
    * Return a rate quote without executing any state change.
    */
   async preview(userId: string, dto: PreviewSwapDto) {
-    this.validatePair(dto.fromCurrency, dto.toCurrency);
+    const fromCurrency = dto.fromCurrency.toUpperCase();
+    const toCurrency = dto.toCurrency.toUpperCase();
+    this.validatePair(fromCurrency, toCurrency);
     const fromAmount = this.parseAmount(dto.fromAmount);
 
-    const result = await this.provider.preview({
-      fromCurrency: dto.fromCurrency.toUpperCase(),
-      toCurrency: dto.toCurrency.toUpperCase(),
-      fromAmount,
-    });
+    const livePreview = this.ratesService.preview(
+      Number(fromAmount) / 1_000_000,
+      fromCurrency,
+      toCurrency,
+    );
+    console.log('🚀 ~ SwapService ~ preview ~ livePreview:', livePreview);
 
-    return this.serializePreview(result);
+    const toAmountUnits = BigInt(
+      Math.round(livePreview.estimatedOutput * 1_000_000),
+    );
+    const feeUnits = BigInt(Math.round(livePreview.fee * 1_000_000));
+
+    return {
+      fromCurrency,
+      toCurrency,
+      fromAmount: fromAmount.toString(),
+      toAmount: toAmountUnits.toString(),
+      rate: livePreview.rate.toFixed(6),
+      fee: feeUnits.toString(),
+      feeCurrency: toCurrency,
+      rateDisplay: livePreview.rateDisplay,
+    };
   }
 
   /**
@@ -58,12 +77,8 @@ export class SwapService {
 
     const idempotencyKey = randomUUID();
 
-    // Get rate from provider first (outside transaction — read-only)
-    const preview = await this.provider.preview({
-      fromCurrency,
-      toCurrency,
-      fromAmount,
-    });
+    // Get live rate (outside transaction — read-only)
+    const liveRate = this.ratesService.getRate(fromCurrency, toCurrency);
 
     // Execute with provider (mock: instant; real: DEX call)
     const swapResult = await this.provider.execute({
@@ -134,30 +149,30 @@ export class SwapService {
         toCurrency,
         fromAmount: swapResult.fromAmount.toString(),
         toAmount: swapResult.toAmount.toString(),
-        rate: preview.rate,
+        rate: liveRate.toFixed(6),
         fee: swapResult.fee.toString(),
         externalId: swapResult.externalId,
       });
       await tx.insert(schema.ledgerEntries).values([
         {
           // Debit side: source currency leaves the savings wallet
-          debitWalletId:  savings.id,
+          debitWalletId: savings.id,
           creditWalletId: savings.id,
-          amount:   swapResult.fromAmount,
+          amount: swapResult.fromAmount,
           currency: fromCurrency,
-          type:     'swap',
-          status:   swapResult.status,
+          type: 'swap',
+          status: swapResult.status,
           idempotencyKey,
           metadata: sharedMeta,
         },
         {
           // Credit side: target currency arrives in the savings wallet
-          debitWalletId:  savings.id,
+          debitWalletId: savings.id,
           creditWalletId: savings.id,
-          amount:   swapResult.toAmount,
+          amount: swapResult.toAmount,
           currency: toCurrency,
-          type:     'swap',
-          status:   swapResult.status,
+          type: 'swap',
+          status: swapResult.status,
           // idempotencyKey must be unique per entry — append suffix
           idempotencyKey: `${idempotencyKey}_credit`,
           metadata: sharedMeta,
@@ -181,7 +196,7 @@ export class SwapService {
       toCurrency,
       fromAmount: swapResult.fromAmount.toString(),
       toAmount: swapResult.toAmount.toString(),
-      rate: preview.rate,
+      rate: liveRate.toFixed(6),
       fee: swapResult.fee.toString(),
       feeCurrency: swapResult.feeCurrency,
       externalId: swapResult.externalId,
@@ -206,11 +221,14 @@ export class SwapService {
 
   private parseAmount(raw: string): bigint {
     const amount = BigInt(raw);
-    if (amount <= 0n) throw new BadRequestException('fromAmount must be positive');
+    if (amount <= 0n)
+      throw new BadRequestException('fromAmount must be positive');
     return amount;
   }
 
-  private serializePreview(result: Awaited<ReturnType<SwapProvider['preview']>>) {
+  private serializePreview(
+    result: Awaited<ReturnType<SwapProvider['preview']>>,
+  ) {
     return {
       fromCurrency: result.fromCurrency,
       toCurrency: result.toCurrency,

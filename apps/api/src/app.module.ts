@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validate } from './config/config.validation';
@@ -22,6 +23,7 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { OffRampModule } from './offramp/offramp.module';
 import { NfcModule } from './nfc/nfc.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { RatesModule } from './rates/rates.module';
 
 @Module({
   imports: [
@@ -41,6 +43,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
         },
       ],
     }),
+    ScheduleModule.forRoot(),
     LoggingModule,
     DatabaseModule,
     HealthModule,
@@ -57,6 +60,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     TransactionsModule,
     OffRampModule,
     NfcModule,
+    RatesModule,
   ],
   controllers: [AppController],
   providers: [

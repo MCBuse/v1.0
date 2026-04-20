@@ -8,9 +8,10 @@ import { SWAP_PROVIDER } from './swap-provider.interface';
 import { WalletsModule } from '../wallets/wallets.module';
 import { UsersModule } from '../users/users.module';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
+import { RatesModule } from '../rates/rates.module';
 
 @Module({
-  imports: [ConfigModule, WalletsModule, UsersModule],
+  imports: [ConfigModule, WalletsModule, UsersModule, RatesModule],
   providers: [
     MockSwapProvider,
     JupiterSwapProvider,
