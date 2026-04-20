@@ -18,7 +18,7 @@ export const walletSchema = z.object({
 export type Wallet = z.infer<typeof walletSchema>;
 
 export const walletsResponseSchema = z.object({
-  savings: walletSchema,
-  routine: walletSchema,
+  savings: walletSchema.optional(),
+  routine: walletSchema.optional(),
 });
 export type WalletsResponse = z.infer<typeof walletsResponseSchema>;

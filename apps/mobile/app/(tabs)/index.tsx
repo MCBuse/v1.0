@@ -5,9 +5,11 @@ import {
   ArrowCircleDown,
   ArrowCircleUp,
   ArrowSwapHorizontal,
+  Bank,
   Notification,
   Scan,
   Send2,
+  TransactionMinus,
   type Icon as IconType,
 } from "iconsax-react-native";
 import React, { useCallback, useMemo, useState } from "react";
@@ -25,7 +27,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Box, Text } from "@/components/ui";
 import { useTransactions } from "@/features/transactions";
 import type { LedgerEntry } from "@/features/transactions";
-import { useWallets } from "@/features/wallet";
+import { useWallets } from "@/features/wallets";
 import {
   formatAmount,
   formatRelativeTime,
@@ -47,6 +49,12 @@ const QUICK_ACTIONS: QuickAction[] = [
   { Icon: ArrowCircleDown, label: "Receive", route: "/(flows)/receive" },
   { Icon: Scan, label: "Scan", route: "/(flows)/scan" },
   { Icon: AddCircle, label: "Top Up", route: "/(flows)/top-up" },
+];
+
+const SAVINGS_ACTIONS: QuickAction[] = [
+  { Icon: TransactionMinus, label: "Move", route: "/(flows)/transfer" },
+  { Icon: ArrowSwapHorizontal, label: "Swap", route: "/(flows)/swap" },
+  { Icon: Bank, label: "Cash Out", route: "/(flows)/cashout" },
 ];
 
 // ── Transaction helpers ────────────────────────────────────────────────────────
@@ -234,7 +242,7 @@ export default function HomeScreen() {
         flexDirection="row"
         justifyContent="space-between"
         paddingHorizontal="2xl"
-        marginBottom="3xl"
+        marginBottom="xl"
       >
         {QUICK_ACTIONS.map((action) => (
           <Box key={action.label} alignItems="center" gap="s">
@@ -260,16 +268,42 @@ export default function HomeScreen() {
             </Pressable>
             <Text
               variant="label"
-              style={{
-                color: action.primary
-                  ? colors.textPrimary
-                  : colors.textSecondary,
-              }}
+              style={{ color: action.primary ? colors.textPrimary : colors.textSecondary }}
             >
               {action.label}
             </Text>
           </Box>
         ))}
+      </Box>
+
+      {/* ── Savings actions ──────────────────────────────────────────── */}
+      <Box
+        marginHorizontal="2xl"
+        marginBottom="3xl"
+        padding="l"
+        backgroundColor="bgSecondary"
+        borderRadius="xl"
+      >
+        <Text variant="label" color="textTertiary" style={{ marginBottom: 12 }}>
+          SAVINGS WALLET
+        </Text>
+        <Box flexDirection="row" justifyContent="space-around">
+          {SAVINGS_ACTIONS.map((action) => (
+            <Box key={action.label} alignItems="center" gap="s">
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  { backgroundColor: colors.bgPrimary, borderWidth: 1, borderColor: colors.borderSubtle },
+                  { opacity: pressed ? 0.72 : 1 },
+                ]}
+                onPress={() => router.push(action.route as any)}
+              >
+                <action.Icon size={22} color={colors.textPrimary} variant="Linear" />
+              </Pressable>
+              <Text variant="label" color="textSecondary">{action.label}</Text>
+            </Box>
+          ))}
+        </Box>
       </Box>
 
       {/* ── Recent activity ──────────────────────────────────────────── */}

@@ -128,25 +128,41 @@ export class SwapService {
         );
       }
 
-      // Double-entry ledger — same wallet on both sides (intra-wallet currency exchange)
-      await tx.insert(schema.ledgerEntries).values({
-        debitWalletId: savings.id,
-        creditWalletId: savings.id,
-        amount: swapResult.fromAmount,
-        currency: fromCurrency,
-        type: 'swap',
-        status: swapResult.status,
-        idempotencyKey,
-        metadata: JSON.stringify({
-          fromCurrency,
-          toCurrency,
-          fromAmount: swapResult.fromAmount.toString(),
-          toAmount: swapResult.toAmount.toString(),
-          rate: preview.rate,
-          fee: swapResult.fee.toString(),
-          externalId: swapResult.externalId,
-        }),
+      // Double-entry ledger — two entries for a swap (one per currency side)
+      const sharedMeta = JSON.stringify({
+        fromCurrency,
+        toCurrency,
+        fromAmount: swapResult.fromAmount.toString(),
+        toAmount: swapResult.toAmount.toString(),
+        rate: preview.rate,
+        fee: swapResult.fee.toString(),
+        externalId: swapResult.externalId,
       });
+      await tx.insert(schema.ledgerEntries).values([
+        {
+          // Debit side: source currency leaves the savings wallet
+          debitWalletId:  savings.id,
+          creditWalletId: savings.id,
+          amount:   swapResult.fromAmount,
+          currency: fromCurrency,
+          type:     'swap',
+          status:   swapResult.status,
+          idempotencyKey,
+          metadata: sharedMeta,
+        },
+        {
+          // Credit side: target currency arrives in the savings wallet
+          debitWalletId:  savings.id,
+          creditWalletId: savings.id,
+          amount:   swapResult.toAmount,
+          currency: toCurrency,
+          type:     'swap',
+          status:   swapResult.status,
+          // idempotencyKey must be unique per entry — append suffix
+          idempotencyKey: `${idempotencyKey}_credit`,
+          metadata: sharedMeta,
+        },
+      ]);
     });
 
     this.logger.log(

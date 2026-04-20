@@ -8,7 +8,7 @@ import QRCode from 'react-native-qrcode-svg';
 
 import { Box, Button, Text } from '@/components/ui';
 import { useCreatePaymentRequest } from '@/features/payments';
-import { useWallets } from '@/features/wallet';
+import { useWallets } from '@/features/wallets';
 import { truncateAddress } from '@/lib/currency';
 import type { Theme } from '@/theme';
 
