@@ -98,6 +98,18 @@ export class EnvironmentVariables {
   @IsString()
   CIRCLE_API_KEY?: string;
 
+  @IsOptional()
+  @IsString()
+  CIRCLE_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  CIRCLE_WEBHOOK_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  CIRCLE_SETTLEMENT_MODE?: string; // 'polling' (default) | 'webhook'
+
   @IsNumber()
   THROTTLE_TTL: number;
 

@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
 
 export class InitiateOnRampDto {
   @ApiProperty({
@@ -13,4 +13,11 @@ export class InitiateOnRampDto {
   @ApiProperty({ enum: ['USDC', 'EURC'], example: 'USDC' })
   @IsIn(['USDC', 'EURC'])
   currency: string;
+
+  @ApiPropertyOptional({
+    description: 'Circle card ID from POST /onramp/cards. Required when ONRAMP_PROVIDER=circle.',
+  })
+  @IsString()
+  @IsOptional()
+  cardSourceId?: string;
 }

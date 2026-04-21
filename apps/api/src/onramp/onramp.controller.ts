@@ -1,7 +1,8 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OnRampService } from './onramp.service';
 import { InitiateOnRampDto } from './dto/initiate-onramp.dto';
+import { CreateCardDto } from './dto/create-card.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 
@@ -20,5 +21,18 @@ export class OnRampController {
     @Body() dto: InitiateOnRampDto,
   ) {
     return this.onRampService.initiate(user.id, dto);
+  }
+
+  @Get('encryption-key')
+  @ApiOperation({ summary: "Fetch Circle's RSA public key for client-side card encryption" })
+  getEncryptionKey() {
+    return this.onRampService.getEncryptionKey();
+  }
+
+  @Post('cards')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Tokenize a card with Circle — returns a cardSourceId for top-up' })
+  createCard(@Body() dto: CreateCardDto) {
+    return this.onRampService.createCard(dto);
   }
 }

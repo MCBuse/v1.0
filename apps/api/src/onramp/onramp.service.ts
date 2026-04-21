@@ -9,6 +9,8 @@ import { WalletsService } from '../wallets/wallets.service';
 import type { OnRampProvider } from './onramp-provider.interface';
 import { ONRAMP_PROVIDER } from './onramp-provider.interface';
 import { InitiateOnRampDto } from './dto/initiate-onramp.dto';
+import { CreateCardDto } from './dto/create-card.dto';
+import { CircleClient } from './circle/circle.client';
 
 @Injectable()
 export class OnRampService {
@@ -19,6 +21,7 @@ export class OnRampService {
     @Inject(ONRAMP_PROVIDER) private readonly provider: OnRampProvider,
     private readonly walletsService: WalletsService,
     private readonly ledgerService: LedgerService,
+    private readonly circleClient: CircleClient,
   ) {}
 
   async initiate(userId: string, dto: InitiateOnRampDto) {
@@ -40,6 +43,7 @@ export class OnRampService {
       amount,
       currency,
       idempotencyKey,
+      cardSourceId: dto.cardSourceId,
     });
 
     // For completed (mock) or synchronous on-ramps, credit balance immediately
@@ -100,5 +104,33 @@ export class OnRampService {
       currency,
       balance: updatedBalance,
     };
+  }
+
+  /** Proxy Circle's public key — mobile uses this to encrypt card data before tokenization */
+  getEncryptionKey() {
+    return this.circleClient.get<{ keyId: string; publicKey: string }>(
+      '/v1/encryption/public',
+    );
+  }
+
+  /** Tokenize a card with Circle. Returns a Circle card ID for use in initiateOnRamp. */
+  async createCard(dto: CreateCardDto) {
+    return this.circleClient.post<{ id: string; status: string; last4: string; network: string }>(
+      '/v1/cards',
+      {
+        idempotencyKey: randomUUID(),
+        keyId: dto.keyId,
+        encryptedData: dto.encryptedData,
+        billingDetails: dto.billingDetails,
+        expMonth: dto.expMonth,
+        expYear: dto.expYear,
+        metadata: {
+          email: 'user@mcbuse.com',
+          phoneNumber: '+10000000000',
+          sessionId: randomUUID(),
+          ipAddress: '0.0.0.0',
+        },
+      },
+    );
   }
 }

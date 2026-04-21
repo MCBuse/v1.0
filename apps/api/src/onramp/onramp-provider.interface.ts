@@ -4,6 +4,7 @@ export interface OnRampParams {
   amount: bigint;
   currency: string;
   idempotencyKey: string;
+  cardSourceId?: string; // Circle card ID from POST /onramp/cards
 }
 
 export interface OnRampResult {
