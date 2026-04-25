@@ -24,6 +24,7 @@ import { OffRampModule } from './offramp/offramp.module';
 import { NfcModule } from './nfc/nfc.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RatesModule } from './rates/rates.module';
+import { ChainWatcherModule } from './chain-watcher/chain-watcher.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { RatesModule } from './rates/rates.module';
     OffRampModule,
     NfcModule,
     RatesModule,
+    ChainWatcherModule,
   ],
   controllers: [AppController],
   providers: [

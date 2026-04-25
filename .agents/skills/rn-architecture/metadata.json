@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "organization": "Engineering",
+  "date": "April 2026",
+  "abstract": "Production React Native / Expo architecture. Feature-based layering with clean separation between data (repositories + Zod models), domain (React Query, Zustand), and presentation (screens + hooks). Covers: RepositoryBase with 3-tier caching (MMKV, expo-secure-store, RQ in-memory), typed ServiceLocator DI, useDataScreen + useOperation hooks, global OverlayManager via Zustand, Expo Router dual-group navigation, axios interceptor chain with token-refresh queuing, structured error hierarchy, and RNTL testing patterns.",
+  "references": [
+    "https://tanstack.com/query/latest/docs/framework/react/react-native",
+    "https://docs.expo.dev/router/introduction/",
+    "https://zustand.docs.pmnd.rs",
+    "https://zod.dev",
+    "https://www.mmkv.io",
+    "https://docs.expo.dev/versions/latest/sdk/securestore/",
+    "https://axios-http.com/docs/interceptors",
+    "https://testing-library.com/docs/react-native-testing-library/intro/",
+    "https://docs.sentry.io/platforms/react-native/"
+  ]
+}

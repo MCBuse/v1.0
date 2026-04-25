@@ -11,7 +11,7 @@ export const ledgerEntry = z.object({
   solanaTxSignature: z.string().nullable().optional(),
   paymentRequestId:  z.string().nullable().optional(),
   idempotencyKey:    z.string().nullable().optional(),
-  metadata:          z.string().nullable().optional(),
+  metadata:          z.unknown().nullable().optional(),
   createdAt:         z.string(),
 });
 export type LedgerEntry = z.infer<typeof ledgerEntry>;

@@ -3,6 +3,11 @@ import { HttpModule } from '@nestjs/axios';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { OnRampService } from './onramp.service';
 import { OnRampController } from './onramp.controller';
+import { OnrampSessionsController } from './onramp-sessions.controller';
+import { OnrampWebhooksController } from './onramp-webhooks.controller';
+import { OnrampSessionsService } from './onramp-sessions.service';
+import { WidgetOnrampSettlementService } from './widget-onramp-settlement.service';
+import { MoonpayWidgetProvider } from './widget/moonpay-widget.provider';
 import { MockOnRampProvider } from './providers/mock-onramp.provider';
 import { CircleOnRampProvider } from './providers/circle-onramp.provider';
 import { ONRAMP_PROVIDER } from './onramp-provider.interface';
@@ -40,8 +45,17 @@ import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
       inject: [ConfigService, MockOnRampProvider, CircleOnRampProvider],
     },
     OnRampService,
+    MoonpayWidgetProvider,
+    OnrampSessionsService,
+    WidgetOnrampSettlementService,
     VerifiedEmailGuard,
   ],
-  controllers: [OnRampController, CircleWebhookController],
+  controllers: [
+    OnRampController,
+    OnrampSessionsController,
+    OnrampWebhooksController,
+    CircleWebhookController,
+  ],
+  exports: [WidgetOnrampSettlementService],
 })
 export class OnRampModule {}

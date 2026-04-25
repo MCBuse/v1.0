@@ -1,5 +1,6 @@
 export * from './users';
 export * from './wallets';
+export * from './onramp-transactions';
 export * from './balances';
 export * from './ledger-entries';
 export * from './payment-requests';

@@ -110,6 +110,44 @@ export class EnvironmentVariables {
   @IsString()
   CIRCLE_SETTLEMENT_MODE?: string; // 'polling' (default) | 'webhook'
 
+  /** MoonPay widget (optional unless using POST /onramp/sessions) */
+  @IsOptional()
+  @IsString()
+  MOONPAY_PUBLIC_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  MOONPAY_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  MOONPAY_SECRET_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  MOONPAY_WEBHOOK_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  MOONPAY_WEBHOOK_TOLERANCE_SECONDS?: string;
+
+  @IsOptional()
+  @IsString()
+  MOONPAY_BASE_URL?: string;
+
+  /** Minimum EUR amount for MoonPay session (default 20) */
+  @IsOptional()
+  @IsString()
+  MOONPAY_MIN_EUR?: string;
+
+  @IsOptional()
+  @IsString()
+  SOLANA_USDC_MINT?: string;
+
+  @IsOptional()
+  @IsString()
+  APP_REDIRECT_URL?: string;
+
   @IsNumber()
   THROTTLE_TTL: number;
 

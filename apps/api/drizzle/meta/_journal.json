@@ -8,6 +8,20 @@
       "when": 1775352379595,
       "tag": "0000_rapid_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776819195755,
+      "tag": "0001_onramp_transactions",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777075200000,
+      "tag": "0002_onramp_network",
+      "breakpoints": true
     }
   ]
 }

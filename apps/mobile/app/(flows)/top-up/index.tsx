@@ -2,7 +2,7 @@ import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
 import { ArrowLeft, ArrowRight, Bank } from 'iconsax-react-native';
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Box, NumPad, Text } from '@/components/ui';
@@ -113,6 +113,14 @@ export default function TopUpScreen() {
             Bank or card · Powered by Circle · 1 {fiat} = 1 {currency}
           </Text>
         </Box>
+        <Pressable
+          onPress={() => router.push('/(flows)/buy-usdc')}
+          style={{ marginTop: 12, alignSelf: 'flex-start' }}
+        >
+          <Text variant="captionMedium" color="brand">
+            Buy USDC with card (MoonPay) →
+          </Text>
+        </Pressable>
       </Box>
 
       {/* NumPad */}
