@@ -2,53 +2,62 @@ import { useTheme } from '@shopify/restyle';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'iconsax-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView, type WebViewNavigation } from 'react-native-webview';
 
 import { Box, Text } from '@/components/ui';
-import { getOnrampWebClient } from '@/features/onramp';
 import { takeOnrampWidgetSession } from '@/lib/onramp-widget-cache';
 import type { Theme } from '@/theme';
 
-export default function OnrampWebViewScreen() {
+const REDIRECT_SCHEME = 'mcbuse://';
+
+export default function TopUpCheckoutScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ transactionId: string }>();
-
   const transactionId = params.transactionId ?? '';
   const [widgetUrl, setWidgetUrl] = useState('');
-  const [redirectUrl, setRedirectUrl] = useState('');
 
   useEffect(() => {
     if (!transactionId) return;
     const s = takeOnrampWidgetSession(transactionId);
-    if (s) {
-      setWidgetUrl(s.widgetUrl);
-      setRedirectUrl(s.redirectUrl);
-    }
+    if (s) setWidgetUrl(s.widgetUrl);
   }, [transactionId]);
-  const moonpay = getOnrampWebClient('moonpay');
 
-  const finishToStatus = useCallback(() => {
+  const goToStatus = useCallback(() => {
     router.replace(
-      `/(flows)/buy-usdc/status?transactionId=${encodeURIComponent(transactionId)}`,
+      `/(flows)/top-up/status?transactionId=${encodeURIComponent(transactionId)}`,
     );
   }, [transactionId]);
 
-  const onNavChange = useCallback(
-    (navState: { url: string }) => {
-      if (moonpay.isCompletionUrl(navState.url, redirectUrl)) {
-        finishToStatus();
+  const onShouldStartLoadWithRequest = useCallback(
+    (req: { url: string }) => {
+      if (req.url.startsWith(REDIRECT_SCHEME)) {
+        goToStatus();
+        return false;
       }
+      return true;
     },
-    [finishToStatus, moonpay, redirectUrl],
+    [goToStatus],
+  );
+
+  const onNavChange = useCallback(
+    (nav: WebViewNavigation) => {
+      if (nav.url.startsWith(REDIRECT_SCHEME)) goToStatus();
+    },
+    [goToStatus],
   );
 
   if (!widgetUrl || !transactionId) {
     return (
-      <Box flex={1} padding="2xl" justifyContent="center">
+      <Box flex={1} backgroundColor="bgPrimary" padding="2xl" justifyContent="center" gap="m">
         <Text variant="body">Missing checkout session. Go back and try again.</Text>
+        <Pressable onPress={() => router.back()}>
+          <Text variant="captionMedium" color="brand">
+            Go back
+          </Text>
+        </Pressable>
       </Box>
     );
   }
@@ -74,12 +83,24 @@ export default function OnrampWebViewScreen() {
           Secure checkout
         </Text>
       </Box>
+
       <View style={styles.web}>
         <WebView
           source={{ uri: widgetUrl }}
+          onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
           onNavigationStateChange={onNavChange}
           startInLoadingState
+          renderLoading={() => (
+            <Box flex={1} alignItems="center" justifyContent="center">
+              <ActivityIndicator color={colors.textPrimary} />
+            </Box>
+          )}
           setSupportMultipleWindows={false}
+          javaScriptEnabled
+          domStorageEnabled
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          originWhitelist={['https://*', 'http://*', 'mcbuse://*']}
         />
       </View>
     </Box>

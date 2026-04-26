@@ -35,5 +35,5 @@ export type OnrampTransactionList = z.infer<typeof onrampTransactionListSchema>;
 export type CreateOnrampSessionInput = {
   provider: 'moonpay';
   fiatAmount: string;
-  fiatCurrency: 'EUR';
+  fiatCurrency: 'USD' | 'EUR';
 };

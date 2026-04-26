@@ -16,7 +16,4 @@ export const env = {
     process.env.EXPO_PUBLIC_API_BASE_URL ??
     extra.apiBaseUrl ??
     FALLBACK_BASE_URL,
-  /** Must match server APP_REDIRECT_URL (MoonPay redirect → WebView close). */
-  onrampRedirectUrl:
-    process.env.EXPO_PUBLIC_ONRAMP_REDIRECT_URL ?? 'mcbuse://onramp/complete',
 } as const;

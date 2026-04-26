@@ -12,8 +12,8 @@ export class CreateOnrampSessionDto {
   @Matches(/^\d+(\.\d{1,8})?$/, { message: 'fiatAmount must be a positive decimal string' })
   fiatAmount: string;
 
-  @ApiProperty({ example: 'EUR' })
+  @ApiProperty({ example: 'USD', enum: ['USD', 'EUR'] })
   @IsString()
-  @IsIn(['EUR'])
-  fiatCurrency: 'EUR';
+  @IsIn(['USD', 'EUR'])
+  fiatCurrency: 'USD' | 'EUR';
 }

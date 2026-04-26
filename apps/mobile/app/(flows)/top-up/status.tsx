@@ -11,12 +11,11 @@ import type { Theme } from '@/theme';
 
 const TERMINAL = new Set(['completed', 'failed', 'cancelled', 'expired']);
 
-export default function OnrampStatusScreen() {
+export default function TopUpStatusScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ transactionId: string; redirectStatus?: string }>();
+  const params = useLocalSearchParams<{ transactionId: string }>();
   const transactionId = params.transactionId;
-  const redirectStatus = params.redirectStatus;
   const [timedOut, setTimedOut] = useState(false);
 
   const { data, error } = useOnrampStatus(transactionId, Boolean(transactionId));
@@ -30,8 +29,8 @@ export default function OnrampStatusScreen() {
     const s = data?.status;
     if (!s) return 'Starting…';
     if (s === 'pending') return 'Waiting for payment';
-    if (s === 'processing') return 'Payment received, delivering USDC';
-    if (s === 'completed') return 'USDC delivered';
+    if (s === 'processing') return 'Payment received, delivering stablecoins';
+    if (s === 'completed') return 'Stablecoins delivered';
     if (s === 'failed') return 'Purchase failed';
     if (s === 'cancelled') return 'Purchase cancelled';
     if (s === 'expired') return 'Session expired';
@@ -48,21 +47,15 @@ export default function OnrampStatusScreen() {
       style={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }}
       gap="xl"
     >
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
+      <Pressable onPress={() => router.replace('/(tabs)')} style={styles.backBtn}>
         <ArrowLeft size={20} color={colors.textPrimary} variant="Linear" />
       </Pressable>
 
       <Box gap="s">
-        <Text variant="h3">On-ramp status</Text>
+        <Text variant="h3">Top-up status</Text>
         <Text variant="body" color="textSecondary">
           {label}
         </Text>
-        {redirectStatus === 'cancelled' && data?.status !== 'cancelled' && (
-          <Text variant="caption" color="textTertiary">
-            Checkout was closed locally. The server will only mark this purchase successful after a
-            verified MoonPay webhook.
-          </Text>
-        )}
         {error && (
           <Text variant="caption" color="error">
             {error.message}
@@ -86,8 +79,8 @@ export default function OnrampStatusScreen() {
         )}
         {timedOut && !terminal && (
           <Text variant="caption" color="textTertiary">
-            Still processing in the background. You can leave this screen and open Buy USDC again
-            later — your bank may take a minute to authorize.
+            Still processing in the background. You can leave this screen — your bank may take a
+            minute to authorize.
           </Text>
         )}
       </Box>

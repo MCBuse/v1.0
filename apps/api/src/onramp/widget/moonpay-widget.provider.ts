@@ -76,8 +76,11 @@ export class MoonpayWidgetProvider implements OnrampWidgetProvider {
       this.config.get<string>('MOONPAY_BASE_URL')?.replace(/\/$/, '') ??
       'https://buy-sandbox.moonpay.com';
 
+    const usdcOverride = this.config.get<string>('MOONPAY_USDC_CURRENCY_CODE');
     const currencyCode =
-      params.cryptoCurrency.toUpperCase() === 'USDC' ? 'usdc_sol' : params.cryptoCurrency.toLowerCase();
+      params.cryptoCurrency.toUpperCase() === 'USDC'
+        ? (usdcOverride ?? 'usdc_sol')
+        : params.cryptoCurrency.toLowerCase();
 
     const pairs: [string, string][] = [
       ['apiKey', apiKey],
