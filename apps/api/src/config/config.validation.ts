@@ -52,6 +52,14 @@ export class EnvironmentVariables {
   @IsOptional()
   DATABASE_SSL?: string;
 
+  @IsString()
+  @IsOptional()
+  DATABASE_SSL_CA?: string;
+
+  @IsString()
+  @IsOptional()
+  DATABASE_SSL_CA_BASE64?: string;
+
   @IsNumber()
   @IsOptional()
   DATABASE_POOL_MAX?: number;

@@ -12,21 +12,40 @@ fly apps create mcbuse-api
 
 If the name is taken, create another app and update `app` in `fly.toml`.
 
-## 2. Attach Postgres
+## 2. Configure Supabase Postgres
 
-Use Fly Managed Postgres for production, or attach an existing Fly Postgres app. Attaching sets a `DATABASE_URL` secret on the API app.
+Use Supabase for production persistence. In the Supabase dashboard, open your project, click **Connect**, and copy one of these connection strings:
 
-```sh
-fly postgres attach <postgres-app-name> --app mcbuse-api
-```
+- **Direct connection**: preferred for Fly VMs if IPv6 works.
+- **Supavisor Session pooler**: use this if the direct connection cannot resolve/connect from Fly.
 
-For an external database, set `DATABASE_URL` yourself:
+Do not use the Supavisor Transaction pooler for this API. Transaction mode does not support prepared statements, and this NestJS/Drizzle service is a long-running server, not a serverless function.
+
+Set the Supabase database URL as a Fly secret:
 
 ```sh
 fly secrets set DATABASE_URL='postgres://user:password@host:5432/database' --app mcbuse-api
 ```
 
-Set `DATABASE_SSL=true` only if your database provider requires TLS. Fly internal Postgres typically uses `DATABASE_SSL=false`.
+`fly.toml` currently uses `DATABASE_SSL=no-verify` as a temporary Supabase certificate-chain unblocker for release migrations. This still uses TLS, but it does not verify the certificate chain.
+
+For verified TLS, download the Supabase database CA certificate from the Connect panel and set it as a base64 Fly secret:
+
+```sh
+base64 -i /path/to/supabase-ca.pem | fly secrets set DATABASE_SSL_CA_BASE64=- --app mcbuse-api
+```
+
+Then switch back to verified TLS:
+
+```sh
+fly secrets set DATABASE_SSL='true' DATABASE_POOL_MAX='5' --app mcbuse-api
+```
+
+If release migrations fail with `SELF_SIGNED_CERT_IN_CHAIN`, keep `DATABASE_SSL='no-verify'` temporarily, then set `DATABASE_SSL_CA_BASE64` and switch back to `DATABASE_SSL='true'`.
+
+```sh
+fly secrets set DATABASE_SSL='no-verify' --app mcbuse-api
+```
 
 ## 3. Set required secrets
 

@@ -10,7 +10,8 @@
     "db:generate": "pnpm --filter api db:generate",
     "db:migrate": "pnpm --filter api db:migrate",
     "db:push": "pnpm --filter api db:push",
-    "deploy:api:fly": "fly deploy -c fly.toml"
+    "deploy:api:fly": "fly deploy -c fly.toml",
+    "dev:api": "pnpm --filter api start:dev"
   },
   "devDependencies": {
     "prettier": "^3.7.4",

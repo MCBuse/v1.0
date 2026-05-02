@@ -18,13 +18,21 @@ function getEnv(env: EnvSource, key: string): string | undefined {
 
 function parseDatabaseSsl(env: EnvSource): PoolConfig['ssl'] {
   const value = getEnv(env, 'DATABASE_SSL') ?? getEnv(env, 'PGSSLMODE');
+  const caBase64 = getEnv(env, 'DATABASE_SSL_CA_BASE64');
+  const ca = caBase64
+    ? Buffer.from(caBase64, 'base64').toString('utf8')
+    : getEnv(env, 'DATABASE_SSL_CA');
 
   if (!value || value === 'false' || value === 'disable') {
     return false;
   }
 
-  if (value === 'true' || value === 'require' || value === 'no-verify') {
-    return { rejectUnauthorized: value !== 'no-verify' };
+  if (value === 'no-verify') {
+    return { rejectUnauthorized: false };
+  }
+
+  if (value === 'true' || value === 'require') {
+    return ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: true };
   }
 
   return false;
