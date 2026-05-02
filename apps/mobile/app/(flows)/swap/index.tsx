@@ -121,12 +121,12 @@ export default function SwapScreen() {
           <Box alignItems="center" gap="s">
             <Text variant="h2">Swap Complete</Text>
             <Text variant="body" color="textSecondary" style={styles.centered}>
-              {formatBaseUnits(executeResult.fromAmount, from)} {from} →{" "}
+              {formatBaseUnits(executeResult.fromAmount, from)} {from === 'EURC' ? 'EUR' : 'USD'} →{" "}
               {formatBaseUnits(
                 executeResult.toAmount,
                 executeResult.toCurrency,
               )}{" "}
-              {executeResult.toCurrency}
+              {executeResult.toCurrency === 'EURC' ? 'EUR' : 'USD'}
             </Text>
           </Box>
           <Box style={{ width: "100%" }} gap="m">
@@ -175,7 +175,7 @@ export default function SwapScreen() {
         <Box gap="xs">
           <Text variant="h3">Swap</Text>
           <Text variant="label" color="textTertiary">
-            Savings wallet · USDC ↔ EURC
+            Savings wallet · USD ↔ EUR
           </Text>
         </Box>
       </Box>
@@ -195,7 +195,7 @@ export default function SwapScreen() {
           <Text variant="caption" color="textTertiary">
             You give
           </Text>
-          <Text variant="h3">{from}</Text>
+          <Text variant="h3">{from === 'EURC' ? 'EUR' : 'USD'}</Text>
         </Box>
 
         <Pressable
@@ -213,7 +213,7 @@ export default function SwapScreen() {
           <Text variant="caption" color="textTertiary">
             You get
           </Text>
-          <Text variant="h3">{to}</Text>
+          <Text variant="h3">{to === 'EURC' ? 'EUR' : 'USD'}</Text>
         </Box>
       </Box>
 
@@ -232,7 +232,7 @@ export default function SwapScreen() {
           </Text>
           <Text variant="captionMedium">
             {previewData && hasAmount
-              ? `${formatBaseUnits(previewData.toAmount, to)} ${to}`
+              ? `${formatBaseUnits(previewData.toAmount, to)} ${to === 'EURC' ? 'EUR' : 'USD'}`
               : "–"}
           </Text>
         </Box>
@@ -241,7 +241,9 @@ export default function SwapScreen() {
             Rate
           </Text>
           <Text variant="captionMedium">
-            {previewData ? `1 ${from} = ${previewData.rate} ${to}` : "–"}
+            {previewData
+              ? `1 ${from === 'EURC' ? 'EUR' : 'USD'} = ${previewData.rate} ${to === 'EURC' ? 'EUR' : 'USD'}`
+              : "–"}
           </Text>
         </Box>
         <Box flexDirection="row" justifyContent="space-between">

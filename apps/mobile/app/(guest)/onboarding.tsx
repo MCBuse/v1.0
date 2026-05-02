@@ -22,7 +22,7 @@ const SLIDES: SlideData[] = [
     accentColor: "brand",
     title: "Send & receive instantly",
     description:
-      "Transfer money to anyone in seconds, powered by Solana. Zero waiting, zero friction.",
+      "Transfer money to anyone in seconds. Zero waiting, zero friction.",
   },
   {
     Icon: Scan,
@@ -34,9 +34,9 @@ const SLIDES: SlideData[] = [
   {
     Icon: Wallet3,
     accentColor: "brand",
-    title: "Your wallet, your money",
+    title: "Savings + spending, separated",
     description:
-      "Non-custodial by design. You control your keys, your funds, your future.",
+      "Keep your savings safe and move money to spending whenever you need it.",
   },
 ];
 

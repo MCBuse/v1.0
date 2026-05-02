@@ -1,5 +1,5 @@
 /**
- * AmountInput — full-screen NumPad with a USDC/EURC currency toggle.
+ * AmountInput — full-screen NumPad with a USD/EUR currency toggle.
  *
  * Wraps the existing NumPad component; exposes a controlled interface so the
  * screen can own the amount + currency state.
@@ -56,7 +56,7 @@ export function AmountInput({
                 variant="captionMedium"
                 style={{ color: active ? colors.textInverse : colors.textSecondary }}
               >
-                {c}
+                {c === 'EURC' ? 'EUR' : 'USD'}
               </Text>
             </Pressable>
           );

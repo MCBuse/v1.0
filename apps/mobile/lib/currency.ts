@@ -15,10 +15,21 @@ export function toBaseUnits(display: string, decimals = DECIMALS): string {
   return Math.round(num).toString();
 }
 
-/** "1000000" + "USDC" → "$1.00 USDC" */
-export function formatCurrency(baseUnits: string, currency: 'USDC' | 'EURC'): string {
-  const symbol = currency === 'EURC' ? '€' : '$';
-  return `${symbol}${formatAmount(baseUnits)} ${currency}`;
+export type StableCurrency = 'USDC' | 'EURC';
+
+/** USDC → "USD", EURC → "EUR" — the only label users should ever see. */
+export function displayCurrencyLabel(currency: StableCurrency): 'USD' | 'EUR' {
+  return currency === 'EURC' ? 'EUR' : 'USD';
+}
+
+/** USDC → "$", EURC → "€" */
+export function displayCurrencySymbol(currency: StableCurrency): '$' | '€' {
+  return currency === 'EURC' ? '€' : '$';
+}
+
+/** "1000000" + "USDC" → "$1.00" (no crypto suffix) */
+export function formatCurrency(baseUnits: string, currency: StableCurrency): string {
+  return `${displayCurrencySymbol(currency)}${formatAmount(baseUnits)}`;
 }
 
 /** Shorten a Solana address for display: "AbCd…XyZw" */

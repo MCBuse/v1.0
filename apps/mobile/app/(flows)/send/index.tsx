@@ -54,7 +54,7 @@ export default function SendScreen() {
             Scan to pay
           </Text>
           <Text variant="body" color="textSecondary" style={styles.centeredText}>
-            Point your camera at the recipient's MCBuse QR code to send USDC or EURC instantly.
+            Point your camera at any MCBuse QR code to send money instantly.
           </Text>
         </Box>
 
@@ -84,7 +84,7 @@ export default function SendScreen() {
               borderRadius="full"
               style={{ backgroundColor: '#16A34A' }}
             />
-            <Text variant="captionMedium">USDC & EURC supported</Text>
+            <Text variant="captionMedium">USD & EUR supported</Text>
           </Box>
         </Box>
       </Box>

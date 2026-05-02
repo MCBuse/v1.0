@@ -132,6 +132,7 @@ export default function HomeScreen() {
     return [
       {
         currency: "USDC",
+        label: "USD",
         symbol: "$",
         total: (
           BigInt(get("savings", "USDC")) + BigInt(get("routine", "USDC"))
@@ -141,6 +142,7 @@ export default function HomeScreen() {
       },
       {
         currency: "EURC",
+        label: "EUR",
         symbol: "€",
         total: (
           BigInt(get("savings", "EURC")) + BigInt(get("routine", "EURC"))
@@ -418,6 +420,7 @@ export default function HomeScreen() {
 
 type BalanceCardData = {
   currency: "USDC" | "EURC";
+  label: "USD" | "EUR";
   symbol: "$" | "€";
   total: string;
   savings: string;
@@ -442,7 +445,7 @@ function BalanceCard({
           variant="label"
           style={{ color: "rgba(255,255,255,0.6)", letterSpacing: 0.8 }}
         >
-          {card.currency}
+          {card.label}
         </Text>
       </View>
 

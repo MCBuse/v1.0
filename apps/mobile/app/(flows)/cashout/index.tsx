@@ -85,7 +85,7 @@ export default function CashOutScreen() {
         </Pressable>
         <Box gap="xs">
           <Text variant="h3">Cash Out</Text>
-          <Text variant="label" color="textTertiary">Stablecoin → fiat · Powered by Circle</Text>
+          <Text variant="label" color="textTertiary">Send money from savings to your bank</Text>
         </Box>
       </Box>
 
@@ -107,7 +107,7 @@ export default function CashOutScreen() {
               variant="captionMedium"
               style={{ color: currency === c ? colors.textInverse : colors.textPrimary }}
             >
-              {c}
+              {c === 'EURC' ? 'EUR' : 'USD'}
             </Text>
           </Pressable>
         ))}

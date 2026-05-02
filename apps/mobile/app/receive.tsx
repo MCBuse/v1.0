@@ -190,7 +190,7 @@ export default function ReceiveScreen() {
               variant="captionMedium"
               style={{ color: currency === c ? colors.textInverse : colors.textPrimary }}
             >
-              {c}
+              {c === 'EURC' ? 'EUR' : 'USD'}
             </Text>
           </Pressable>
         ))}

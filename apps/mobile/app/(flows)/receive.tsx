@@ -95,7 +95,7 @@ export default function ReceiveScreen() {
                 color: currency === c ? colors.textPrimary : colors.textTertiary,
               }}
             >
-              {c}
+              {c === 'EURC' ? 'EUR' : 'USD'}
             </Text>
           </Pressable>
         ))}

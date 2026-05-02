@@ -20,10 +20,6 @@ import type { Theme } from '@/theme';
 
 type FiatCurrency = 'USD' | 'EUR';
 
-const FIAT_TO_STABLE: Record<FiatCurrency, 'USDC' | 'EURC'> = {
-  USD: 'USDC',
-  EUR: 'EURC',
-};
 const FIAT_SYMBOL: Record<FiatCurrency, string> = { USD: '$', EUR: '€' };
 const QUICK = ['25', '50', '100', '250'] as const;
 const MIN = 20;
@@ -37,7 +33,6 @@ export default function TopUpScreen() {
   const [fiat, setFiat] = useState<FiatCurrency>('USD');
   const { mutateAsync: createSession, isPending } = useOnrampSession();
 
-  const stable = FIAT_TO_STABLE[fiat];
   const symbol = FIAT_SYMBOL[fiat];
   const numeric = Number(amount);
   const hasAmount = amount !== '' && Number.isFinite(numeric) && numeric > 0;
@@ -101,7 +96,7 @@ export default function TopUpScreen() {
           <Box gap="xs">
             <Text variant="h3">Add Money</Text>
             <Text variant="label" color="textTertiary">
-              Buy stablecoins with card · MoonPay
+              Top up your savings with a card
             </Text>
           </Box>
         </Box>
@@ -197,15 +192,18 @@ export default function TopUpScreen() {
             <ArrowRight size={18} color={colors.textTertiary} />
             <Box gap="xs" alignItems="flex-end">
               <Text variant="caption" color="textTertiary">
-                You receive
+                Added to savings
               </Text>
-              <Text variant="bodyMedium">{hasAmount ? amount : '–'} {stable}</Text>
+              <Text variant="bodyMedium">
+                {symbol}
+                {hasAmount ? amount : '–'}
+              </Text>
             </Box>
           </Box>
           <Box flexDirection="row" alignItems="center" gap="xs" marginTop="xs">
             <Bank size={12} color={colors.textTertiary} variant="Linear" />
             <Text variant="label" color="textTertiary">
-              Card · Solana · Sandbox · 1 {fiat} ≈ 1 {stable}
+              Card payment · secured by your bank
             </Text>
           </Box>
         </Box>

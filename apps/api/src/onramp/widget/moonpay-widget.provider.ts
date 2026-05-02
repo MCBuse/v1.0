@@ -64,12 +64,16 @@ export class MoonpayWidgetProvider implements OnrampWidgetProvider {
 
   constructor(private readonly config: ConfigService) {}
 
-  async createWidgetSession(params: CreateWidgetSessionParams): Promise<CreateWidgetSessionResult> {
+  async createWidgetSession(
+    params: CreateWidgetSessionParams,
+  ): Promise<CreateWidgetSessionResult> {
     const apiKey =
       this.config.get<string>('MOONPAY_PUBLIC_KEY') ??
       this.config.get<string>('MOONPAY_API_KEY');
     if (!apiKey) {
-      throw new Error('MOONPAY_PUBLIC_KEY is required for MoonPay widget sessions');
+      throw new Error(
+        'MOONPAY_PUBLIC_KEY is required for MoonPay widget sessions',
+      );
     }
     const secretKey = this.config.getOrThrow<string>('MOONPAY_SECRET_KEY');
     const baseUrl =
@@ -99,7 +103,9 @@ export class MoonpayWidgetProvider implements OnrampWidgetProvider {
         .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
         .join('&');
 
-    const signature = createHmac('sha256', secretKey).update(search).digest('base64');
+    const signature = createHmac('sha256', secretKey)
+      .update(search)
+      .digest('base64');
     const widgetUrl = `${baseUrl}${search}&signature=${encodeURIComponent(signature)}`;
 
     return { widgetUrl, internalReference: params.internalReference };
@@ -108,7 +114,9 @@ export class MoonpayWidgetProvider implements OnrampWidgetProvider {
   verifyWebhook(rawBody: Buffer, signatureHeader: string | undefined): boolean {
     const webhookSecret = this.config.get<string>('MOONPAY_WEBHOOK_SECRET');
     if (!webhookSecret) {
-      this.logger.error('MOONPAY_WEBHOOK_SECRET not set — rejecting MoonPay webhook');
+      this.logger.error(
+        'MOONPAY_WEBHOOK_SECRET not set — rejecting MoonPay webhook',
+      );
       return false;
     }
     if (!signatureHeader) return false;
@@ -137,7 +145,9 @@ export class MoonpayWidgetProvider implements OnrampWidgetProvider {
     }
 
     const signedPayload = `${t}.${rawBody.toString('utf8')}`;
-    const expectedHex = createHmac('sha256', webhookSecret).update(signedPayload).digest('hex');
+    const expectedHex = createHmac('sha256', webhookSecret)
+      .update(signedPayload)
+      .digest('hex');
     try {
       const a = Buffer.from(expectedHex, 'hex');
       const b = Buffer.from(s, 'hex');
@@ -174,10 +184,14 @@ export class MoonpayWidgetProvider implements OnrampWidgetProvider {
     const baseAmt = asNumber(data['baseCurrencyAmount']);
     const fiatAmount = baseAmt !== undefined ? String(baseAmt) : undefined;
 
-    const baseCur = isRecord(data['baseCurrency']) ? asString(data['baseCurrency']['code']) : undefined;
+    const baseCur = isRecord(data['baseCurrency'])
+      ? asString(data['baseCurrency']['code'])
+      : undefined;
     const fiatCurrency = baseCur?.toUpperCase();
 
-    const quoteCur = isRecord(data['currency']) ? asString(data['currency']['code']) : undefined;
+    const quoteCur = isRecord(data['currency'])
+      ? asString(data['currency']['code'])
+      : undefined;
     const cryptoCurrency = quoteCur?.toUpperCase();
 
     return {

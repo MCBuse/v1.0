@@ -29,10 +29,10 @@ export default function TopUpStatusScreen() {
     const s = data?.status;
     if (!s) return 'Starting…';
     if (s === 'pending') return 'Waiting for payment';
-    if (s === 'processing') return 'Payment received, delivering stablecoins';
-    if (s === 'completed') return 'Stablecoins delivered';
-    if (s === 'failed') return 'Purchase failed';
-    if (s === 'cancelled') return 'Purchase cancelled';
+    if (s === 'processing') return 'Payment received, finalizing';
+    if (s === 'completed') return 'Money added to your savings';
+    if (s === 'failed') return 'Top-up failed';
+    if (s === 'cancelled') return 'Top-up cancelled';
     if (s === 'expired') return 'Session expired';
     return s;
   }, [data?.status]);
@@ -64,17 +64,8 @@ export default function TopUpStatusScreen() {
         {data && (
           <Box gap="xs" marginTop="m">
             <Text variant="caption" color="textTertiary">
-              Status: {data.status} · {data.network}
+              Amount: {data.fiatAmount ?? '—'} {data.fiatCurrency}
             </Text>
-            <Text variant="caption" color="textTertiary">
-              {data.fiatAmount ?? '—'} {data.fiatCurrency} → {data.cryptoAmount ?? 'pending'}{' '}
-              {data.cryptoCurrency}
-            </Text>
-            {data.txHash ? (
-              <Text variant="caption" color="textTertiary" selectable>
-                Tx: {data.txHash}
-              </Text>
-            ) : null}
           </Box>
         )}
         {timedOut && !terminal && (
