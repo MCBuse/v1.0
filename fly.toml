@@ -1,0 +1,49 @@
+app = "mcbuse-api"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile.api"
+
+[deploy]
+  release_command = "node dist/src/database/migrate.js"
+  release_command_timeout = "10m"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4000"
+  API_PREFIX = "api/v1"
+  DATABASE_SSL = "false"
+  DATABASE_POOL_MAX = "10"
+  OTP_PROVIDER = "mock"
+  ONRAMP_PROVIDER = "moonpay"
+  OFFRAMP_PROVIDER = "mock"
+  SWAP_PROVIDER = "mock"
+  TRANSFER_PROVIDER = "mock"
+  SOLANA_NETWORK = "devnet"
+  SOLANA_RPC_URL = "https://api.devnet.solana.com"
+  MOONPAY_BASE_URL = "https://buy-sandbox.moonpay.com"
+  MOONPAY_USDC_CURRENCY_CODE = "usdc_sol"
+  MOONPAY_WEBHOOK_TOLERANCE_SECONDS = "300"
+  MOONPAY_MIN_EUR = "20"
+  THROTTLE_TTL = "60000"
+  THROTTLE_LIMIT = "100"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/api/v1/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "1gb"

@@ -9,7 +9,8 @@
     "check-types": "turbo run check-types",
     "db:generate": "pnpm --filter api db:generate",
     "db:migrate": "pnpm --filter api db:migrate",
-    "db:push": "pnpm --filter api db:push"
+    "db:push": "pnpm --filter api db:push",
+    "deploy:api:fly": "fly deploy -c fly.toml"
   },
   "devDependencies": {
     "prettier": "^3.7.4",

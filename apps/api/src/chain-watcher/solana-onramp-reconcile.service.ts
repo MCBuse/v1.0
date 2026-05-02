@@ -59,6 +59,7 @@ export class SolanaOnrampReconcileService {
       .where(
         and(
           eq(schema.onrampTransactions.provider, 'moonpay'),
+          eq(schema.onrampTransactions.network, 'solana'),
           inArray(schema.onrampTransactions.status, ['pending', 'processing', 'completed']),
           gte(schema.onrampTransactions.createdAt, since),
         ),

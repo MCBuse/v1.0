@@ -25,19 +25,36 @@ export class EnvironmentVariables {
   API_PREFIX: string;
 
   @IsString()
-  DATABASE_HOST: string;
+  @IsOptional()
+  DATABASE_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  DATABASE_HOST?: string;
 
   @IsNumber()
-  DATABASE_PORT: number;
+  @IsOptional()
+  DATABASE_PORT?: number;
 
   @IsString()
-  DATABASE_USER: string;
+  @IsOptional()
+  DATABASE_USER?: string;
 
   @IsString()
-  DATABASE_PASSWORD: string;
+  @IsOptional()
+  DATABASE_PASSWORD?: string;
 
   @IsString()
-  DATABASE_NAME: string;
+  @IsOptional()
+  DATABASE_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  DATABASE_SSL?: string;
+
+  @IsNumber()
+  @IsOptional()
+  DATABASE_POOL_MAX?: number;
 
   @IsString()
   @MinLength(32)
@@ -180,6 +197,26 @@ export function validate(config: Record<string, unknown>) {
       return `  - ${error.property}: ${constraints}`;
     });
     throw new Error(`Configuration validation failed:\n${messages.join('\n')}`);
+  }
+
+  if (!validatedConfig.DATABASE_URL) {
+    const requiredDatabaseFields = [
+      'DATABASE_HOST',
+      'DATABASE_PORT',
+      'DATABASE_USER',
+      'DATABASE_PASSWORD',
+      'DATABASE_NAME',
+    ] as const;
+
+    const missingDatabaseFields = requiredDatabaseFields.filter(
+      (field) => validatedConfig[field] === undefined || validatedConfig[field] === '',
+    );
+
+    if (missingDatabaseFields.length > 0) {
+      throw new Error(
+        `Configuration validation failed:\n  - database: set DATABASE_URL or all of ${requiredDatabaseFields.join(', ')}. Missing: ${missingDatabaseFields.join(', ')}`,
+      );
+    }
   }
 
   // In production, reject known placeholder secrets that pass length checks

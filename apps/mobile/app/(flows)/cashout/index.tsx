@@ -1,49 +1,99 @@
 import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
 import { ArrowLeft, Bank, TickCircle } from 'iconsax-react-native';
-import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Box, Button, NumPad, Text } from '@/components/ui';
+import { Box, Button, Text } from '@/components/ui';
 import { useInitiateOfframp } from '@/features/offramp';
 import { toBaseUnits, formatCurrency } from '@/lib/currency';
 import type { Theme } from '@/theme';
 
 type StableCurrency = 'USDC' | 'EURC';
-const SYMBOL:     Record<StableCurrency, string> = { USDC: '$', EURC: '€' };
+const SYMBOL: Record<StableCurrency, string> = { USDC: '$', EURC: '€' };
 const FIAT_LABEL: Record<StableCurrency, string> = { USDC: 'USD', EURC: 'EUR' };
+const QUICK = ['25', '50', '100', '250'] as const;
 
 export default function CashOutScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
+  const inputRef = useRef<TextInput>(null);
 
-  const [amount, setAmount]     = useState('0');
+  const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<StableCurrency>('USDC');
   const [succeeded, setSucceeded] = useState(false);
 
   const offramp = useInitiateOfframp();
+  const numeric = Number(amount);
+  const hasAmount = amount !== '' && Number.isFinite(numeric) && numeric > 0;
+
+  useEffect(() => {
+    const timer = setTimeout(() => inputRef.current?.focus(), 250);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleAmountChange = (value: string) => {
+    const cleaned = value.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return;
+    if (parts[1] && parts[1].length > 2) return;
+    setAmount(cleaned);
+  };
 
   const handleCashOut = useCallback(async () => {
+    if (!hasAmount) {
+      Alert.alert(
+        'Enter an amount',
+        'Please enter an amount greater than zero.',
+      );
+      return;
+    }
+
     const baseUnits = toBaseUnits(amount);
     if (baseUnits === '0') {
-      Alert.alert('Enter an amount', 'Please enter an amount greater than zero.');
+      Alert.alert(
+        'Enter an amount',
+        'Please enter an amount greater than zero.',
+      );
       return;
     }
     try {
       await offramp.mutateAsync({ amount: baseUnits, currency });
       setSucceeded(true);
     } catch (err: any) {
-      Alert.alert('Cash Out Failed', err?.message ?? 'Something went wrong. Please try again.');
+      Alert.alert(
+        'Cash Out Failed',
+        err?.message ?? 'Something went wrong. Please try again.',
+      );
     }
-  }, [amount, currency, offramp]);
+  }, [amount, currency, hasAmount, offramp]);
 
   // ── Success ────────────────────────────────────────────────────────────────
 
   if (succeeded) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 8 }]}>
-        <Box flex={1} alignItems="center" justifyContent="center" gap="xl" paddingHorizontal="2xl">
+      <View
+        style={[
+          styles.screen,
+          { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 8 },
+        ]}
+      >
+        <Box
+          flex={1}
+          alignItems="center"
+          justifyContent="center"
+          gap="xl"
+          paddingHorizontal="2xl"
+        >
           <Box
             width={80}
             height={80}
@@ -57,11 +107,16 @@ export default function CashOutScreen() {
           <Box alignItems="center" gap="s">
             <Text variant="h2">Withdrawal Initiated</Text>
             <Text variant="body" color="textSecondary" style={styles.centered}>
-              {formatCurrency(toBaseUnits(amount), currency)} will arrive in your linked bank account within 1–3 business days.
+              {formatCurrency(toBaseUnits(amount), currency)} will arrive in
+              your linked bank account within 1–3 business days.
             </Text>
           </Box>
           <Box style={{ width: '100%' }} gap="m">
-            <Button label="Done" variant="primary" onPress={() => router.back()} />
+            <Button
+              label="Done"
+              variant="primary"
+              onPress={() => router.back()}
+            />
           </Box>
         </Box>
       </View>
@@ -71,124 +126,243 @@ export default function CashOutScreen() {
   // ── Amount entry ───────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 8 }]}>
-      {/* Header */}
-      <Box
-        flexDirection="row"
-        alignItems="center"
-        gap="m"
-        paddingHorizontal="2xl"
-        marginBottom="l"
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View
+        style={[
+          styles.screen,
+          {
+            backgroundColor: colors.bgPrimary,
+            paddingTop: insets.top + 8,
+            paddingBottom: insets.bottom,
+          },
+        ]}
       >
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <ArrowLeft size={20} color={colors.textPrimary} variant="Linear" />
-        </Pressable>
-        <Box gap="xs">
-          <Text variant="h3">Cash Out</Text>
-          <Text variant="label" color="textTertiary">Send money from savings to your bank</Text>
-        </Box>
-      </Box>
-
-      {/* Currency selector */}
-      <Box flexDirection="row" gap="s" paddingHorizontal="2xl" marginBottom="m">
-        {(['USDC', 'EURC'] as StableCurrency[]).map((c) => (
-          <Pressable
-            key={c}
-            onPress={() => setCurrency(c)}
-            style={[
-              styles.chip,
-              {
-                backgroundColor: currency === c ? colors.brand : colors.bgSecondary,
-                borderColor:     currency === c ? colors.brand : colors.borderDefault,
-              },
-            ]}
-          >
-            <Text
-              variant="captionMedium"
-              style={{ color: currency === c ? colors.textInverse : colors.textPrimary }}
-            >
-              {c === 'EURC' ? 'EUR' : 'USD'}
-            </Text>
-          </Pressable>
-        ))}
-      </Box>
-
-      {/* Destination + receive summary */}
-      <Box
-        marginHorizontal="2xl"
-        marginBottom="m"
-        padding="l"
-        backgroundColor="bgSecondary"
-        borderRadius="l"
-        gap="s"
-      >
-        <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-          <Box gap="xs">
-            <Text variant="caption" color="textTertiary">You withdraw</Text>
-            <Text variant="h3">{amount !== '0' ? `${SYMBOL[currency]}${amount}` : '–'} {currency}</Text>
-          </Box>
-          <Box gap="xs" alignItems="flex-end">
-            <Text variant="caption" color="textTertiary">You receive</Text>
-            <Text variant="h3">{amount !== '0' ? `${SYMBOL[currency]}${amount}` : '–'} {FIAT_LABEL[currency]}</Text>
-          </Box>
-        </Box>
-
-        {/* Destination row */}
+        {/* Header */}
         <Box
           flexDirection="row"
           alignItems="center"
-          gap="s"
-          marginTop="xs"
-          padding="m"
-          backgroundColor="bgPrimary"
-          borderRadius="m"
+          gap="m"
+          paddingHorizontal="2xl"
+          marginBottom="l"
         >
-          <Bank size={16} color={colors.textSecondary} variant="Linear" />
-          <Box flex={1}>
-            <Text variant="captionMedium">Linked bank account</Text>
-            <Text variant="label" color="textTertiary">•••• •••• •••• 4242</Text>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <ArrowLeft size={20} color={colors.textPrimary} variant="Linear" />
+          </Pressable>
+          <Box gap="xs">
+            <Text variant="h3">Cash Out</Text>
+            <Text variant="label" color="textTertiary">
+              Send money from savings to your bank
+            </Text>
           </Box>
         </Box>
 
-        <Text variant="label" color="textTertiary">
-          1–3 business days · No fees · Powered by Circle
-        </Text>
-      </Box>
+        {/* Currency selector */}
+        <Box
+          flexDirection="row"
+          gap="s"
+          paddingHorizontal="2xl"
+          marginBottom="m"
+        >
+          {(['USDC', 'EURC'] as StableCurrency[]).map((c) => (
+            <Pressable
+              key={c}
+              onPress={() => setCurrency(c)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor:
+                    currency === c ? colors.brand : colors.bgSecondary,
+                  borderColor:
+                    currency === c ? colors.brand : colors.borderDefault,
+                },
+              ]}
+            >
+              <Text
+                variant="captionMedium"
+                style={{
+                  color:
+                    currency === c ? colors.textInverse : colors.textPrimary,
+                }}
+              >
+                {c === 'EURC' ? 'EUR' : 'USD'}
+              </Text>
+            </Pressable>
+          ))}
+        </Box>
 
-      {/* NumPad */}
-      <Box flex={1}>
-        <NumPad
-          amount={amount}
-          onAmountChange={setAmount}
-          currency={SYMBOL[currency]}
-          primaryAction={{
-            label:   offramp.isPending ? 'Processing…' : 'Cash Out',
-            onPress: handleCashOut,
-          }}
-          secondaryActions={[
-            { label: 'Cancel', onPress: () => router.back() },
-            { label: `${SYMBOL[currency]}100`, onPress: () => setAmount('100') },
-          ]}
-        />
-      </Box>
-    </View>
+        <Pressable
+          onPress={() => inputRef.current?.focus()}
+          style={styles.amountWrap}
+        >
+          <Text variant="display" style={{ color: colors.textTertiary }}>
+            {SYMBOL[currency]}
+          </Text>
+          <TextInput
+            ref={inputRef}
+            value={amount}
+            onChangeText={handleAmountChange}
+            keyboardType="decimal-pad"
+            inputMode="decimal"
+            placeholder="0"
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.amountInput, { color: colors.textPrimary }]}
+            maxLength={9}
+            selectionColor={colors.brand}
+            autoFocus
+          />
+        </Pressable>
+
+        <Box paddingHorizontal="2xl" marginBottom="m">
+          <View style={styles.chipRow}>
+            {QUICK.map((quickAmount) => (
+              <Pressable
+                key={quickAmount}
+                onPress={() => setAmount(quickAmount)}
+                style={[
+                  styles.quickChip,
+                  {
+                    backgroundColor:
+                      amount === quickAmount
+                        ? colors.brand
+                        : colors.bgSecondary,
+                    borderColor:
+                      amount === quickAmount
+                        ? colors.brand
+                        : colors.borderDefault,
+                  },
+                ]}
+              >
+                <Text
+                  variant="captionMedium"
+                  style={{
+                    color:
+                      amount === quickAmount
+                        ? colors.textInverse
+                        : colors.textPrimary,
+                  }}
+                >
+                  {SYMBOL[currency]}
+                  {quickAmount}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Box>
+
+        {/* Destination + receive summary */}
+        <Box
+          marginHorizontal="2xl"
+          marginBottom="m"
+          padding="l"
+          backgroundColor="bgSecondary"
+          borderRadius="l"
+          gap="s"
+        >
+          <Box
+            flexDirection="row"
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Box gap="xs">
+              <Text variant="caption" color="textTertiary">
+                You withdraw
+              </Text>
+              <Text variant="h3">
+                {hasAmount ? `${SYMBOL[currency]}${amount}` : '–'} {currency}
+              </Text>
+            </Box>
+            <Box gap="xs" alignItems="flex-end">
+              <Text variant="caption" color="textTertiary">
+                You receive
+              </Text>
+              <Text variant="h3">
+                {hasAmount ? `${SYMBOL[currency]}${amount}` : '–'}{' '}
+                {FIAT_LABEL[currency]}
+              </Text>
+            </Box>
+          </Box>
+
+          {/* Destination row */}
+          <Box
+            flexDirection="row"
+            alignItems="center"
+            gap="s"
+            marginTop="xs"
+            padding="m"
+            backgroundColor="bgPrimary"
+            borderRadius="m"
+          >
+            <Bank size={16} color={colors.textSecondary} variant="Linear" />
+            <Box flex={1}>
+              <Text variant="captionMedium">Linked bank account</Text>
+              <Text variant="label" color="textTertiary">
+                •••• •••• •••• 4242
+              </Text>
+            </Box>
+          </Box>
+
+          <Text variant="label" color="textTertiary">
+            1–3 business days · No fees · Powered by Circle
+          </Text>
+        </Box>
+
+        <Box flex={1} />
+
+        <Box paddingHorizontal="2xl" paddingBottom="m" paddingTop="m">
+          <Button
+            label={offramp.isPending ? 'Processing…' : 'Cash Out'}
+            onPress={handleCashOut}
+            disabled={!hasAmount || offramp.isPending}
+            loading={offramp.isPending}
+          />
+        </Box>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen:   { flex: 1 },
+  screen: { flex: 1 },
   centered: { textAlign: 'center' },
   backBtn: {
-    width:          36,
-    height:         36,
-    borderRadius:   10,
-    alignItems:     'center',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   chip: {
     paddingHorizontal: 16,
-    paddingVertical:    8,
-    borderRadius:       99,
-    borderWidth:        1,
+    paddingVertical: 8,
+    borderRadius: 99,
+    borderWidth: 1,
+  },
+  amountWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 4,
+  },
+  amountInput: {
+    fontSize: 56,
+    fontWeight: '700',
+    minWidth: 80,
+    padding: 0,
+    textAlign: 'left',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 99,
+    borderWidth: 1,
   },
 });
