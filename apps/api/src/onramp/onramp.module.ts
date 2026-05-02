@@ -34,9 +34,11 @@ import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
         config: ConfigService,
         mock: MockOnRampProvider,
         circle: CircleOnRampProvider,
+        moonpay: MoonpayWidgetProvider,
       ) => {
         const provider = config.get<string>('ONRAMP_PROVIDER') ?? 'mock';
         if (provider === 'circle') return circle;
+        if (provider === 'moonpay') return moonpay;
         if (provider === 'mock') return mock;
         throw new Error(
           `Invalid ONRAMP_PROVIDER: "${provider}". Supported values: "mock", "circle".`,
