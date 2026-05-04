@@ -73,3 +73,47 @@ export const registerSchema = z
   });
 
 export type RegisterFormValues = z.infer<typeof registerSchema>;
+
+// ── Forgot password ───────────────────────────────────────────────────────────
+
+export const forgotPasswordSchema = z
+  .object({
+    mode:       z.enum(['email', 'phone']),
+    identifier: z.string().min(1, 'This field is required'),
+  })
+  .superRefine((data, ctx) => {
+    const result =
+      data.mode === 'email'
+        ? emailField.safeParse(data.identifier)
+        : phoneField.safeParse(data.identifier);
+
+    if (!result.success) {
+      ctx.addIssue({
+        code:    z.ZodIssueCode.custom,
+        path:    ['identifier'],
+        message: result.error.issues[0]?.message ?? 'Invalid value',
+      });
+    }
+  });
+
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+
+// ── Reset password ────────────────────────────────────────────────────────────
+
+export const resetPasswordSchema = z
+  .object({
+    code:        z.string().length(6, 'Enter the 6-digit code'),
+    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    confirm:     z.string().min(1, 'Please confirm your password'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.newPassword !== data.confirm) {
+      ctx.addIssue({
+        code:    z.ZodIssueCode.custom,
+        path:    ['confirm'],
+        message: 'Passwords do not match',
+      });
+    }
+  });
+
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;

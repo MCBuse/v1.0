@@ -2,8 +2,10 @@ import { ApiError, authSession, http } from '@/lib/api';
 
 import {
   tokenPairResponse,
+  type ForgotPasswordRequest,
   type LoginPhoneRequest,
   type LoginRequest,
+  type ResetPasswordRequest,
   type SendOtpRequest,
   type SignupRequest,
   type TokenPairResponse,
@@ -52,5 +54,13 @@ export const authRepository = {
 
   async verifyPhoneOtp(input: VerifyOtpRequest): Promise<void> {
     await http.post('/auth/phone/verify-otp', input);
+  },
+
+  async forgotPassword(input: ForgotPasswordRequest): Promise<void> {
+    await http.post('/auth/forgot-password', input);
+  },
+
+  async resetPassword(input: ResetPasswordRequest): Promise<void> {
+    await http.post('/auth/reset-password', input);
   },
 };

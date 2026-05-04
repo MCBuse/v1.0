@@ -4,6 +4,8 @@ export {
   useSignOut,
   useSendPhoneOtp,
   useVerifyPhoneOtp,
+  useForgotPassword,
+  useResetPassword,
 } from './hooks';
 export { authRepository }       from './repository';
 export type {
@@ -12,4 +14,6 @@ export type {
   SendOtpRequest,
   VerifyOtpRequest,
   TokenPairResponse,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
 }                               from './models';

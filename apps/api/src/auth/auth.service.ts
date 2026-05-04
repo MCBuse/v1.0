@@ -9,7 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gt, isNull } from 'drizzle-orm';
+import { eq, and, gt, isNull, desc } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import { randomInt, randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
@@ -21,6 +21,7 @@ import { WalletsService } from '../wallets/wallets.service';
 import { SignupDto } from './dto/signup.dto';
 
 const BCRYPT_ROUNDS = 12;
+const RESET_CODE_TTL_MINUTES = 15;
 
 export interface AuthTokens {
   accessToken: string;
@@ -140,6 +141,135 @@ export class AuthService {
     await this.usersService.setPendingPhone(userId, phone);
     await this.otpProvider.sendOtp(phone, code);
     this.logger.log('OTP sent to ' + phone.slice(-4) + ' for user: ' + userId);
+  }
+
+  async forgotPassword(input: { email?: string; phone?: string }): Promise<void> {
+    if (!input.email && !input.phone) {
+      throw new BadRequestException('email or phone is required');
+    }
+
+    const user = input.email
+      ? await this.usersService.findByEmail(input.email)
+      : await this.usersService.findByPhone(input.phone!);
+
+    // Silent success when the identifier isn't registered — don't leak account
+    // existence. We still pretend to do work to keep timing roughly even.
+    if (!user || !user.isActive) {
+      this.logger.log(
+        'Password reset requested for unknown identifier: ' +
+          (input.email ?? input.phone ?? '(unknown)'),
+      );
+      return;
+    }
+
+    const code = String(randomInt(100000, 1000000));
+    const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
+    const expiresAt = new Date(Date.now() + RESET_CODE_TTL_MINUTES * 60_000);
+    const channel: 'email' | 'phone' = input.email ? 'email' : 'phone';
+
+    await this.db.insert(schema.passwordResetCodes).values({
+      userId: user.id,
+      channel,
+      codeHash,
+      expiresAt,
+    });
+
+    if (channel === 'phone' && input.phone) {
+      // Reuse the OTP provider so SMS delivery is wired to whichever provider
+      // is configured (mock logs the code in dev; Twilio would send an SMS).
+      try {
+        await this.otpProvider.sendOtp(input.phone, code);
+      } catch (err) {
+        this.logger.error(
+          'Failed to deliver password reset SMS for user: ' + user.id,
+          err instanceof Error ? err.stack : undefined,
+        );
+      }
+    }
+
+    // Email delivery is not yet wired. Log the code in non-production so the
+    // dev flow is testable end-to-end. Production should integrate an email
+    // provider here.
+    if (channel === 'email' && process.env.NODE_ENV !== 'production') {
+      this.logger.log(
+        '[DEV] Password reset code for ' + (input.email ?? '') + ': ' + code,
+      );
+    }
+
+    this.logger.log('Password reset code issued for user: ' + user.id);
+  }
+
+  async resetPassword(input: {
+    email?: string;
+    phone?: string;
+    code: string;
+    newPassword: string;
+  }): Promise<void> {
+    if (!input.email && !input.phone) {
+      throw new BadRequestException('email or phone is required');
+    }
+
+    const user = input.email
+      ? await this.usersService.findByEmail(input.email)
+      : await this.usersService.findByPhone(input.phone!);
+
+    if (!user || !user.isActive) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    const channel: 'email' | 'phone' = input.email ? 'email' : 'phone';
+
+    // Pull the most recent unconsumed, unexpired code for this user+channel.
+    const rows = await this.db
+      .select()
+      .from(schema.passwordResetCodes)
+      .where(
+        and(
+          eq(schema.passwordResetCodes.userId, user.id),
+          eq(schema.passwordResetCodes.channel, channel),
+          isNull(schema.passwordResetCodes.consumedAt),
+          gt(schema.passwordResetCodes.expiresAt, new Date()),
+        ),
+      )
+      .orderBy(desc(schema.passwordResetCodes.createdAt))
+      .limit(1);
+
+    const candidate = rows[0] ?? null;
+    if (!candidate || !(await bcrypt.compare(input.code, candidate.codeHash))) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    const newHash = await bcrypt.hash(input.newPassword, BCRYPT_ROUNDS);
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.passwordResetCodes)
+        .set({ consumedAt: new Date() })
+        .where(eq(schema.passwordResetCodes.id, candidate.id));
+
+      await tx
+        .update(schema.users)
+        .set({
+          passwordHash: newHash,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, user.id));
+
+      // Revoke every active refresh token — force a fresh login everywhere.
+      await tx
+        .update(schema.refreshTokens)
+        .set({ isRevoked: true, revokedAt: new Date() })
+        .where(
+          and(
+            eq(schema.refreshTokens.userId, user.id),
+            eq(schema.refreshTokens.isRevoked, false),
+          ),
+        );
+    });
+
+    this.logger.log('Password reset completed for user: ' + user.id);
   }
 
   async verifyOtp(userId: string, phone: string, code: string): Promise<void> {

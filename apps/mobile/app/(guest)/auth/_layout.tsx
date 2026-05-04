@@ -21,6 +21,8 @@ export default function AuthLayout() {
       <Stack.Screen name="login"    options={{ headerShown: true }} />
       <Stack.Screen name="register" options={{ headerShown: true }} />
       <Stack.Screen name="otp"      options={{ headerShown: true }} />
+      <Stack.Screen name="forgot-password" options={{ headerShown: true }} />
+      <Stack.Screen name="reset-password"  options={{ headerShown: true }} />
     </Stack>
   );
 }

@@ -34,6 +34,28 @@ export const verifyOtpRequest = z.object({
 });
 export type VerifyOtpRequest = z.infer<typeof verifyOtpRequest>;
 
+export const forgotPasswordRequest = z
+  .object({
+    email: z.string().email().optional(),
+    phone: z.string().min(1).optional(),
+  })
+  .refine((d) => Boolean(d.email || d.phone), {
+    message: 'email or phone is required',
+  });
+export type ForgotPasswordRequest = z.infer<typeof forgotPasswordRequest>;
+
+export const resetPasswordRequest = z
+  .object({
+    email:       z.string().email().optional(),
+    phone:       z.string().min(1).optional(),
+    code:        z.string().length(6),
+    newPassword: z.string().min(8),
+  })
+  .refine((d) => Boolean(d.email || d.phone), {
+    message: 'email or phone is required',
+  });
+export type ResetPasswordRequest = z.infer<typeof resetPasswordRequest>;
+
 // ── Responses ───────────────────────────────────────────────────────────────
 
 export const tokenPairResponse = z.object({

@@ -24,6 +24,8 @@ import { LoginPhoneDto } from './dto/login-phone.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -82,6 +84,27 @@ export class AuthController {
     @Body() dto: RefreshTokenDto,
   ) {
     return this.authService.logout(user.id, dto.refreshToken);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Request a password reset code via email or phone' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword({ email: dto.email, phone: dto.phone });
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Reset password using a previously issued reset code' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword({
+      email: dto.email,
+      phone: dto.phone,
+      code: dto.code,
+      newPassword: dto.newPassword,
+    });
   }
 
   @Post('phone/send-otp')

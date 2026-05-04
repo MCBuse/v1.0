@@ -5,8 +5,10 @@ import { authSession, useOperation } from '@/lib/api';
 import { useAppStore } from '@/store/app-store';
 
 import type {
+  ForgotPasswordRequest,
   LoginPhoneRequest,
   LoginRequest,
+  ResetPasswordRequest,
   SendOtpRequest,
   SignupRequest,
   TokenPairResponse,
@@ -91,5 +93,17 @@ export function useSendPhoneOtp() {
 export function useVerifyPhoneOtp() {
   return useOperation<VerifyOtpRequest, void>({
     mutationFn: (input) => authRepository.verifyPhoneOtp(input),
+  });
+}
+
+export function useForgotPassword() {
+  return useOperation<ForgotPasswordRequest, void>({
+    mutationFn: (input) => authRepository.forgotPassword(input),
+  });
+}
+
+export function useResetPassword() {
+  return useOperation<ResetPasswordRequest, void>({
+    mutationFn: (input) => authRepository.resetPassword(input),
   });
 }
