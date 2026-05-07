@@ -38,8 +38,7 @@ export default function SwapScreen() {
 
   const to = from === "USDC" ? "EURC" : "USDC";
 
-  const preview = useSwapPreview();
-  console.log("🚀 ~ SwapScreen ~ preview:", preview.data);
+  const { mutate: previewSwap, data: previewData } = useSwapPreview();
   const execute = useExecuteSwap();
 
   const hasAmount = amount !== "0" && amount !== "";
@@ -49,13 +48,12 @@ export default function SwapScreen() {
     if (!hasAmount) return;
     const baseUnits = toBaseUnits(amount);
     if (baseUnits === "0") return;
-    preview.mutate({
+    previewSwap({
       fromCurrency: from,
       toCurrency: to,
       fromAmount: baseUnits,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amount, from]);
+  }, [amount, from, hasAmount, previewSwap, to]);
 
   const flipDirection = useCallback(() => {
     setFrom((prev) => (prev === "USDC" ? "EURC" : "USDC"));
@@ -152,8 +150,6 @@ export default function SwapScreen() {
 
   // ── Amount entry ───────────────────────────────────────────────────────────
 
-  const previewData = preview.data;
-
   return (
     <View
       style={[
@@ -175,7 +171,7 @@ export default function SwapScreen() {
         <Box gap="xs">
           <Text variant="h3">Swap</Text>
           <Text variant="label" color="textTertiary">
-            Savings wallet · USD ↔ EUR
+            Holding Account · USD ↔ EUR
           </Text>
         </Box>
       </Box>

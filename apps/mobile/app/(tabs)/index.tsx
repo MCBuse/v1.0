@@ -27,7 +27,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Box, Text } from "@/components/ui";
 import { useTransactions } from "@/features/transactions";
 import type { LedgerEntry } from "@/features/transactions";
+import { useProfile } from "@/features/users";
 import { useWallets } from "@/features/wallets";
+import {
+  displayCurrencyLabel,
+  displayCurrencySymbol,
+  formatAmount as formatTokenAmount,
+  type StableCurrency,
+} from "@/lib/currency";
 import {
   formatAmount,
   formatRelativeTime,
@@ -116,42 +123,39 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const walletsQuery = useWallets();
+  const profileQuery = useProfile();
   const txQuery = useTransactions({ limit: 5 });
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([walletsQuery.reload(), txQuery.reload()]);
+    await Promise.all([walletsQuery.reload(), profileQuery.reload(), txQuery.reload()]);
     setRefreshing(false);
-  }, [walletsQuery, txQuery]);
+  }, [walletsQuery, profileQuery, txQuery]);
 
-  const balanceCards = useMemo<BalanceCardData[]>(() => {
+  const accountCards = useMemo<AccountCardData[]>(() => {
     const w = walletsQuery.data;
-    const get = (type: "savings" | "routine", cur: "USDC" | "EURC") =>
-      w?.[type]?.balances.find((b) => b.currency === cur)?.available ?? "0";
+    const primary = profileQuery.data?.primaryCurrency ?? "USDC";
+    const ordered = ([primary, primary === "USDC" ? "EURC" : "USDC"] as StableCurrency[]);
+
+    const build = (type: "routine" | "savings", title: "Routine Account" | "Holding Account") => {
+      const walletBalances = w?.[type]?.balances ?? [];
+      const balances = ordered
+        .map((currency) => ({
+          currency,
+          label: displayCurrencyLabel(currency),
+          symbol: displayCurrencySymbol(currency),
+          available: walletBalances.find((b) => b.currency === currency)?.available ?? "0",
+        }))
+        .filter((balance) => balance.currency === primary || BigInt(balance.available) > 0n);
+
+      return { type, title, primaryCurrency: primary, balances };
+    };
 
     return [
-      {
-        currency: "USDC",
-        label: "USD",
-        symbol: "$",
-        total: (
-          BigInt(get("savings", "USDC")) + BigInt(get("routine", "USDC"))
-        ).toString(),
-        savings: get("savings", "USDC"),
-        spending: get("routine", "USDC"),
-      },
-      {
-        currency: "EURC",
-        label: "EUR",
-        symbol: "€",
-        total: (
-          BigInt(get("savings", "EURC")) + BigInt(get("routine", "EURC"))
-        ).toString(),
-        savings: get("savings", "EURC"),
-        spending: get("routine", "EURC"),
-      },
+      build("routine", "Routine Account"),
+      build("savings", "Holding Account"),
     ];
-  }, [walletsQuery.data]);
+  }, [profileQuery.data?.primaryCurrency, walletsQuery.data]);
 
   const ownWalletIds = useMemo<Set<string>>(() => {
     const w = walletsQuery.data;
@@ -160,6 +164,8 @@ export default function HomeScreen() {
   }, [walletsQuery.data]);
 
   const transactions = txQuery.data?.data ?? [];
+
+  const firstName = profileQuery.data?.firstName
 
   return (
     <ScrollView
@@ -185,11 +191,15 @@ export default function HomeScreen() {
         paddingHorizontal="2xl"
         marginBottom="xl"
       >
-        <Box>
-          <Text variant="caption" color="textSecondary">
+        <Box
+          flexDirection="row"
+          alignItems="center"
+          columnGap="xs"
+        >
+          <Text color="textSecondary" fontWeight="bold">
             {greetingForTime()}
           </Text>
-          <Text variant="h3">MCBuse</Text>
+          <Text>{firstName}</Text>
         </Box>
 
         <Box flexDirection="row" alignItems="center" gap="m">
@@ -215,7 +225,7 @@ export default function HomeScreen() {
               color="textInverse"
               style={styles.avatarLetter}
             >
-              M
+              {firstName?.slice(0, 1) ?? ""}
             </Text>
           </Box>
         </Box>
@@ -223,7 +233,7 @@ export default function HomeScreen() {
 
       {/* ── Balance cards (horizontal scroll) ────────────────────────── */}
       <FlatList
-        data={walletsQuery.isLoading ? ([{}, {}] as any[]) : balanceCards}
+        data={walletsQuery.isLoading ? ([{}, {}] as any[]) : accountCards}
         keyExtractor={(_, i) => String(i)}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -234,7 +244,7 @@ export default function HomeScreen() {
           walletsQuery.isLoading ? (
             <View style={[styles.cardSkeleton, { width: cardWidth }]} />
           ) : (
-            <BalanceCard card={item as BalanceCardData} width={cardWidth} />
+            <AccountCard card={item as AccountCardData} width={cardWidth} />
           )
         }
       />
@@ -254,10 +264,10 @@ export default function HomeScreen() {
                 action.primary
                   ? { backgroundColor: colors.brand }
                   : {
-                      backgroundColor: colors.bgSecondary,
-                      borderWidth: 1,
-                      borderColor: colors.borderSubtle,
-                    },
+                    backgroundColor: colors.bgSecondary,
+                    borderWidth: 1,
+                    borderColor: colors.borderSubtle,
+                  },
                 { opacity: pressed ? 0.72 : 1 },
               ]}
               onPress={() => router.push(action.route as any)}
@@ -278,7 +288,7 @@ export default function HomeScreen() {
         ))}
       </Box>
 
-      {/* ── Savings actions ──────────────────────────────────────────── */}
+      {/* ── Holding actions ──────────────────────────────────────────── */}
       <Box
         marginHorizontal="2xl"
         marginBottom="3xl"
@@ -287,7 +297,7 @@ export default function HomeScreen() {
         borderRadius="xl"
       >
         <Text variant="label" color="textTertiary" style={{ marginBottom: 12 }}>
-          SAVINGS WALLET
+          HOLDING ACCOUNT
         </Text>
         <Box flexDirection="row" justifyContent="space-around">
           {SAVINGS_ACTIONS.map((action) => (
@@ -418,20 +428,23 @@ export default function HomeScreen() {
 
 // ── Subcomponents ──────────────────────────────────────────────────────────────
 
-type BalanceCardData = {
-  currency: "USDC" | "EURC";
-  label: "USD" | "EUR";
-  symbol: "$" | "€";
-  total: string;
-  savings: string;
-  spending: string;
+type AccountCardData = {
+  type: "routine" | "savings";
+  title: "Routine Account" | "Holding Account";
+  primaryCurrency: StableCurrency;
+  balances: {
+    currency: StableCurrency;
+    label: "USD" | "EUR";
+    symbol: "$" | "€";
+    available: string;
+  }[];
 };
 
-function BalanceCard({
+function AccountCard({
   card,
   width,
 }: {
-  card: BalanceCardData;
+  card: AccountCardData;
   width: number;
 }) {
   const { colors } = useTheme<Theme>();
@@ -439,44 +452,39 @@ function BalanceCard({
     <View
       style={[styles.balanceCard, { width, backgroundColor: colors.bgInverse }]}
     >
-      {/* Currency label */}
-      <View style={styles.currencyBadge}>
-        <Text
-          variant="label"
-          style={{ color: "rgba(255,255,255,0.6)", letterSpacing: 0.8 }}
-        >
-          {card.label}
+      <View style={styles.accountHeader}>
+        <Text variant="h3" style={styles.accountTitle}>
+          {card.title}
         </Text>
+        {/* <View style={styles.currencyBadge}>
+          <Text
+            variant="label"
+            style={{ color: "rgba(255,255,255,0.72)", letterSpacing: 0.3 }}
+          >
+            {displayCurrencyLabel(card.primaryCurrency)}
+          </Text>
+        </View> */}
       </View>
-
-      {/* Total */}
-      <Text variant="display" style={styles.balanceAmount}>
-        {card.symbol}
-        {formatAmount(card.total).replace("$", "")}
-      </Text>
 
       <View style={styles.divider} />
 
-      {/* Savings / Spending */}
-      <View style={styles.cardFooter}>
-        <View>
-          <Text variant="caption" style={styles.dimTextSm}>
-            Savings
-          </Text>
-          <Text variant="captionMedium" style={styles.subBalance}>
-            {card.symbol}
-            {formatAmount(card.savings).replace("$", "")}
-          </Text>
-        </View>
-        <View>
-          <Text variant="caption" style={styles.dimTextSm}>
-            Spending
-          </Text>
-          <Text variant="captionMedium" style={styles.subBalance}>
-            {card.symbol}
-            {formatAmount(card.spending).replace("$", "")}
-          </Text>
-        </View>
+      <View style={styles.balanceRows}>
+        {card.balances.map((balance) => (
+          <View key={balance.currency} style={styles.balanceRow}>
+            <View>
+              <Text variant="caption" style={styles.dimTextSm}>
+                {balance.label}
+              </Text>
+              {/* <Text variant="label" style={styles.assetCode}>
+                {balance.currency}
+              </Text> */}
+            </View>
+            <Text variant="h2" style={styles.rowBalance}>
+              {balance.symbol}
+              {formatTokenAmount(balance.available)}
+            </Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -576,6 +584,7 @@ const styles = StyleSheet.create({
   balanceCard: {
     borderRadius: 28,
     padding: 24,
+    minHeight: 168,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
@@ -587,25 +596,36 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     backgroundColor: "#E5E7EB",
   },
+  accountHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  accountTitle: { color: "#fff", flex: 1 },
   currencyBadge: {
     alignSelf: "flex-start",
     backgroundColor: "rgba(255,255,255,0.1)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
-    marginBottom: 12,
   },
-  dimTextSm: { color: "rgba(255,255,255,0.45)", fontSize: 11 },
-  subBalance: { color: "rgba(255,255,255,0.8)", marginTop: 2 },
-  balanceAmount: { color: "#fff", marginBottom: 4 },
+  balanceRows: {
+    gap: 14,
+  },
+  balanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  dimTextSm: { color: "rgba(255,255,255,0.52)", fontSize: 12 },
+  assetCode: { color: "rgba(255,255,255,0.42)", marginTop: 2 },
+  rowBalance: { color: "#fff" },
   divider: {
     height: 1,
     backgroundColor: "rgba(255,255,255,0.12)",
-    marginVertical: 14,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    gap: 32,
+    marginVertical: 16,
   },
 
   actionBtn: {

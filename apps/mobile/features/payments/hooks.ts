@@ -4,6 +4,7 @@ import {
   type CreatePaymentRequestInput,
   type ExecutePaymentInput,
   type ExecutePaymentResponse,
+  type ExecuteUsernamePaymentInput,
   type OnRampInput,
   type OnRampResponse,
   type PaymentRequest,
@@ -26,6 +27,13 @@ export function useResolvePaymentRequest() {
 export function useExecutePayment() {
   return useOperation<ExecutePaymentInput, ExecutePaymentResponse>({
     mutationFn:     (input) => paymentRepository.executePayment(input),
+    invalidateKeys: [['wallets'], ['transactions']],
+  });
+}
+
+export function useExecuteUsernamePayment() {
+  return useOperation<ExecuteUsernamePaymentInput, ExecutePaymentResponse>({
+    mutationFn:     (input) => paymentRepository.executeUsernamePayment(input),
     invalidateKeys: [['wallets'], ['transactions']],
   });
 }

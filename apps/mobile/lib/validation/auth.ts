@@ -12,6 +12,12 @@ const phoneField = z
   .min(1, 'Phone number is required')
   .regex(/^\+?[1-9]\d{6,14}$/, 'Enter a valid phone number (e.g. +12125551234)');
 
+const usernameField = z
+  .string()
+  .min(3, 'Username must be at least 3 characters')
+  .max(30, 'Username must be 30 characters or less')
+  .regex(/^[a-z0-9_]+$/, 'Use lowercase letters, numbers, or underscores');
+
 // ── Login ─────────────────────────────────────────────────────────────────────
 
 export const loginSchema = z
@@ -43,6 +49,7 @@ export const registerSchema = z
   .object({
     mode:       z.enum(['email', 'phone']),
     fullName:   z.string().min(2, 'Enter your full name'),
+    username:   usernameField,
     identifier: z.string().min(1, 'This field is required'),
     password:   z.string().min(8, 'Password must be at least 8 characters'),
     confirm:    z.string().min(1, 'Please confirm your password'),

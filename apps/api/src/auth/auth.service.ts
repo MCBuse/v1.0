@@ -49,6 +49,7 @@ export class AuthService {
       firstName: dto.firstName,
       lastName: dto.lastName,
       phone: dto.phone,
+      username: dto.username,
     });
 
     try {

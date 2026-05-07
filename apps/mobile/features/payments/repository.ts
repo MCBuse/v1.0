@@ -8,6 +8,7 @@ import {
   type CreatePaymentRequestInput,
   type ExecutePaymentInput,
   type ExecutePaymentResponse,
+  type ExecuteUsernamePaymentInput,
   type OnRampInput,
   type OnRampResponse,
   type PaymentRequest,
@@ -27,6 +28,11 @@ export const paymentRepository = {
 
   async executePayment(input: ExecutePaymentInput): Promise<ExecutePaymentResponse> {
     const raw = await http.post<unknown>('/payments', input);
+    return executePaymentResponse.parse(raw);
+  },
+
+  async executeUsernamePayment(input: ExecuteUsernamePaymentInput): Promise<ExecutePaymentResponse> {
+    const raw = await http.post<unknown>('/payments/username', input);
     return executePaymentResponse.parse(raw);
   },
 

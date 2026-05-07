@@ -1,18 +1,22 @@
 import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
-import { ArrowLeft, ArrowRight, TickCircle } from 'iconsax-react-native';
+import { ArrowLeft, ArrowSwapHorizontal, TickCircle } from 'iconsax-react-native';
 import React, { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Box, Button, NumPad, Text } from '@/components/ui';
 import { useInternalTransfer } from '@/features/transfer';
-import { toBaseUnits } from '@/lib/currency';
-import { formatCurrency } from '@/lib/currency';
+import { formatCurrency, toBaseUnits } from '@/lib/currency';
 import type { Theme } from '@/theme';
 
 type StableCurrency = 'USDC' | 'EURC';
+type AccountType = 'routine' | 'savings';
 const SYMBOL: Record<StableCurrency, string> = { USDC: '$', EURC: '€' };
+const ACCOUNT_LABEL: Record<AccountType, string> = {
+  routine: 'Routine Account',
+  savings: 'Holding Account',
+};
 
 export default function TransferScreen() {
   const { colors } = useTheme<Theme>();
@@ -20,9 +24,12 @@ export default function TransferScreen() {
 
   const [amount, setAmount]     = useState('0');
   const [currency, setCurrency] = useState<StableCurrency>('USDC');
+  const [fromWalletType, setFromWalletType] = useState<AccountType>('savings');
   const [succeeded, setSucceeded] = useState(false);
+  const toWalletType: AccountType = fromWalletType === 'savings' ? 'routine' : 'savings';
 
   const transfer = useInternalTransfer();
+  const flipDirection = () => setFromWalletType((current) => current === 'savings' ? 'routine' : 'savings');
 
   const handleTransfer = useCallback(async () => {
     const baseUnits = toBaseUnits(amount);
@@ -32,8 +39,8 @@ export default function TransferScreen() {
     }
     try {
       await transfer.mutateAsync({
-        fromWalletType: 'savings',
-        toWalletType:   'routine',
+        fromWalletType,
+        toWalletType,
         amount:         baseUnits,
         currency,
       });
@@ -41,7 +48,7 @@ export default function TransferScreen() {
     } catch (err: any) {
       Alert.alert('Transfer Failed', err?.message ?? 'Something went wrong. Please try again.');
     }
-  }, [amount, currency, transfer]);
+  }, [amount, currency, fromWalletType, toWalletType, transfer]);
 
   // ── Success ────────────────────────────────────────────────────────────────
 
@@ -62,7 +69,7 @@ export default function TransferScreen() {
           <Box alignItems="center" gap="s">
             <Text variant="h2">Transfer Complete</Text>
             <Text variant="body" color="textSecondary" style={styles.centered}>
-              {formatCurrency(toBaseUnits(amount), currency)} moved to your spending wallet.
+              {formatCurrency(toBaseUnits(amount), currency)} moved to {ACCOUNT_LABEL[toWalletType].toLowerCase()}.
             </Text>
           </Box>
           <Box style={{ width: '100%' }} gap="m">
@@ -94,8 +101,10 @@ export default function TransferScreen() {
           <ArrowLeft size={20} color={colors.textPrimary} variant="Linear" />
         </Pressable>
         <Box gap="xs">
-          <Text variant="h3">Move to Spending</Text>
-          <Text variant="label" color="textTertiary">Savings → Spending wallet</Text>
+          <Text variant="h3">Move Money</Text>
+          <Text variant="label" color="textTertiary">
+            {ACCOUNT_LABEL[fromWalletType]} → {ACCOUNT_LABEL[toWalletType]}
+          </Text>
         </Box>
       </Box>
 
@@ -136,12 +145,19 @@ export default function TransferScreen() {
       >
         <Box gap="xs">
           <Text variant="caption" color="textTertiary">From</Text>
-          <Text variant="captionMedium">Savings wallet</Text>
+          <Text variant="captionMedium">{ACCOUNT_LABEL[fromWalletType]}</Text>
         </Box>
-        <ArrowRight size={18} color={colors.textTertiary} />
+        <Pressable
+          onPress={flipDirection}
+          style={[styles.flipBtn, { backgroundColor: colors.bgPrimary }]}
+          accessibilityRole="button"
+          accessibilityLabel="Swap transfer direction"
+        >
+          <ArrowSwapHorizontal size={18} color={colors.textPrimary} />
+        </Pressable>
         <Box gap="xs" alignItems="flex-end">
           <Text variant="caption" color="textTertiary">To</Text>
-          <Text variant="captionMedium">Spending wallet</Text>
+          <Text variant="captionMedium">{ACCOUNT_LABEL[toWalletType]}</Text>
         </Box>
       </Box>
 
@@ -157,7 +173,7 @@ export default function TransferScreen() {
           }}
           secondaryActions={[
             { label: 'Cancel', onPress: () => router.back() },
-            { label: `${SYMBOL[currency]}20`, onPress: () => setAmount('20') },
+            { label: 'Flip', onPress: flipDirection },
           ]}
         />
       </Box>
@@ -180,5 +196,12 @@ const styles = StyleSheet.create({
     paddingVertical:    8,
     borderRadius:       99,
     borderWidth:        1,
+  },
+  flipBtn: {
+    width:          40,
+    height:         40,
+    borderRadius:   20,
+    alignItems:     'center',
+    justifyContent: 'center',
   },
 });

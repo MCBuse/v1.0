@@ -146,7 +146,7 @@ export default function SendConfirmScreen() {
           gap="xs"
         >
           <Text variant="caption" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            You're sending
+            {"You're sending"}
           </Text>
           <Text variant="display" style={{ color: '#fff' }}>
             {displayedAmount}

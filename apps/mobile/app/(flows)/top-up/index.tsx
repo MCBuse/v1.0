@@ -96,7 +96,7 @@ export default function TopUpScreen() {
           <Box gap="xs">
             <Text variant="h3">Add Money</Text>
             <Text variant="label" color="textTertiary">
-              Top up your savings with a card
+              Top up your Holding Account with a card
             </Text>
           </Box>
         </Box>
@@ -192,7 +192,7 @@ export default function TopUpScreen() {
             <ArrowRight size={18} color={colors.textTertiary} />
             <Box gap="xs" alignItems="flex-end">
               <Text variant="caption" color="textTertiary">
-                Added to savings
+                Added to Holding
               </Text>
               <Text variant="bodyMedium">
                 {symbol}

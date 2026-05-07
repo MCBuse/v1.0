@@ -12,22 +12,22 @@ import { OtpInput } from '@/components/auth/OtpInput';
 import { Box, Button, Text } from '@/components/ui';
 
 const RESEND_SECONDS = 60;
-const DEV_OTP        = '123456';
+const DEV_OTP = '123456';
 
 export default function OtpScreen() {
   const { colors } = useTheme<Theme>();
-  const insets     = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
   const { identifier = '' } = useLocalSearchParams<{
     identifier: string;
-    flow:       'login' | 'register';
+    flow: 'login' | 'register';
   }>();
 
-  const pending       = usePendingAuthStore((s) => s.pending);
-  const clearPending  = usePendingAuthStore((s) => s.clear);
+  const pending = usePendingAuthStore((s) => s.pending);
+  const clearPending = usePendingAuthStore((s) => s.clear);
   const commitPending = useCommitPendingAuth();
 
-  const [code, setCode]           = useState('');
-  const [error, setError]         = useState(false);
+  const [code, setCode] = useState('');
+  const [error, setError] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_SECONDS);
   const [canResend, setCanResend] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -87,7 +87,7 @@ export default function OtpScreen() {
     router.back();
   };
 
-  const isEmail          = identifier.includes('@');
+  const isEmail = identifier.includes('@');
   const maskedIdentifier = isEmail
     ? identifier.replace(/(.{2}).+(@.+)/, '$1•••$2')
     : identifier.replace(/(\+?\d{1,3})\d+(\d{4})/, '$1•••••$2');
@@ -110,9 +110,9 @@ export default function OtpScreen() {
             We sent a 6-digit code to{'\n'}
             <Text variant="bodyMedium">{maskedIdentifier}</Text>
           </Text>
-          <Text variant="caption" color="textTertiary" marginTop="s">
+          {/* <Text variant="caption" color="textTertiary" marginTop="s">
             Dev mode — use code {DEV_OTP}.
-          </Text>
+          </Text> */}
         </Box>
 
         {/* OTP boxes */}
@@ -177,7 +177,7 @@ export default function OtpScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   resendLink: {
-    fontWeight:         '600',
+    fontWeight: '600',
     textDecorationLine: 'underline',
   },
   changeLink: {

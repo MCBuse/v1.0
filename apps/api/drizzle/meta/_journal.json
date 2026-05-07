@@ -29,6 +29,13 @@
       "when": 1777680000000,
       "tag": "0003_password_reset_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778112000000,
+      "tag": "0004_usernames_primary_currency",
+      "breakpoints": true
     }
   ]
 }

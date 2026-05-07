@@ -18,6 +18,13 @@ export const executePaymentInput = z.object({
 });
 export type ExecutePaymentInput = z.infer<typeof executePaymentInput>;
 
+export const executeUsernamePaymentInput = z.object({
+  username: z.string(),
+  amount:   z.string(),
+  currency: z.enum(['USDC', 'EURC']),
+});
+export type ExecuteUsernamePaymentInput = z.infer<typeof executeUsernamePaymentInput>;
+
 export const onRampInput = z.object({
   amount:   z.string(),
   currency: z.enum(['USDC', 'EURC']),
@@ -56,7 +63,11 @@ export const executePaymentResponse = z.object({
   payerWalletId:    z.string(),
   payeeWalletId:    z.string(),
   idempotencyKey:   z.string(),
-  paymentRequestId: z.string(),
+  paymentRequestId: z.string().optional(),
+  recipient: z.object({
+    username:    z.string(),
+    displayName: z.string(),
+  }).optional(),
 });
 export type ExecutePaymentResponse = z.infer<typeof executePaymentResponse>;
 

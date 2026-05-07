@@ -42,7 +42,7 @@ function txLabel(entry: LedgerEntry): string {
     case 'off_ramp':  return 'Cash Out';
     case 'p2p':       return 'Sent';
     case 'swap':      return 'Swap';
-    case 'internal':  return 'Move to Spending';
+    case 'internal':  return 'Account Transfer';
     default:          return 'Transaction';
   }
 }

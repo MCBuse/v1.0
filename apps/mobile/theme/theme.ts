@@ -5,73 +5,73 @@ const theme = createTheme({
   // ── Colors ────────────────────────────────────────────────────────────────
   colors: {
     // Brand — black/white/gray only
-    brand:          palette.black,
-    brandDark:      palette.gray900,
-    brandLight:     palette.gray100,
-    brandMuted:     'rgba(0,0,0,0.08)',
+    brand: palette.black,
+    brandDark: palette.gray900,
+    brandLight: palette.gray100,
+    brandMuted: 'rgba(0,0,0,0.08)',
 
     // Backgrounds
-    bgPrimary:      palette.white,
-    bgSecondary:    palette.gray50,
-    bgTertiary:     palette.gray100,
-    bgInverse:      palette.black,
-    bgBrand:        palette.black,
-    bgOverlay:      palette.overlay,
+    bgPrimary: palette.white,
+    bgSecondary: palette.gray50,
+    bgTertiary: palette.gray100,
+    bgInverse: palette.black,
+    bgBrand: palette.black,
+    bgOverlay: palette.overlay,
 
     // Text
-    textPrimary:    palette.black,
-    textSecondary:  palette.gray600,
-    textTertiary:   palette.gray400,
-    textInverse:    palette.white,
-    textBrand:      palette.black,
-    textDisabled:   palette.gray400,
-    textLink:       palette.black,
+    textPrimary: palette.black,
+    textSecondary: palette.gray700,
+    textTertiary: palette.gray600,
+    textInverse: palette.white,
+    textBrand: palette.black,
+    textDisabled: palette.gray400,
+    textLink: palette.black,
 
     // Borders
-    borderSubtle:   palette.gray200,
-    borderDefault:  palette.gray300,
-    borderStrong:   palette.black,
-    borderFocus:    palette.black,
-    borderBrand:    palette.black,
+    borderSubtle: palette.gray200,
+    borderDefault: palette.gray300,
+    borderStrong: palette.black,
+    borderFocus: palette.black,
+    borderBrand: palette.black,
 
     // Interactive
-    btnPrimary:      palette.black,
-    btnPrimaryText:  palette.white,
-    btnBrand:        palette.black,
-    btnBrandText:    palette.white,
-    btnSecondary:    palette.gray50,
+    btnPrimary: palette.black,
+    btnPrimaryText: palette.white,
+    btnBrand: palette.black,
+    btnBrandText: palette.white,
+    btnSecondary: palette.gray50,
     btnSecondaryText: palette.black,
-    btnDisabled:     palette.gray100,
+    btnDisabled: palette.gray100,
     btnDisabledText: palette.gray400,
 
     // Status — keep semantic colors for error/warning/info; success uses black
-    success:  palette.black,
-    error:    palette.red,
-    warning:  palette.orange,
-    info:     palette.blue,
+    success: palette.black,
+    error: palette.red,
+    warning: palette.orange,
+    info: palette.blue,
 
     // Numpad — black background, white keys
-    numpadBg:      palette.black,
-    numpadText:    palette.white,
-    numpadKeyBg:   palette.numpadKeyDark,  // rgba(255,255,255,0.15) on black bg
-    numpadBtnBg:   'rgba(255,255,255,0.12)',
-    numpadPayBg:   palette.white,
+    numpadBg: palette.black,
+    numpadText: palette.white,
+    numpadKeyBg: palette.numpadKeyDark,  // rgba(255,255,255,0.15) on black bg
+    numpadBtnBg: 'rgba(255,255,255,0.12)',
+    numpadPayBg: palette.white,
     numpadPayText: palette.black,
 
     // Misc
-    transparent:    palette.transparent,
-    white:          palette.white,
-    black:          palette.black,
+    transparent: palette.transparent,
+    white: palette.white,
+    black: palette.black,
   },
 
   // ── Spacing ───────────────────────────────────────────────────────────────
   spacing: {
-    none:  0,
-    xs:    4,
-    s:     8,
-    m:     12,
-    l:     16,
-    xl:    20,
+    none: 0,
+    xs: 4,
+    s: 8,
+    m: 12,
+    l: 16,
+    xl: 20,
     '2xl': 24,
     '3xl': 32,
     '4xl': 40,
@@ -82,14 +82,14 @@ const theme = createTheme({
 
   // ── Border Radii ──────────────────────────────────────────────────────────
   borderRadii: {
-    none:  0,
-    xs:    4,
-    s:     8,
-    m:     10,
-    l:     16,
-    xl:    20,
+    none: 0,
+    xs: 4,
+    s: 8,
+    m: 10,
+    l: 16,
+    xl: 20,
     '2xl': 28,
-    full:  9999,
+    full: 9999,
   },
 
   // ── Text Variants — IBM Plex Sans ─────────────────────────────────────────
@@ -98,87 +98,87 @@ const theme = createTheme({
   textVariants: {
     defaults: {
       fontFamily: fonts.regular,
-      color:      'textPrimary',
+      color: 'textPrimary',
     },
 
     // Large display number — used in NumPad
     display: {
-      fontFamily:    fonts.bold,
-      fontSize:      52,
-      lineHeight:    56,
+      fontFamily: fonts.bold,
+      fontSize: 52,
+      lineHeight: 56,
       letterSpacing: -1,
-      color:         'textPrimary',
+      color: 'textPrimary',
     },
 
     // Page headlines
     h1: {
-      fontFamily:    fonts.bold,
-      fontSize:      28,
-      lineHeight:    34,
+      fontFamily: fonts.bold,
+      fontSize: 28,
+      lineHeight: 34,
       letterSpacing: -0.3,
-      color:         'textPrimary',
+      color: 'textPrimary',
     },
     h2: {
-      fontFamily:    fonts.semibold,
-      fontSize:      22,
-      lineHeight:    28,
+      fontFamily: fonts.semibold,
+      fontSize: 22,
+      lineHeight: 28,
       letterSpacing: -0.2,
-      color:         'textPrimary',
+      color: 'textPrimary',
     },
     h3: {
       fontFamily: fonts.semibold,
-      fontSize:   18,
+      fontSize: 18,
       lineHeight: 24,
-      color:      'textPrimary',
+      color: 'textPrimary',
     },
 
     // Body — regular inherited from defaults
     body: {
-      fontSize:  16,
+      fontSize: 16,
       lineHeight: 22,
-      color:     'textPrimary',
+      color: 'textPrimary',
     },
     bodyMedium: {
       fontFamily: fonts.medium,
-      fontSize:   16,
+      fontSize: 16,
       lineHeight: 22,
-      color:      'textPrimary',
+      color: 'textPrimary',
     },
     bodySemibold: {
       fontFamily: fonts.semibold,
-      fontSize:   16,
+      fontSize: 16,
       lineHeight: 22,
-      color:      'textPrimary',
+      color: 'textPrimary',
     },
 
     // Small text — regular inherited from defaults
     caption: {
-      fontSize:  13,
+      fontSize: 13,
       lineHeight: 18,
-      color:     'textSecondary',
+      color: 'textSecondary',
     },
     captionMedium: {
       fontFamily: fonts.medium,
-      fontSize:   13,
+      fontSize: 13,
       lineHeight: 18,
-      color:      'textSecondary',
+      color: 'textSecondary',
     },
 
     // Tab bar, badges, labels
     label: {
-      fontFamily:    fonts.medium,
-      fontSize:      11,
-      lineHeight:    13,
+      fontFamily: fonts.medium,
+      fontSize: 11,
+      lineHeight: 13,
       letterSpacing: 0.1,
-      color:         'textSecondary',
+      color: 'textSecondary',
     },
 
     // Underlined links — regular inherited from defaults
     link: {
-      fontSize:           16,
-      lineHeight:         22,
+      fontSize: 16,
+      lineHeight: 22,
       textDecorationLine: 'underline',
-      color:              'textLink',
+      color: 'textLink',
     },
   },
 });

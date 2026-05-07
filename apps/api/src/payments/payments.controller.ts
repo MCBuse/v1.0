@@ -2,6 +2,7 @@ import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import { ExecutePaymentDto } from './dto/execute-payment.dto';
+import { ExecuteUsernamePaymentDto } from './dto/execute-username-payment.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 
@@ -26,5 +27,20 @@ export class PaymentsController {
     @Body() dto: ExecutePaymentDto,
   ) {
     return this.paymentsService.execute(user.id, dto);
+  }
+
+  @Post('username')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Execute a P2P payment by username',
+    description:
+      'Sends from the payer routine wallet to the recipient routine wallet. ' +
+      'The username may be supplied with or without @.',
+  })
+  executeByUsername(
+    @CurrentUser() user: { id: string },
+    @Body() dto: ExecuteUsernamePaymentDto,
+  ) {
+    return this.paymentsService.executeByUsername(user.id, dto);
   }
 }

@@ -17,6 +17,7 @@ export type LoginPhoneRequest = z.infer<typeof loginPhoneRequest>;
 export const signupRequest = z.object({
   email:     z.string().email().optional(),
   phone:     z.string().optional(),
+  username:  z.string().min(3).max(30),
   password:  z.string().min(8),
   firstName: z.string().min(1),
   lastName:  z.string().min(1),

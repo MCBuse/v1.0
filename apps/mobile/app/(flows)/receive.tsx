@@ -129,7 +129,7 @@ export default function ReceiveScreen() {
         {data && routineAddress && !isLoading && (
           <>
             <Text variant="caption" color="textSecondary" style={styles.centeredText}>
-              Anyone with this QR can send you {currency} instantly.
+              Anyone with this QR can send {currency} to your Routine Account.
             </Text>
 
             {/* QR card */}
@@ -163,7 +163,7 @@ export default function ReceiveScreen() {
             >
               <Box flex={1}>
                 <Text variant="caption" color="textTertiary" style={{ marginBottom: 2 }}>
-                  Wallet address
+                  Routine address
                 </Text>
                 <Text variant="captionMedium" numberOfLines={1}>
                   {truncateAddress(routineAddress, 12)}

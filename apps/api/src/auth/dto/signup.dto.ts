@@ -46,4 +46,12 @@ export class SignupDto {
   @IsString()
   @IsNotEmpty()
   lastName: string;
+
+  @ApiProperty({
+    example: 'jane_doe',
+    description: 'Lowercase username without @. Supports letters, numbers, and underscores.',
+  })
+  @IsString()
+  @IsNotEmpty()
+  username: string;
 }

@@ -154,7 +154,7 @@ export default function CashOutScreen() {
           <Box gap="xs">
             <Text variant="h3">Cash Out</Text>
             <Text variant="label" color="textTertiary">
-              Send money from savings to your bank
+              Send money from Holding to your bank
             </Text>
           </Box>
         </Box>

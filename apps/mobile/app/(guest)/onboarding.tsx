@@ -34,9 +34,9 @@ const SLIDES: SlideData[] = [
   {
     Icon: Wallet3,
     accentColor: "brand",
-    title: "Savings + spending, separated",
+    title: "Routine + Holding, separated",
     description:
-      "Keep your savings safe and move money to spending whenever you need it.",
+      "Receive into Routine and move money to Holding whenever you need it.",
   },
 ];
 

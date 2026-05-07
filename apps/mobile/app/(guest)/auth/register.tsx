@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
@@ -20,6 +20,11 @@ import { Eye, EyeSlash } from 'iconsax-react-native';
 
 import { useSignup } from '@/features/auth/hooks';
 import { usePendingAuthStore } from '@/features/auth/pending-store';
+import {
+  isUsernameFormatValid,
+  normalizeUsernameInput,
+  useUsernameAvailability,
+} from '@/features/users';
 
 import type { Theme } from '@/theme';
 import { Box, Button, Input, PhoneInput, Text } from '@/components/ui';
@@ -40,6 +45,7 @@ export default function RegisterScreen() {
   const { colors } = useTheme<Theme>();
   const insets     = useSafeAreaInsets();
   const [showPassword, setShowPassword] = useState(false);
+  const [usernameForCheck, setUsernameForCheck] = useState('');
 
   const setPending = usePendingAuthStore((s) => s.set);
   const signup     = useSignup();
@@ -55,6 +61,7 @@ export default function RegisterScreen() {
     defaultValues: {
       mode:       'email',
       fullName:   '',
+      username:   '',
       identifier: '',
       password:   '',
       confirm:    '',
@@ -63,6 +70,19 @@ export default function RegisterScreen() {
   });
 
   const mode = watch('mode');
+  const username = watch('username');
+  const normalizedUsername = normalizeUsernameInput(username);
+  const usernameCheck = useUsernameAvailability(usernameForCheck, usernameForCheck.length > 0);
+
+  useEffect(() => {
+    if (!isUsernameFormatValid(normalizedUsername)) {
+      setUsernameForCheck('');
+      return;
+    }
+
+    const timer = setTimeout(() => setUsernameForCheck(normalizedUsername), 350);
+    return () => clearTimeout(timer);
+  }, [normalizedUsername]);
 
   const switchMode = (m: Mode) => {
     setValue('mode',       m,  { shouldValidate: false });
@@ -71,11 +91,18 @@ export default function RegisterScreen() {
 
   const onSubmit = async (data: RegisterFormValues) => {
     const { firstName, lastName } = splitName(data.fullName);
+    const cleanUsername = normalizeUsernameInput(data.username);
+
+    if (usernameCheck.data && usernameCheck.data.username === cleanUsername && !usernameCheck.data.available) {
+      Alert.alert('Username unavailable', 'Choose one of the suggested usernames or try another.');
+      return;
+    }
 
     try {
       const tokens = await signup.mutateAsync({
         firstName,
         lastName,
+        username: cleanUsername,
         password: data.password,
         ...(data.mode === 'email'
           ? { email: data.identifier }
@@ -165,6 +192,56 @@ export default function RegisterScreen() {
                 error={errors.fullName?.message}
               />
             )}
+          />
+
+          <Controller
+            control={control}
+            name="username"
+            render={({ field }) => {
+              const availability = usernameCheck.data;
+              const checked = availability?.username === normalizedUsername;
+              const taken = checked && !availability.available;
+              const available = checked && availability.available;
+
+              return (
+                <Box gap="s">
+                  <Input
+                    label="Username"
+                    prefix="@"
+                    placeholder="fred123"
+                    value={field.value}
+                    onChangeText={(value) => field.onChange(normalizeUsernameInput(value))}
+                    onBlur={field.onBlur}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    returnKeyType="next"
+                    error={errors.username?.message || (taken ? 'That username is taken' : undefined)}
+                    hint={
+                      available
+                        ? 'Username available'
+                        : 'Lowercase letters, numbers, and underscores'
+                    }
+                  />
+                  {taken && availability.suggestions.length > 0 && (
+                    <Box flexDirection="row" flexWrap="wrap" gap="s">
+                      {availability.suggestions.map((suggestion) => (
+                        <Pressable
+                          key={suggestion}
+                          onPress={() => setValue('username', suggestion, { shouldValidate: true })}
+                          style={[
+                            styles.suggestionChip,
+                            { backgroundColor: colors.bgSecondary, borderColor: colors.borderDefault },
+                          ]}
+                        >
+                          <Text variant="captionMedium">@{suggestion}</Text>
+                        </Pressable>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              );
+            }}
           />
 
           <Controller
@@ -297,4 +374,10 @@ const styles = StyleSheet.create({
   },
   link:       { fontWeight: '500', textDecorationLine: 'underline' },
   switchLink: { fontWeight: '600', textDecorationLine: 'underline' },
+  suggestionChip: {
+    borderWidth:        1,
+    borderRadius:       999,
+    paddingHorizontal: 12,
+    paddingVertical:    7,
+  },
 });

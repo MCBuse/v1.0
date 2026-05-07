@@ -68,7 +68,7 @@ export default function AuthLandingScreen() {
 
         {/* Sign up link */}
         <Box flexDirection="row" justifyContent="center" gap="xs" paddingTop="s">
-          <Text variant="caption" color="textSecondary">Don't have an account?</Text>
+          <Text variant="caption" color="textSecondary">{"Don't have an account?"}</Text>
           <Text
             variant="caption"
             color="textPrimary"

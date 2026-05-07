@@ -30,7 +30,7 @@ export default function TopUpStatusScreen() {
     if (!s) return 'Starting…';
     if (s === 'pending') return 'Waiting for payment';
     if (s === 'processing') return 'Payment received, finalizing';
-    if (s === 'completed') return 'Money added to your savings';
+    if (s === 'completed') return 'Money added to Holding';
     if (s === 'failed') return 'Top-up failed';
     if (s === 'cancelled') return 'Top-up cancelled';
     if (s === 'expired') return 'Session expired';
