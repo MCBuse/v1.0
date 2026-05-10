@@ -212,8 +212,8 @@ export default function ReceiveScreen() {
             onPress: () => handleGenerate(amount !== '0'),
           }}
           secondaryActions={[
-            { label: 'Any amount', onPress: () => handleGenerate(false) },
-            { label: 'Cancel',     onPress: () => router.back() },
+            { label: 'Any amount',     onPress: () => handleGenerate(false) },
+            { label: 'Create invoice', onPress: () => router.push('/(flows)/invoice') },
           ]}
         />
       </Box>

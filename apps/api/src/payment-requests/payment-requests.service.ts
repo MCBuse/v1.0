@@ -40,11 +40,31 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async create(userId: string, dto: CreatePaymentRequestDto) {
-    if (dto.type === 'dynamic') {
+    const hasLineItems = !!dto.lineItems?.length;
+
+    if (hasLineItems && dto.type !== 'dynamic') {
+      throw new BadRequestException('lineItems require type=dynamic');
+    }
+
+    // When line items are provided, the server computes the total — client `amount` is ignored.
+    let computedAmount: bigint | null = null;
+    if (hasLineItems) {
+      computedAmount = dto.lineItems!.reduce(
+        (sum, it) => sum + BigInt(it.unitAmount) * BigInt(it.quantity),
+        0n,
+      );
+      if (computedAmount <= 0n) {
+        throw new BadRequestException('Line items total must be positive');
+      }
+      if (!dto.currency) {
+        throw new BadRequestException('currency is required when lineItems are provided');
+      }
+    } else if (dto.type === 'dynamic') {
       if (!dto.amount) throw new BadRequestException('amount is required for dynamic payment requests');
       if (!dto.currency) throw new BadRequestException('currency is required for dynamic payment requests');
       const amount = BigInt(dto.amount);
       if (amount <= 0n) throw new BadRequestException('amount must be positive');
+      computedAmount = amount;
     }
 
     // P2P payments land in the routine wallet
@@ -66,9 +86,10 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
       .values({
         creatorWalletId: routine.id,
         type: dto.type,
-        amount: dto.type === 'dynamic' && dto.amount ? BigInt(dto.amount) : null,
+        amount: computedAmount,
         currency: dto.type === 'dynamic' ? dto.currency?.toUpperCase() ?? null : null,
         description: dto.description ?? null,
+        lineItems: hasLineItems ? dto.lineItems! : null,
         nonce,
         status: 'pending',
         expiresAt,
@@ -104,19 +125,35 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('Payment request has expired');
     }
 
-    // Return creator wallet pubkey so payer can verify the destination
-    const walletRows = await this.db
-      .select({ id: schema.wallets.id, solanaPubkey: schema.wallets.solanaPubkey, type: schema.wallets.type })
+    // Return creator wallet pubkey + creator identity so payer sees who they're paying
+    const rows2 = await this.db
+      .select({
+        walletId:     schema.wallets.id,
+        solanaPubkey: schema.wallets.solanaPubkey,
+        walletType:   schema.wallets.type,
+        username:     schema.users.username,
+        firstName:    schema.users.firstName,
+        lastName:     schema.users.lastName,
+      })
       .from(schema.wallets)
+      .innerJoin(schema.users, eq(schema.users.id, schema.wallets.userId))
       .where(and(eq(schema.wallets.id, pr.creatorWalletId), eq(schema.wallets.isActive, true)))
       .limit(1);
 
-    const creatorWallet = walletRows[0];
-    if (!creatorWallet) throw new NotFoundException('Creator wallet not found');
+    const row = rows2[0];
+    if (!row) throw new NotFoundException('Creator wallet not found');
 
     return {
       ...this.sanitize(pr),
-      creatorWallet,
+      creatorWallet: {
+        id:           row.walletId,
+        solanaPubkey: row.solanaPubkey,
+        type:         row.walletType,
+      },
+      recipient: {
+        username:    row.username,
+        displayName: `${row.firstName} ${row.lastName}`.trim(),
+      },
     };
   }
 
@@ -243,6 +280,7 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
       amount: pr.amount?.toString() ?? null,
       currency: pr.currency,
       description: pr.description,
+      lineItems: pr.lineItems ?? null,
       nonce: pr.nonce,
       status: pr.status,
       expiresAt: pr.expiresAt?.toISOString() ?? null,

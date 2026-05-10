@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+// ── Line items ────────────────────────────────────────────────────────────────
+
+export const lineItem = z.object({
+  name:       z.string().min(1).max(60),
+  quantity:   z.number().int().min(1).max(999),
+  unitAmount: z.string().regex(/^\d+$/), // base units (6 decimals)
+});
+export type LineItem = z.infer<typeof lineItem>;
+
 // ── Requests ──────────────────────────────────────────────────────────────────
 
 export const createPaymentRequestInput = z.object({
@@ -7,6 +16,7 @@ export const createPaymentRequestInput = z.object({
   amount:            z.string().optional(),
   currency:          z.enum(['USDC', 'EURC']).optional(),
   description:       z.string().max(100).optional(),
+  lineItems:         lineItem.array().min(1).max(50).optional(),
   expiresInSeconds:  z.number().optional(),
 });
 export type CreatePaymentRequestInput = z.infer<typeof createPaymentRequestInput>;
@@ -39,6 +49,7 @@ export const paymentRequest = z.object({
   amount:      z.string().nullable().optional(),
   currency:    z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  lineItems:   lineItem.array().nullable().optional(),
   nonce:       z.string(),
   status:      z.string(),
   expiresAt:   z.string().nullable().optional(),
@@ -52,6 +63,10 @@ export const resolveResponse = paymentRequest.extend({
     id:           z.string(),
     solanaPubkey: z.string(),
     type:         z.literal('routine'),
+  }),
+  recipient: z.object({
+    username:    z.string(),
+    displayName: z.string(),
   }),
 });
 export type ResolveResponse = z.infer<typeof resolveResponse>;

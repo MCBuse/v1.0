@@ -1,5 +1,11 @@
-import { pgTable, uuid, varchar, bigint, text, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, bigint, text, timestamp, boolean, jsonb } from 'drizzle-orm/pg-core';
 import { wallets } from './wallets';
+
+export type LineItem = {
+  name: string;
+  quantity: number;
+  unitAmount: string; // base units (USDC/EURC have 6 decimals)
+};
 
 export const paymentRequests = pgTable('payment_requests', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -8,6 +14,7 @@ export const paymentRequests = pgTable('payment_requests', {
   amount: bigint('amount', { mode: 'bigint' }), // null for static QR
   currency: varchar('currency', { length: 10 }), // 'USDC' | 'EURC'
   description: text('description'),
+  lineItems: jsonb('line_items').$type<LineItem[]>(), // optional itemised invoice
   nonce: text('nonce').notNull().unique(),
   status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending' | 'completed' | 'expired' | 'cancelled'
   expiresAt: timestamp('expires_at'), // null = never expires (static QR)

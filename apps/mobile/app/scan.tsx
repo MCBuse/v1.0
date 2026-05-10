@@ -2,20 +2,21 @@ import { useTheme } from '@shopify/restyle';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ArrowCircleDown2, CloseCircle, ScanBarcode, TickCircle } from 'iconsax-react-native';
+import { CloseCircle, ScanBarcode, TickCircle } from 'iconsax-react-native';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Box, Button, NumPad, Text } from '@/components/ui';
+import { Avatar, Box, Button, NumPad, Text } from '@/components/ui';
 import { useExecutePayment } from '@/features/payments';
 import { paymentRepository } from '@/features/payments';
-import type { PaymentRequest } from '@/features/payments';
+import type { ResolveResponse } from '@/features/payments';
 import { formatAmount, toBaseUnits } from '@/lib/format';
 import type { Theme } from '@/theme';
 
@@ -38,7 +39,7 @@ export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [step, setStep]               = useState<Step>('scan');
   const [resolving, setResolving]     = useState(false);
-  const [paymentReq, setPaymentReq]   = useState<PaymentRequest | null>(null);
+  const [paymentReq, setPaymentReq]   = useState<ResolveResponse | null>(null);
   const [amount, setAmount]           = useState('0');
   const [currency, setCurrency]       = useState<Currency>('USDC');
 
@@ -221,6 +222,8 @@ export default function ScanScreen() {
     const displayAmt = paymentReq.amount
       ? formatAmount(paymentReq.amount, paymentReq.currency ?? undefined)
       : '—';
+    const items = paymentReq.lineItems ?? [];
+    const hasItems = items.length > 0;
 
     return (
       <View style={[styles.screen, { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 8 }]}>
@@ -229,7 +232,7 @@ export default function ScanScreen() {
           alignItems="center"
           justifyContent="space-between"
           paddingHorizontal="2xl"
-          marginBottom="3xl"
+          marginBottom="xl"
         >
           <Text variant="h2">Confirm Payment</Text>
           <Pressable onPress={resetScan} hitSlop={12}>
@@ -237,7 +240,22 @@ export default function ScanScreen() {
           </Pressable>
         </Box>
 
-        <Box flex={1} paddingHorizontal="2xl" gap="xl">
+        <ScrollView
+          contentContainerStyle={[styles.reviewContent, { paddingBottom: insets.bottom + 16 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Payee identity */}
+          <Box flexDirection="row" alignItems="center" gap="m" marginBottom="l">
+            <Avatar name={paymentReq.recipient.displayName} size="lg" />
+            <Box flex={1} gap="xs">
+              <Text variant="captionMedium" color="textSecondary">Paying to</Text>
+              <Text variant="bodySemibold" numberOfLines={1}>
+                {paymentReq.recipient.displayName}
+              </Text>
+              <Text variant="caption" color="textTertiary">@{paymentReq.recipient.username}</Text>
+            </Box>
+          </Box>
+
           {/* Amount */}
           <Box
             backgroundColor="bgSecondary"
@@ -245,6 +263,7 @@ export default function ScanScreen() {
             padding="2xl"
             alignItems="center"
             gap="xs"
+            marginBottom="l"
           >
             <Text variant="caption" color="textSecondary">You are paying</Text>
             <Text variant="display">{displayAmt}</Text>
@@ -255,32 +274,42 @@ export default function ScanScreen() {
             )}
           </Box>
 
-          {/* Send icon */}
-          <Box alignItems="center">
+          {/* Line items */}
+          {hasItems && (
             <Box
-              width={48}
-              height={48}
-              borderRadius="full"
               backgroundColor="bgSecondary"
-              alignItems="center"
-              justifyContent="center"
+              borderRadius="l"
+              padding="l"
+              gap="s"
+              marginBottom="l"
             >
-              <ArrowCircleDown2 size={28} color={colors.textPrimary} variant="Linear" />
+              <Text variant="captionMedium" color="textSecondary" marginBottom="xs">
+                Items
+              </Text>
+              {items.map((it, idx) => {
+                const lineBase = (BigInt(it.unitAmount) * BigInt(it.quantity)).toString();
+                return (
+                  <Box key={`${it.name}_${idx}`} flexDirection="row" justifyContent="space-between" gap="m">
+                    <Text variant="body" style={styles.itemName} numberOfLines={1}>
+                      {it.quantity} × {it.name}
+                    </Text>
+                    <Text variant="bodyMedium">
+                      {formatAmount(lineBase, paymentReq.currency ?? undefined)}
+                    </Text>
+                  </Box>
+                );
+              })}
             </Box>
-          </Box>
+          )}
+        </ScrollView>
 
-          <Box gap="m" style={{ marginTop: 'auto' }}>
-            <Button
-              label={execute.isPending ? 'Sending…' : 'Confirm & Pay'}
-              loading={execute.isPending}
-              onPress={handlePay}
-            />
-            <Button
-              label="Cancel"
-              variant="secondary"
-              onPress={resetScan}
-            />
-          </Box>
+        <Box gap="m" paddingHorizontal="2xl" paddingTop="m" style={{ paddingBottom: insets.bottom + 12 }}>
+          <Button
+            label={execute.isPending ? 'Sending…' : 'Confirm & Pay'}
+            loading={execute.isPending}
+            onPress={handlePay}
+          />
+          <Button label="Cancel" variant="secondary" onPress={resetScan} />
         </Box>
       </View>
     );
@@ -343,6 +372,8 @@ const styles = StyleSheet.create({
   white:  { color: '#fff' },
   dimWhite: { color: 'rgba(255,255,255,0.6)', textAlign: 'center' },
   centered: { textAlign: 'center' },
+  reviewContent: { paddingHorizontal: 24 },
+  itemName: { flex: 1 },
 
   topBar: {
     flexDirection:   'row',
