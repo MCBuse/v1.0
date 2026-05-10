@@ -36,6 +36,13 @@
       "when": 1778112000000,
       "tag": "0004_usernames_primary_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778371200000,
+      "tag": "0005_moonpay_offramp_transactions",
+      "breakpoints": true
     }
   ]
 }

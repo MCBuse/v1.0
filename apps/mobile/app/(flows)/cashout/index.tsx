@@ -1,7 +1,7 @@
 import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
-import { ArrowLeft, Bank, TickCircle } from 'iconsax-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Bank, Wallet2 } from 'iconsax-react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,13 +14,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Box, Button, Text } from '@/components/ui';
-import { useInitiateOfframp } from '@/features/offramp';
-import { toBaseUnits, formatCurrency } from '@/lib/currency';
+import { useCreateOfframpSession } from '@/features/offramp';
+import { useWallets } from '@/features/wallets';
+import { formatAmount, formatCurrency, toBaseUnits } from '@/lib/currency';
+import { setOfframpWidgetSession } from '@/lib/offramp-widget-cache';
 import type { Theme } from '@/theme';
 
-type StableCurrency = 'USDC' | 'EURC';
-const SYMBOL: Record<StableCurrency, string> = { USDC: '$', EURC: '€' };
-const FIAT_LABEL: Record<StableCurrency, string> = { USDC: 'USD', EURC: 'EUR' };
+type FiatCurrency = 'USD' | 'EUR';
+
+const FIAT_SYMBOL: Record<FiatCurrency, string> = { USD: '$', EUR: '€' };
 const QUICK = ['25', '50', '100', '250'] as const;
 
 export default function CashOutScreen() {
@@ -29,12 +31,20 @@ export default function CashOutScreen() {
   const inputRef = useRef<TextInput>(null);
 
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<StableCurrency>('USDC');
-  const [succeeded, setSucceeded] = useState(false);
+  const [fiatCurrency, setFiatCurrency] = useState<FiatCurrency>('USD');
 
-  const offramp = useInitiateOfframp();
+  const wallets = useWallets();
+  const createSession = useCreateOfframpSession();
+
+  const holdingUsdc = useMemo(() => {
+    const balance = wallets.data?.savings?.balances.find((b) => b.currency === 'USDC');
+    return balance?.available ?? '0';
+  }, [wallets.data?.savings?.balances]);
+
   const numeric = Number(amount);
   const hasAmount = amount !== '' && Number.isFinite(numeric) && numeric > 0;
+  const baseUnits = hasAmount ? toBaseUnits(amount) : '0';
+  const hasSufficientBalance = BigInt(baseUnits) <= BigInt(holdingUsdc);
 
   useEffect(() => {
     const timer = setTimeout(() => inputRef.current?.focus(), 250);
@@ -49,81 +59,38 @@ export default function CashOutScreen() {
     setAmount(cleaned);
   };
 
-  const handleCashOut = useCallback(async () => {
-    if (!hasAmount) {
-      Alert.alert(
-        'Enter an amount',
-        'Please enter an amount greater than zero.',
-      );
+  const handleMax = useCallback(() => {
+    setAmount(formatAmount(holdingUsdc));
+  }, [holdingUsdc]);
+
+  const handleContinue = useCallback(async () => {
+    if (!hasAmount || baseUnits === '0') {
+      Alert.alert('Enter an amount', 'Please enter an amount greater than zero.');
+      return;
+    }
+    if (!hasSufficientBalance) {
+      Alert.alert('Insufficient balance', 'You do not have enough USDC in Holding.');
       return;
     }
 
-    const baseUnits = toBaseUnits(amount);
-    if (baseUnits === '0') {
-      Alert.alert(
-        'Enter an amount',
-        'Please enter an amount greater than zero.',
-      );
-      return;
-    }
     try {
-      await offramp.mutateAsync({ amount: baseUnits, currency });
-      setSucceeded(true);
+      const session = await createSession.mutateAsync({
+        provider: 'moonpay',
+        cryptoAmount: baseUnits,
+        cryptoCurrency: 'USDC',
+        fiatCurrency,
+      });
+      setOfframpWidgetSession(session);
+      router.push(
+        `/(flows)/cashout/checkout?transactionId=${encodeURIComponent(session.transactionId)}`,
+      );
     } catch (err: any) {
       Alert.alert(
-        'Cash Out Failed',
+        'Could not start cash-out',
         err?.message ?? 'Something went wrong. Please try again.',
       );
     }
-  }, [amount, currency, hasAmount, offramp]);
-
-  // ── Success ────────────────────────────────────────────────────────────────
-
-  if (succeeded) {
-    return (
-      <View
-        style={[
-          styles.screen,
-          { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 8 },
-        ]}
-      >
-        <Box
-          flex={1}
-          alignItems="center"
-          justifyContent="center"
-          gap="xl"
-          paddingHorizontal="2xl"
-        >
-          <Box
-            width={80}
-            height={80}
-            borderRadius="full"
-            backgroundColor="bgSecondary"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <TickCircle size={44} color={colors.textPrimary} variant="Bold" />
-          </Box>
-          <Box alignItems="center" gap="s">
-            <Text variant="h2">Withdrawal Initiated</Text>
-            <Text variant="body" color="textSecondary" style={styles.centered}>
-              {formatCurrency(toBaseUnits(amount), currency)} will arrive in
-              your linked bank account within 1–3 business days.
-            </Text>
-          </Box>
-          <Box style={{ width: '100%' }} gap="m">
-            <Button
-              label="Done"
-              variant="primary"
-              onPress={() => router.back()}
-            />
-          </Box>
-        </Box>
-      </View>
-    );
-  }
-
-  // ── Amount entry ───────────────────────────────────────────────────────────
+  }, [baseUnits, createSession, fiatCurrency, hasAmount, hasSufficientBalance]);
 
   return (
     <KeyboardAvoidingView
@@ -140,7 +107,6 @@ export default function CashOutScreen() {
           },
         ]}
       >
-        {/* Header */}
         <Box
           flexDirection="row"
           alignItems="center"
@@ -151,32 +117,52 @@ export default function CashOutScreen() {
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <ArrowLeft size={20} color={colors.textPrimary} variant="Linear" />
           </Pressable>
-          <Box gap="xs">
+          <Box gap="xs" flex={1}>
             <Text variant="h3">Cash Out</Text>
             <Text variant="label" color="textTertiary">
-              Send money from Holding to your bank
+              Sell USDC from Holding with MoonPay
             </Text>
           </Box>
         </Box>
 
-        {/* Currency selector */}
         <Box
-          flexDirection="row"
-          gap="s"
-          paddingHorizontal="2xl"
+          marginHorizontal="2xl"
           marginBottom="m"
+          padding="m"
+          backgroundColor="bgSecondary"
+          borderRadius="m"
+          flexDirection="row"
+          alignItems="center"
+          gap="s"
         >
-          {(['USDC', 'EURC'] as StableCurrency[]).map((c) => (
+          <Wallet2 size={18} color={colors.textSecondary} variant="Linear" />
+          <Box flex={1}>
+            <Text variant="caption" color="textTertiary">
+              Holding available
+            </Text>
+            <Text variant="captionMedium">
+              {formatCurrency(holdingUsdc, 'USDC')} USDC
+            </Text>
+          </Box>
+          <Pressable onPress={handleMax} style={styles.maxBtn}>
+            <Text variant="captionMedium" color="brand">
+              Max
+            </Text>
+          </Pressable>
+        </Box>
+
+        <Box flexDirection="row" gap="s" paddingHorizontal="2xl" marginBottom="m">
+          {(['USD', 'EUR'] as FiatCurrency[]).map((currency) => (
             <Pressable
-              key={c}
-              onPress={() => setCurrency(c)}
+              key={currency}
+              onPress={() => setFiatCurrency(currency)}
               style={[
                 styles.chip,
                 {
                   backgroundColor:
-                    currency === c ? colors.brand : colors.bgSecondary,
+                    fiatCurrency === currency ? colors.brand : colors.bgSecondary,
                   borderColor:
-                    currency === c ? colors.brand : colors.borderDefault,
+                    fiatCurrency === currency ? colors.brand : colors.borderDefault,
                 },
               ]}
             >
@@ -184,10 +170,10 @@ export default function CashOutScreen() {
                 variant="captionMedium"
                 style={{
                   color:
-                    currency === c ? colors.textInverse : colors.textPrimary,
+                    fiatCurrency === currency ? colors.textInverse : colors.textPrimary,
                 }}
               >
-                {c === 'EURC' ? 'EUR' : 'USD'}
+                {FIAT_SYMBOL[currency]} {currency}
               </Text>
             </Pressable>
           ))}
@@ -198,7 +184,7 @@ export default function CashOutScreen() {
           style={styles.amountWrap}
         >
           <Text variant="display" style={{ color: colors.textTertiary }}>
-            {SYMBOL[currency]}
+            $
           </Text>
           <TextInput
             ref={inputRef}
@@ -225,13 +211,9 @@ export default function CashOutScreen() {
                   styles.quickChip,
                   {
                     backgroundColor:
-                      amount === quickAmount
-                        ? colors.brand
-                        : colors.bgSecondary,
+                      amount === quickAmount ? colors.brand : colors.bgSecondary,
                     borderColor:
-                      amount === quickAmount
-                        ? colors.brand
-                        : colors.borderDefault,
+                      amount === quickAmount ? colors.brand : colors.borderDefault,
                   },
                 ]}
               >
@@ -239,20 +221,16 @@ export default function CashOutScreen() {
                   variant="captionMedium"
                   style={{
                     color:
-                      amount === quickAmount
-                        ? colors.textInverse
-                        : colors.textPrimary,
+                      amount === quickAmount ? colors.textInverse : colors.textPrimary,
                   }}
                 >
-                  {SYMBOL[currency]}
-                  {quickAmount}
+                  ${quickAmount}
                 </Text>
               </Pressable>
             ))}
           </View>
         </Box>
 
-        {/* Destination + receive summary */}
         <Box
           marginHorizontal="2xl"
           marginBottom="m"
@@ -261,31 +239,25 @@ export default function CashOutScreen() {
           borderRadius="l"
           gap="s"
         >
-          <Box
-            flexDirection="row"
-            alignItems="center"
-            justifyContent="space-between"
-          >
+          <Box flexDirection="row" alignItems="center" justifyContent="space-between">
             <Box gap="xs">
               <Text variant="caption" color="textTertiary">
-                You withdraw
+                You sell
               </Text>
               <Text variant="h3">
-                {hasAmount ? `${SYMBOL[currency]}${amount}` : '–'} {currency}
+                {hasAmount ? `${amount} USDC` : '-'}
               </Text>
             </Box>
             <Box gap="xs" alignItems="flex-end">
               <Text variant="caption" color="textTertiary">
-                You receive
+                Payout currency
               </Text>
               <Text variant="h3">
-                {hasAmount ? `${SYMBOL[currency]}${amount}` : '–'}{' '}
-                {FIAT_LABEL[currency]}
+                {FIAT_SYMBOL[fiatCurrency]} {fiatCurrency}
               </Text>
             </Box>
           </Box>
 
-          {/* Destination row */}
           <Box
             flexDirection="row"
             alignItems="center"
@@ -297,15 +269,17 @@ export default function CashOutScreen() {
           >
             <Bank size={16} color={colors.textSecondary} variant="Linear" />
             <Box flex={1}>
-              <Text variant="captionMedium">Linked bank account</Text>
+              <Text variant="captionMedium">Payout details</Text>
               <Text variant="label" color="textTertiary">
-                •••• •••• •••• 4242
+                MoonPay asks for your bank or card details next
               </Text>
             </Box>
           </Box>
 
-          <Text variant="label" color="textTertiary">
-            1–3 business days · No fees · Powered by Circle
+          <Text variant="label" color={hasSufficientBalance ? 'textTertiary' : 'error'}>
+            {hasSufficientBalance
+              ? 'Your USDC is reserved after you continue to MoonPay.'
+              : 'Amount exceeds your Holding balance.'}
           </Text>
         </Box>
 
@@ -313,10 +287,10 @@ export default function CashOutScreen() {
 
         <Box paddingHorizontal="2xl" paddingBottom="m" paddingTop="m">
           <Button
-            label={offramp.isPending ? 'Processing…' : 'Cash Out'}
-            onPress={handleCashOut}
-            disabled={!hasAmount || offramp.isPending}
-            loading={offramp.isPending}
+            label={createSession.isPending ? 'Starting MoonPay...' : 'Continue with MoonPay'}
+            onPress={handleContinue}
+            disabled={!hasAmount || !hasSufficientBalance || createSession.isPending}
+            loading={createSession.isPending}
           />
         </Box>
       </View>
@@ -326,13 +300,16 @@ export default function CashOutScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  centered: { textAlign: 'center' },
   backBtn: {
     width: 36,
     height: 36,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  maxBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   chip: {
     paddingHorizontal: 16,

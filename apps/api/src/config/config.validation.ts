@@ -160,6 +160,22 @@ export class EnvironmentVariables {
   @IsString()
   MOONPAY_BASE_URL?: string;
 
+  @IsOptional()
+  @IsString()
+  MOONPAY_SELL_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  MOONPAY_API_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  MOONPAY_ENVIRONMENT?: string;
+
+  @IsOptional()
+  @IsString()
+  MOONPAY_USDC_CURRENCY_CODE?: string;
+
   /** Minimum EUR amount for MoonPay session (default 20) */
   @IsOptional()
   @IsString()

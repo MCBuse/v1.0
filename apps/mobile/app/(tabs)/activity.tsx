@@ -5,13 +5,14 @@ import {
   ArrowSwapHorizontal,
   Send2,
 } from 'iconsax-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
   View,
+  type ListRenderItem,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -60,6 +61,164 @@ function isCredit(entry: LedgerEntry): boolean {
   return entry.type === 'on_ramp';
 }
 
+const STATUS_BG_COMPLETED = 'rgba(22,163,74,0.08)';
+const STATUS_BG_FAILED    = 'rgba(239,68,68,0.08)';
+const STATUS_BG_DEFAULT   = 'rgba(0,0,0,0.05)';
+const CREDIT_COLOR        = '#16A34A';
+const FAILED_COLOR        = '#EF4444';
+const CREDIT_ICON_BG      = 'rgba(22,163,74,0.1)';
+
+function statusBg(status: LedgerEntry['status']): string {
+  if (status === 'completed') return STATUS_BG_COMPLETED;
+  if (status === 'failed')    return STATUS_BG_FAILED;
+  return STATUS_BG_DEFAULT;
+}
+
+// ── Memoized rows ──────────────────────────────────────────────────────────────
+
+type FilterColors = {
+  activeBg: string;
+  inactiveBg: string;
+  activeBorder: string;
+  inactiveBorder: string;
+  activeText: string;
+  inactiveText: string;
+};
+
+const FilterChip = memo(function FilterChip({
+  label,
+  value,
+  active,
+  colors,
+  onPress,
+}: {
+  label: string;
+  value: TypeFilter;
+  active: boolean;
+  colors: FilterColors;
+  onPress: (value: TypeFilter) => void;
+}) {
+  const handlePress = useCallback(() => onPress(value), [onPress, value]);
+  const chipStyle = useMemo(
+    () => [
+      styles.filterChip,
+      {
+        backgroundColor: active ? colors.activeBg : colors.inactiveBg,
+        borderColor:     active ? colors.activeBorder : colors.inactiveBorder,
+      },
+    ],
+    [active, colors],
+  );
+  const textStyle = useMemo(
+    () => ({ color: active ? colors.activeText : colors.inactiveText }),
+    [active, colors],
+  );
+  return (
+    <Pressable onPress={handlePress} style={chipStyle}>
+      <Text variant="captionMedium" style={textStyle}>{label}</Text>
+    </Pressable>
+  );
+});
+
+type SkeletonColors = { skeletonBg: string };
+
+const TxSkeleton = memo(function TxSkeleton({ colors }: { colors: SkeletonColors }) {
+  const skel = useMemo(() => ({ backgroundColor: colors.skeletonBg }), [colors]);
+  return (
+    <Box flexDirection="row" alignItems="center" gap="m" paddingVertical="m" paddingHorizontal="2xl">
+      <Box width={44} height={44} borderRadius="l" style={skel} />
+      <Box flex={1} gap="xs">
+        <Box height={14} borderRadius="xs" width="50%" style={skel} />
+        <Box height={11} borderRadius="xs" width="30%" style={skel} />
+      </Box>
+      <Box height={14} borderRadius="xs" width={60} style={skel} />
+    </Box>
+  );
+});
+
+type RowColors = {
+  borderSubtle: string;
+  bgSecondary:  string;
+  textPrimary:  string;
+  textTertiary: string;
+};
+
+const TxRow = memo(function TxRow({
+  entry,
+  colors,
+}: {
+  entry: LedgerEntry;
+  colors: RowColors;
+}) {
+  const credit = isCredit(entry);
+
+  const rowStyle = useMemo(
+    () => [styles.txRow, { borderBottomColor: colors.borderSubtle }],
+    [colors],
+  );
+  const iconBgStyle = useMemo(
+    () => ({ backgroundColor: credit ? CREDIT_ICON_BG : colors.bgSecondary }),
+    [credit, colors],
+  );
+  const amountStyle = useMemo(
+    () => ({ color: credit ? CREDIT_COLOR : colors.textPrimary }),
+    [credit, colors],
+  );
+  const badgeStyle = useMemo(
+    () => [styles.statusBadge, { backgroundColor: statusBg(entry.status) }],
+    [entry.status],
+  );
+  const statusTextStyle = useMemo(
+    () => ({
+      color:
+        entry.status === 'completed' ? CREDIT_COLOR
+        : entry.status === 'failed'  ? FAILED_COLOR
+        : colors.textTertiary,
+    }),
+    [entry.status, colors],
+  );
+
+  return (
+    <Box
+      flexDirection="row"
+      alignItems="center"
+      gap="m"
+      paddingVertical="m"
+      paddingHorizontal="2xl"
+      style={rowStyle}
+    >
+      <Box
+        width={44}
+        height={44}
+        borderRadius="l"
+        alignItems="center"
+        justifyContent="center"
+        style={iconBgStyle}
+      >
+        <TxIcon type={entry.type} />
+      </Box>
+
+      <Box flex={1}>
+        <Text variant="bodyMedium">{txLabel(entry)}</Text>
+        <Text variant="caption" color="textTertiary">
+          {formatRelativeTime(entry.createdAt)}
+        </Text>
+      </Box>
+
+      <Box alignItems="flex-end">
+        <Text variant="bodySemibold" style={amountStyle}>
+          {credit ? '+' : '-'}{formatAmount(entry.amount, entry.currency)}
+        </Text>
+        <View style={badgeStyle}>
+          <Text variant="label" style={statusTextStyle}>
+            {entry.status}
+          </Text>
+        </View>
+      </Box>
+    </Box>
+  );
+});
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function ActivityScreen() {
@@ -77,59 +236,95 @@ export default function ActivityScreen() {
     setRefreshing(false);
   }, [txQuery]);
 
+  const filterColors = useMemo<FilterColors>(
+    () => ({
+      activeBg:       colors.brand,
+      inactiveBg:     colors.bgSecondary,
+      activeBorder:   colors.brand,
+      inactiveBorder: colors.borderDefault,
+      activeText:     colors.textInverse,
+      inactiveText:   colors.textPrimary,
+    }),
+    [colors],
+  );
+  const rowColors = useMemo<RowColors>(
+    () => ({
+      borderSubtle: colors.borderSubtle,
+      bgSecondary:  colors.bgSecondary,
+      textPrimary:  colors.textPrimary,
+      textTertiary: colors.textTertiary,
+    }),
+    [colors],
+  );
+  const skeletonColors = useMemo<SkeletonColors>(
+    () => ({ skeletonBg: colors.bgSecondary }),
+    [colors],
+  );
+
+  const handleSelectFilter = useCallback((value: TypeFilter) => {
+    setTypeFilter(value);
+  }, []);
+
+  const renderFilter = useCallback<ListRenderItem<{ label: string; value: TypeFilter }>>(
+    ({ item }) => (
+      <FilterChip
+        label={item.label}
+        value={item.value}
+        active={typeFilter === item.value}
+        colors={filterColors}
+        onPress={handleSelectFilter}
+      />
+    ),
+    [typeFilter, filterColors, handleSelectFilter],
+  );
+
+  const renderEntry = useCallback<ListRenderItem<LedgerEntry | null>>(
+    ({ item }) => {
+      if (!item) return <TxSkeleton colors={skeletonColors} />;
+      return <TxRow entry={item} colors={rowColors} />;
+    },
+    [rowColors, skeletonColors],
+  );
+
+  const headerStyle = useMemo(
+    () => ({ paddingTop: insets.top + 8 }),
+    [insets.top],
+  );
+  const listContentStyle = useMemo(
+    () => [styles.listContent, { paddingBottom: insets.bottom + 24 }],
+    [insets.bottom],
+  );
+  const rootStyle = useMemo(
+    () => [styles.root, { backgroundColor: colors.bgPrimary }],
+    [colors.bgPrimary],
+  );
+
   const entries = txQuery.data?.data ?? [];
+  const listData = txQuery.isLoading ? (Array(5).fill(null) as null[]) : entries;
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.bgPrimary }]}>
+    <View style={rootStyle}>
       {/* Header */}
-      <Box
-        paddingHorizontal="2xl"
-        style={{ paddingTop: insets.top + 8 }}
-        paddingBottom="m"
-      >
+      <Box paddingHorizontal="2xl" style={headerStyle} paddingBottom="m">
         <Text variant="h2">Activity</Text>
       </Box>
 
       {/* Type filter chips */}
       <FlatList
         data={TYPE_FILTERS}
-        keyExtractor={(f) => f.value}
+        keyExtractor={filterKeyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
-        style={{ flexGrow: 0, marginBottom: 8 }}
-        renderItem={({ item }) => {
-          const active = typeFilter === item.value;
-          return (
-            <Pressable
-              onPress={() => setTypeFilter(item.value)}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: active ? colors.brand : colors.bgSecondary,
-                  borderColor:     active ? colors.brand : colors.borderDefault,
-                },
-              ]}
-            >
-              <Text
-                variant="captionMedium"
-                style={{ color: active ? colors.textInverse : colors.textPrimary }}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        }}
+        style={styles.filterList}
+        renderItem={renderFilter}
       />
 
       {/* Transaction list */}
       <FlatList
-        data={txQuery.isLoading ? (Array(5).fill(null) as null[]) : entries}
-        keyExtractor={(item, i) => (item ? item.id : String(i))}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: insets.bottom + 24 },
-        ]}
+        data={listData}
+        keyExtractor={entryKeyExtractor}
+        contentContainerStyle={listContentStyle}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -159,95 +354,19 @@ export default function ActivityScreen() {
             </Box>
           ) : null
         }
-        renderItem={({ item }) => {
-          if (!item) {
-            // Skeleton
-            return (
-              <Box flexDirection="row" alignItems="center" gap="m" paddingVertical="m" paddingHorizontal="2xl">
-                <Box width={44} height={44} borderRadius="l" style={{ backgroundColor: colors.bgSecondary }} />
-                <Box flex={1} gap="xs">
-                  <Box height={14} borderRadius="xs" width="50%" style={{ backgroundColor: colors.bgSecondary }} />
-                  <Box height={11} borderRadius="xs" width="30%" style={{ backgroundColor: colors.bgSecondary }} />
-                </Box>
-                <Box height={14} borderRadius="xs" width={60} style={{ backgroundColor: colors.bgSecondary }} />
-              </Box>
-            );
-          }
-
-          const credit = isCredit(item);
-          return (
-            <Box
-              flexDirection="row"
-              alignItems="center"
-              gap="m"
-              paddingVertical="m"
-              paddingHorizontal="2xl"
-              style={[styles.txRow, { borderBottomColor: colors.borderSubtle }]}
-            >
-              <Box
-                width={44}
-                height={44}
-                borderRadius="l"
-                alignItems="center"
-                justifyContent="center"
-                style={{ backgroundColor: credit ? 'rgba(22,163,74,0.1)' : colors.bgSecondary }}
-              >
-                <TxIcon type={item.type} />
-              </Box>
-
-              <Box flex={1}>
-                <Text variant="bodyMedium">{txLabel(item)}</Text>
-                <Text variant="caption" color="textTertiary">
-                  {formatRelativeTime(item.createdAt)}
-                </Text>
-              </Box>
-
-              <Box alignItems="flex-end">
-                <Text
-                  variant="bodySemibold"
-                  style={{ color: credit ? '#16A34A' : colors.textPrimary }}
-                >
-                  {credit ? '+' : '-'}{formatAmount(item.amount, item.currency)}
-                </Text>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    {
-                      backgroundColor:
-                        item.status === 'completed'
-                          ? 'rgba(22,163,74,0.08)'
-                          : item.status === 'failed'
-                          ? 'rgba(239,68,68,0.08)'
-                          : 'rgba(0,0,0,0.05)',
-                    },
-                  ]}
-                >
-                  <Text
-                    variant="label"
-                    style={{
-                      color:
-                        item.status === 'completed'
-                          ? '#16A34A'
-                          : item.status === 'failed'
-                          ? '#EF4444'
-                          : colors.textTertiary,
-                    }}
-                  >
-                    {item.status}
-                  </Text>
-                </View>
-              </Box>
-            </Box>
-          );
-        }}
+        renderItem={renderEntry}
       />
     </View>
   );
 }
 
+const filterKeyExtractor = (f: { value: TypeFilter }) => f.value;
+const entryKeyExtractor = (item: LedgerEntry | null, i: number) => (item ? item.id : String(i));
+
 const styles = StyleSheet.create({
   root:       { flex: 1 },
   filterRow:  { paddingHorizontal: 16, paddingVertical: 4, gap: 8 },
+  filterList: { flexGrow: 0, marginBottom: 8 },
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical:    6,

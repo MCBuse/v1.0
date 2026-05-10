@@ -19,9 +19,10 @@ import { LedgerModule } from '../ledger/ledger.module';
 import { WalletsModule } from '../wallets/wallets.module';
 import { UsersModule } from '../users/users.module';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
+import { OffRampModule } from '../offramp/offramp.module';
 
 @Module({
-  imports: [HttpModule, ConfigModule, LedgerModule, WalletsModule, UsersModule],
+  imports: [HttpModule, ConfigModule, LedgerModule, WalletsModule, UsersModule, OffRampModule],
   providers: [
     CircleClient,
     CircleSettlementService,
@@ -44,7 +45,7 @@ import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
           `Invalid ONRAMP_PROVIDER: "${provider}". Supported values: "mock", "circle".`,
         );
       },
-      inject: [ConfigService, MockOnRampProvider, CircleOnRampProvider],
+      inject: [ConfigService, MockOnRampProvider, CircleOnRampProvider, MoonpayWidgetProvider],
     },
     OnRampService,
     MoonpayWidgetProvider,

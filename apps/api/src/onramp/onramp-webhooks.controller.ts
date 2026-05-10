@@ -13,6 +13,8 @@ import {
 import { Public } from '../auth/decorators/public.decorator';
 import { OnrampSessionsService } from './onramp-sessions.service';
 import { MoonpayWidgetProvider } from './widget/moonpay-widget.provider';
+import { OfframpSessionsService } from '../offramp/offramp-sessions.service';
+import { MoonpayOfframpProvider } from '../offramp/moonpay-offramp.provider';
 
 type ReqWithRaw = { rawBody?: Buffer };
 
@@ -24,9 +26,12 @@ export class OnrampWebhooksController {
   constructor(
     private readonly sessions: OnrampSessionsService,
     private readonly moonpay: MoonpayWidgetProvider,
+    private readonly offrampSessions: OfframpSessionsService,
+    private readonly moonpayOfframp: MoonpayOfframpProvider,
   ) {}
 
   @Post('onramp/webhooks/:provider')
+  @Post('offramp/webhooks/:provider')
   @Post('webhooks/:provider')
   @HttpCode(HttpStatus.OK)
   async handle(
@@ -62,9 +67,20 @@ export class OnrampWebhooksController {
       throw new BadRequestException('Invalid JSON body');
     }
 
-    const event = this.moonpay.parseWebhook(parsed);
-    await this.sessions.applyMoonpayWebhook(event, parsed);
+    if (this.isSellWebhook(parsed)) {
+      const event = this.moonpayOfframp.parseWebhook(parsed);
+      await this.offrampSessions.applyMoonpayWebhook(event, parsed);
+    } else {
+      const event = this.moonpay.parseWebhook(parsed);
+      await this.sessions.applyMoonpayWebhook(event, parsed);
+    }
 
     return { received: true };
+  }
+
+  private isSellWebhook(payload: unknown): boolean {
+    if (typeof payload !== 'object' || payload === null) return false;
+    const type = (payload as { type?: unknown }).type;
+    return typeof type === 'string' && type.startsWith('sell_');
   }
 }

@@ -1,3 +1,20 @@
-export { useInitiateOfframp } from './hooks';
+export {
+  useCreateOfframpSession,
+  useInitiateMoonpayDeposit,
+  useInitiateOfframp,
+  useOfframpStatus,
+  useOfframpTransactions,
+  useSignOfframpUrl,
+} from './hooks';
 export { offrampRepository }  from './repository';
-export type { OfframpInput, OfframpResponse } from './models';
+export type {
+  CreateOfframpSessionInput,
+  CreateOfframpSessionResponse,
+  InitiateMoonpayDepositInput,
+  InitiateMoonpayDepositResponse,
+  MoonpayOfframpParams,
+  OfframpInput,
+  OfframpResponse,
+  OfframpTransactionStatus,
+  SignOfframpUrlResponse,
+} from './models';
