@@ -40,6 +40,7 @@ describe('MoonpayWidgetProvider', () => {
       fiatAmount: '25.00',
       fiatCurrency: 'EUR',
       cryptoCurrency: 'USDC',
+      network: 'solana',
       redirectUrl: 'mcbuse://onramp/complete',
       internalReference: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
     });

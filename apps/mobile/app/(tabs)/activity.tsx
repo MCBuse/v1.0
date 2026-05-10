@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, Text } from '@/components/ui';
 import { useTransactions } from '@/features/transactions';
 import type { LedgerEntry } from '@/features/transactions';
+import { useWallets } from '@/features/wallets';
 import { formatAmount, formatRelativeTime } from '@/lib/format';
 import type { Theme } from '@/theme';
 
@@ -29,7 +30,7 @@ type TypeFilter = LedgerEntry['type'] | 'all';
 const TYPE_FILTERS: { label: string; value: TypeFilter }[] = [
   { label: 'All',      value: 'all' },
   { label: 'Top Ups',  value: 'on_ramp' },
-  { label: 'Sent',     value: 'p2p' },
+  { label: 'Payments', value: 'p2p' },
   { label: 'Swaps',    value: 'swap' },
   { label: 'Transfers',value: 'internal' },
   { label: 'Cash Out', value: 'off_ramp' },
@@ -37,28 +38,52 @@ const TYPE_FILTERS: { label: string; value: TypeFilter }[] = [
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function txLabel(entry: LedgerEntry): string {
+type Direction = 'credit' | 'debit' | 'neutral';
+
+function txDirection(entry: LedgerEntry, walletIds: ReadonlySet<string>): Direction {
+  if (entry.direction) return entry.direction;
+  if (entry.type === 'on_ramp') return 'credit';
+  if (entry.type === 'off_ramp') return 'debit';
+
+  const debitsOwnWallet = walletIds.has(entry.debitWalletId);
+  const creditsOwnWallet = walletIds.has(entry.creditWalletId);
+
+  if (creditsOwnWallet && !debitsOwnWallet) return 'credit';
+  if (debitsOwnWallet && !creditsOwnWallet) return 'debit';
+  if (creditsOwnWallet && debitsOwnWallet) return 'neutral';
+
+  return 'debit';
+}
+
+function txLabel(entry: LedgerEntry, direction: Direction): string {
   switch (entry.type) {
     case 'on_ramp':   return 'Top Up';
     case 'off_ramp':  return 'Cash Out';
-    case 'p2p':       return 'Sent';
+    case 'p2p':       return direction === 'credit' ? 'Received' : 'Sent';
     case 'swap':      return 'Swap';
     case 'internal':  return 'Account Transfer';
     default:          return 'Transaction';
   }
 }
 
-function TxIcon({ type }: { type: LedgerEntry['type'] }) {
+function TxIcon({ type, direction }: { type: LedgerEntry['type']; direction: Direction }) {
   const size = 20;
-  const color = '#374151';
+  const credit = direction === 'credit';
+  const color = credit ? '#16A34A' : '#374151';
   if (type === 'on_ramp')  return <ArrowCircleDown size={size} color="#16A34A" variant="Bold" />;
   if (type === 'off_ramp') return <ArrowCircleUp   size={size} color={color}   variant="Bold" />;
-  if (type === 'p2p')      return <Send2            size={size} color={color}   variant="Bold" />;
+  if (type === 'p2p') {
+    return credit
+      ? <ArrowCircleDown size={size} color={color} variant="Bold" />
+      : <Send2 size={size} color={color} variant="Bold" />;
+  }
   return <ArrowSwapHorizontal size={size} color={color} variant="Bold" />;
 }
 
-function isCredit(entry: LedgerEntry): boolean {
-  return entry.type === 'on_ramp';
+function amountPrefix(direction: Direction): string {
+  if (direction === 'credit') return '+';
+  if (direction === 'debit') return '-';
+  return '';
 }
 
 const STATUS_BG_COMPLETED = 'rgba(22,163,74,0.08)';
@@ -146,11 +171,14 @@ type RowColors = {
 const TxRow = memo(function TxRow({
   entry,
   colors,
+  walletIds,
 }: {
   entry: LedgerEntry;
   colors: RowColors;
+  walletIds: ReadonlySet<string>;
 }) {
-  const credit = isCredit(entry);
+  const direction = txDirection(entry, walletIds);
+  const credit = direction === 'credit';
 
   const rowStyle = useMemo(
     () => [styles.txRow, { borderBottomColor: colors.borderSubtle }],
@@ -195,11 +223,11 @@ const TxRow = memo(function TxRow({
         justifyContent="center"
         style={iconBgStyle}
       >
-        <TxIcon type={entry.type} />
+        <TxIcon type={entry.type} direction={direction} />
       </Box>
 
       <Box flex={1}>
-        <Text variant="bodyMedium">{txLabel(entry)}</Text>
+        <Text variant="bodyMedium">{txLabel(entry, direction)}</Text>
         <Text variant="caption" color="textTertiary">
           {formatRelativeTime(entry.createdAt)}
         </Text>
@@ -207,7 +235,7 @@ const TxRow = memo(function TxRow({
 
       <Box alignItems="flex-end">
         <Text variant="bodySemibold" style={amountStyle}>
-          {credit ? '+' : '-'}{formatAmount(entry.amount, entry.currency)}
+          {amountPrefix(direction)}{formatAmount(entry.amount, entry.currency)}
         </Text>
         <View style={badgeStyle}>
           <Text variant="label" style={statusTextStyle}>
@@ -229,12 +257,19 @@ export default function ActivityScreen() {
 
   const query = typeFilter === 'all' ? { limit: 50 } : { type: typeFilter as LedgerEntry['type'], limit: 50 };
   const txQuery = useTransactions(query);
+  const walletsQuery = useWallets();
+
+  const ownWalletIds = useMemo<Set<string>>(() => {
+    const wallets = walletsQuery.data;
+    if (!wallets) return new Set();
+    return new Set([wallets.savings?.id, wallets.routine?.id].filter(Boolean) as string[]);
+  }, [walletsQuery.data]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await txQuery.reload();
+    await Promise.all([txQuery.reload(), walletsQuery.reload()]);
     setRefreshing(false);
-  }, [txQuery]);
+  }, [txQuery, walletsQuery]);
 
   const filterColors = useMemo<FilterColors>(
     () => ({
@@ -281,9 +316,9 @@ export default function ActivityScreen() {
   const renderEntry = useCallback<ListRenderItem<LedgerEntry | null>>(
     ({ item }) => {
       if (!item) return <TxSkeleton colors={skeletonColors} />;
-      return <TxRow entry={item} colors={rowColors} />;
+      return <TxRow entry={item} colors={rowColors} walletIds={ownWalletIds} />;
     },
-    [rowColors, skeletonColors],
+    [ownWalletIds, rowColors, skeletonColors],
   );
 
   const headerStyle = useMemo(
@@ -300,7 +335,9 @@ export default function ActivityScreen() {
   );
 
   const entries = txQuery.data?.data ?? [];
-  const listData = txQuery.isLoading ? (Array(5).fill(null) as null[]) : entries;
+  const needsWalletFallback = entries.some((entry) => !entry.direction);
+  const loading = txQuery.isLoading || (needsWalletFallback && walletsQuery.isLoading);
+  const listData = loading ? (Array(5).fill(null) as null[]) : entries;
 
   return (
     <View style={rootStyle}>
@@ -333,7 +370,7 @@ export default function ActivityScreen() {
           />
         }
         ListEmptyComponent={
-          !txQuery.isLoading ? (
+          !loading ? (
             <Box alignItems="center" justifyContent="center" paddingVertical="5xl" gap="m">
               <Box
                 width={56}

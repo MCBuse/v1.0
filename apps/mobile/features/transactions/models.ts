@@ -6,6 +6,7 @@ export const ledgerEntry = z.object({
   creditWalletId:    z.string().uuid(),
   amount:            z.string(),
   currency:          z.string(),
+  direction:         z.enum(['credit', 'debit', 'neutral']).optional(),
   type:              z.enum(['on_ramp', 'off_ramp', 'p2p', 'swap', 'internal']),
   status:            z.enum(['pending', 'completed', 'failed']),
   solanaTxSignature: z.string().nullable().optional(),

@@ -22,6 +22,10 @@ export class EnvironmentVariables {
   PORT: number;
 
   @IsString()
+  @IsOptional()
+  HOST?: string;
+
+  @IsString()
   API_PREFIX: string;
 
   @IsString()

@@ -66,10 +66,21 @@ const SAVINGS_ACTIONS: QuickAction[] = [
 
 // ── Transaction helpers ────────────────────────────────────────────────────────
 
-type Direction = "credit" | "debit";
+type Direction = "credit" | "debit" | "neutral";
 
 function txDirection(entry: LedgerEntry, walletIds: Set<string>): Direction {
-  return walletIds.has(entry.creditWalletId) ? "credit" : "debit";
+  if (entry.direction) return entry.direction;
+  if (entry.type === "on_ramp") return "credit";
+  if (entry.type === "off_ramp") return "debit";
+
+  const debitsOwnWallet = walletIds.has(entry.debitWalletId);
+  const creditsOwnWallet = walletIds.has(entry.creditWalletId);
+
+  if (creditsOwnWallet && !debitsOwnWallet) return "credit";
+  if (debitsOwnWallet && !creditsOwnWallet) return "debit";
+  if (creditsOwnWallet && debitsOwnWallet) return "neutral";
+
+  return "debit";
 }
 
 function txLabel(entry: LedgerEntry, dir: Direction): string {
@@ -344,6 +355,7 @@ export default function HomeScreen() {
               const dir = txDirection(entry, ownWalletIds);
               const label = txLabel(entry, dir);
               const isCredit = dir === "credit";
+              const prefix = dir === "credit" ? "+" : dir === "debit" ? "-" : "";
               return (
                 <Box
                   key={entry.id}
@@ -385,7 +397,7 @@ export default function HomeScreen() {
                         color: isCredit ? "#16A34A" : colors.textPrimary,
                       }}
                     >
-                      {isCredit ? "+" : "-"}
+                      {prefix}
                       {formatAmount(entry.amount, entry.currency)}
                     </Text>
                     <View

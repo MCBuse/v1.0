@@ -19,6 +19,9 @@ export const offrampResponse = z.object({
 });
 export type OfframpResponse = z.infer<typeof offrampResponse>;
 
+export const offrampProviderSchema = z.enum(['stripe', 'moonpay']);
+export type OfframpProvider = z.infer<typeof offrampProviderSchema>;
+
 export const moonpayOfframpParamsSchema = z.object({
   apiKey: z.string().min(1),
   baseCurrencyCode: z.string().min(1),
@@ -31,21 +34,54 @@ export const moonpayOfframpParamsSchema = z.object({
 });
 export type MoonpayOfframpParams = z.infer<typeof moonpayOfframpParamsSchema>;
 
-export const createOfframpSessionResponseSchema = z.object({
+export const moonpayOfframpSessionResponseSchema = z.object({
   transactionId:     z.string().uuid(),
   internalReference: z.string().uuid(),
   provider:          z.literal('moonpay'),
   environment:       z.enum(['sandbox', 'production']),
   params:            moonpayOfframpParamsSchema,
 });
+export type MoonpayOfframpSessionResponse = z.infer<typeof moonpayOfframpSessionResponseSchema>;
+
+export const stripeOfframpSessionResponseSchema = z.object({
+  transactionId:     z.string().uuid(),
+  internalReference: z.string().uuid(),
+  provider:          z.literal('stripe'),
+  stripePayoutId:    z.string().min(1),
+  stripeTransferId:  z.string().min(1),
+  depositTxHash:     z.string().min(1),
+  fiatAmount:        z.string(),
+  fiatCurrency:      z.string(),
+  status:            z.string(),
+});
+export type StripeOfframpSessionResponse = z.infer<typeof stripeOfframpSessionResponseSchema>;
+
+export const createOfframpSessionResponseSchema = z.union([
+  moonpayOfframpSessionResponseSchema,
+  stripeOfframpSessionResponseSchema,
+]);
 export type CreateOfframpSessionResponse = z.infer<typeof createOfframpSessionResponseSchema>;
 
 export type CreateOfframpSessionInput = {
-  provider: 'moonpay';
+  provider?: OfframpProvider;
   cryptoAmount: string;
   cryptoCurrency?: 'USDC';
   fiatCurrency?: 'USD' | 'EUR';
 };
+
+export const stripeAccountStatusSchema = z.object({
+  accountId:        z.string().nullable(),
+  payoutsEnabled:   z.boolean(),
+  detailsSubmitted: z.boolean(),
+  requirementsDue:  z.array(z.string()),
+});
+export type StripeAccountStatus = z.infer<typeof stripeAccountStatusSchema>;
+
+export const stripeOnboardingLinkSchema = z.object({
+  url:       z.string().min(1),
+  expiresAt: z.number(),
+});
+export type StripeOnboardingLink = z.infer<typeof stripeOnboardingLinkSchema>;
 
 export const signOfframpUrlResponseSchema = z.object({
   signature: z.string().min(1),
@@ -93,6 +129,8 @@ export const offrampTransactionStatusSchema = z.object({
   depositTxHash:           z.string().nullable(),
   refundTxHash:            z.string().nullable(),
   trackerUrl:              z.string().nullable(),
+  stripeTransferId:        z.string().nullable().optional(),
+  stripePayoutId:          z.string().nullable().optional(),
   createdAt:               z.coerce.string(),
   updatedAt:               z.coerce.string(),
 });

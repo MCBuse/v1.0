@@ -13,8 +13,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import * as WebBrowser from 'expo-web-browser';
+
 import { Box, Button, Text } from '@/components/ui';
-import { useCreateOfframpSession } from '@/features/offramp';
+import {
+  useCreateOfframpSession,
+  useCreateStripeOnboardingLink,
+  useStripeAccountStatus,
+} from '@/features/offramp';
 import { useWallets } from '@/features/wallets';
 import { formatAmount, formatCurrency, toBaseUnits } from '@/lib/currency';
 import { setOfframpWidgetSession } from '@/lib/offramp-widget-cache';
@@ -35,6 +41,22 @@ export default function CashOutScreen() {
 
   const wallets = useWallets();
   const createSession = useCreateOfframpSession();
+  const stripeStatus = useStripeAccountStatus();
+  const startOnboarding = useCreateStripeOnboardingLink();
+  const stripePayoutsEnabled = Boolean(stripeStatus.data?.payoutsEnabled);
+
+  const handleStripeOnboarding = useCallback(async () => {
+    try {
+      const link = await startOnboarding.mutateAsync();
+      await WebBrowser.openAuthSessionAsync(link.url, 'mcbuse://offramp/connect/return');
+      stripeStatus.refetch();
+    } catch (err: any) {
+      Alert.alert(
+        'Could not open onboarding',
+        err?.message ?? 'Something went wrong starting the Stripe onboarding flow.',
+      );
+    }
+  }, [startOnboarding, stripeStatus]);
 
   const holdingUsdc = useMemo(() => {
     const balance = wallets.data?.savings?.balances.find((b) => b.currency === 'USDC');
@@ -73,13 +95,27 @@ export default function CashOutScreen() {
       return;
     }
 
+    if (!stripePayoutsEnabled) {
+      Alert.alert(
+        'Connect bank required',
+        'Complete Stripe payout onboarding before cashing out.',
+      );
+      return;
+    }
+
     try {
       const session = await createSession.mutateAsync({
-        provider: 'moonpay',
+        provider: 'stripe',
         cryptoAmount: baseUnits,
         cryptoCurrency: 'USDC',
         fiatCurrency,
       });
+      if (session.provider === 'stripe') {
+        router.push(
+          `/(flows)/cashout/status?transactionId=${encodeURIComponent(session.transactionId)}`,
+        );
+        return;
+      }
       setOfframpWidgetSession(session);
       router.push(
         `/(flows)/cashout/checkout?transactionId=${encodeURIComponent(session.transactionId)}`,
@@ -90,7 +126,14 @@ export default function CashOutScreen() {
         err?.message ?? 'Something went wrong. Please try again.',
       );
     }
-  }, [baseUnits, createSession, fiatCurrency, hasAmount, hasSufficientBalance]);
+  }, [
+    baseUnits,
+    createSession,
+    fiatCurrency,
+    hasAmount,
+    hasSufficientBalance,
+    stripePayoutsEnabled,
+  ]);
 
   return (
     <KeyboardAvoidingView
@@ -120,10 +163,32 @@ export default function CashOutScreen() {
           <Box gap="xs" flex={1}>
             <Text variant="h3">Cash Out</Text>
             <Text variant="label" color="textTertiary">
-              Sell USDC from Holding with MoonPay
+              Sell USDC from Holding via Stripe payout
             </Text>
           </Box>
         </Box>
+
+        {!stripePayoutsEnabled && (
+          <Box
+            marginHorizontal="2xl"
+            marginBottom="m"
+            padding="m"
+            backgroundColor="bgSecondary"
+            borderRadius="m"
+            gap="s"
+          >
+            <Text variant="captionMedium">Connect a bank with Stripe</Text>
+            <Text variant="label" color="textTertiary">
+              Stripe handles bank verification and payouts to your account. This is a one-time
+              setup.
+            </Text>
+            <Pressable onPress={handleStripeOnboarding}>
+              <Text variant="captionMedium" color="brand">
+                {startOnboarding.isPending ? 'Opening Stripe…' : 'Start Stripe onboarding →'}
+              </Text>
+            </Pressable>
+          </Box>
+        )}
 
         <Box
           marginHorizontal="2xl"
@@ -271,14 +336,14 @@ export default function CashOutScreen() {
             <Box flex={1}>
               <Text variant="captionMedium">Payout details</Text>
               <Text variant="label" color="textTertiary">
-                MoonPay asks for your bank or card details next
+                Funds settle directly to the bank you connected with Stripe
               </Text>
             </Box>
           </Box>
 
           <Text variant="label" color={hasSufficientBalance ? 'textTertiary' : 'error'}>
             {hasSufficientBalance
-              ? 'Your USDC is reserved after you continue to MoonPay.'
+              ? 'Your USDC is reserved while Stripe completes the payout.'
               : 'Amount exceeds your Holding balance.'}
           </Text>
         </Box>
@@ -287,9 +352,14 @@ export default function CashOutScreen() {
 
         <Box paddingHorizontal="2xl" paddingBottom="m" paddingTop="m">
           <Button
-            label={createSession.isPending ? 'Starting MoonPay...' : 'Continue with MoonPay'}
+            label={createSession.isPending ? 'Starting payout…' : 'Cash out via Stripe'}
             onPress={handleContinue}
-            disabled={!hasAmount || !hasSufficientBalance || createSession.isPending}
+            disabled={
+              !hasAmount ||
+              !hasSufficientBalance ||
+              createSession.isPending ||
+              !stripePayoutsEnabled
+            }
             loading={createSession.isPending}
           />
         </Box>

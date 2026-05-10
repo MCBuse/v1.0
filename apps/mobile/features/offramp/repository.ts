@@ -7,6 +7,8 @@ import {
   offrampTransactionListSchema,
   offrampTransactionStatusSchema,
   signOfframpUrlResponseSchema,
+  stripeAccountStatusSchema,
+  stripeOnboardingLinkSchema,
   type CreateOfframpSessionInput,
   type CreateOfframpSessionResponse,
   type InitiateMoonpayDepositInput,
@@ -16,6 +18,8 @@ import {
   type OfframpTransactionList,
   type OfframpTransactionStatus,
   type SignOfframpUrlResponse,
+  type StripeAccountStatus,
+  type StripeOnboardingLink,
 } from './models';
 
 export const offrampRepository = {
@@ -55,5 +59,15 @@ export const offrampRepository = {
   async listTransactions(limit = 10): Promise<OfframpTransactionList> {
     const raw = await http.get<unknown>('/offramp/transactions', { params: { limit } });
     return offrampTransactionListSchema.parse(raw);
+  },
+
+  async getStripeAccountStatus(): Promise<StripeAccountStatus> {
+    const raw = await http.get<unknown>('/offramp/stripe/account-status');
+    return stripeAccountStatusSchema.parse(raw);
+  },
+
+  async createStripeOnboardingLink(): Promise<StripeOnboardingLink> {
+    const raw = await http.post<unknown>('/offramp/stripe/onboarding-link', {});
+    return stripeOnboardingLinkSchema.parse(raw);
   },
 };

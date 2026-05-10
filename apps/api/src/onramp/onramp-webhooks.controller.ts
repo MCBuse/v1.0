@@ -13,8 +13,10 @@ import {
 import { Public } from '../auth/decorators/public.decorator';
 import { OnrampSessionsService } from './onramp-sessions.service';
 import { MoonpayWidgetProvider } from './widget/moonpay-widget.provider';
+import { StripeOnrampProvider } from './widget/stripe-onramp.provider';
 import { OfframpSessionsService } from '../offramp/offramp-sessions.service';
 import { MoonpayOfframpProvider } from '../offramp/moonpay-offramp.provider';
+import { StripeOfframpProvider } from '../offramp/stripe-offramp.provider';
 
 type ReqWithRaw = { rawBody?: Buffer };
 
@@ -26,8 +28,10 @@ export class OnrampWebhooksController {
   constructor(
     private readonly sessions: OnrampSessionsService,
     private readonly moonpay: MoonpayWidgetProvider,
+    private readonly stripeOnramp: StripeOnrampProvider,
     private readonly offrampSessions: OfframpSessionsService,
     private readonly moonpayOfframp: MoonpayOfframpProvider,
+    private readonly stripeOfframp: StripeOfframpProvider,
   ) {}
 
   @Post('onramp/webhooks/:provider')
@@ -38,49 +42,84 @@ export class OnrampWebhooksController {
     @Param('provider') provider: string,
     @Req() req: ReqWithRaw,
     @Headers('moonpay-signature-v2') moonpaySigV2: string | undefined,
+    @Headers('stripe-signature') stripeSignature: string | undefined,
     @Headers() allHeaders: Record<string, string | string[] | undefined>,
   ) {
-    if (provider !== 'moonpay') {
-      throw new BadRequestException(`Unsupported webhook provider: ${provider}`);
-    }
-
     const rawBody = req.rawBody;
     if (!rawBody) {
       this.logger.error('Missing rawBody on webhook request — enable Nest rawBody option');
       throw new UnauthorizedException('Missing raw body');
     }
 
-    const sigHeader =
-      moonpaySigV2 ??
-      (typeof allHeaders['moonpay-signature-v2'] === 'string'
-        ? allHeaders['moonpay-signature-v2']
-        : undefined);
+    if (provider === 'moonpay') {
+      const sigHeader =
+        moonpaySigV2 ??
+        (typeof allHeaders['moonpay-signature-v2'] === 'string'
+          ? allHeaders['moonpay-signature-v2']
+          : undefined);
+      if (!this.moonpay.verifyWebhook(rawBody, sigHeader)) {
+        throw new UnauthorizedException('Invalid MoonPay signature');
+      }
 
-    if (!this.moonpay.verifyWebhook(rawBody, sigHeader)) {
-      throw new UnauthorizedException('Invalid MoonPay signature');
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawBody.toString('utf8')) as unknown;
+      } catch {
+        throw new BadRequestException('Invalid JSON body');
+      }
+
+      if (this.isMoonpaySellWebhook(parsed)) {
+        const event = this.moonpayOfframp.parseWebhook(parsed);
+        await this.offrampSessions.applyMoonpayWebhook(event, parsed);
+      } else {
+        const event = this.moonpay.parseWebhook(parsed);
+        await this.sessions.applyMoonpayWebhook(event, parsed);
+      }
+      return { received: true };
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(rawBody.toString('utf8')) as unknown;
-    } catch {
-      throw new BadRequestException('Invalid JSON body');
+    if (provider === 'stripe') {
+      const sigHeader =
+        stripeSignature ??
+        (typeof allHeaders['stripe-signature'] === 'string'
+          ? allHeaders['stripe-signature']
+          : undefined);
+      if (!this.stripeOnramp.verifyWebhook(rawBody, sigHeader)) {
+        throw new UnauthorizedException('Invalid Stripe signature');
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawBody.toString('utf8')) as unknown;
+      } catch {
+        throw new BadRequestException('Invalid JSON body');
+      }
+
+      const eventType = this.extractEventType(parsed);
+      if (this.stripeOfframp.isOfframpEvent(eventType)) {
+        const event = this.stripeOfframp.parseWebhook(parsed);
+        await this.offrampSessions.applyStripeWebhook(event, parsed);
+      } else if (this.stripeOnramp.isOnrampEvent(eventType)) {
+        const event = this.stripeOnramp.parseWebhook(parsed);
+        await this.sessions.applyStripeWebhook(event, parsed);
+      } else {
+        this.logger.debug(`Ignoring Stripe event type: ${eventType}`);
+      }
+      return { received: true };
     }
 
-    if (this.isSellWebhook(parsed)) {
-      const event = this.moonpayOfframp.parseWebhook(parsed);
-      await this.offrampSessions.applyMoonpayWebhook(event, parsed);
-    } else {
-      const event = this.moonpay.parseWebhook(parsed);
-      await this.sessions.applyMoonpayWebhook(event, parsed);
-    }
-
-    return { received: true };
+    throw new BadRequestException(`Unsupported webhook provider: ${provider}`);
   }
 
-  private isSellWebhook(payload: unknown): boolean {
+  private isMoonpaySellWebhook(payload: unknown): boolean {
     if (typeof payload !== 'object' || payload === null) return false;
     const type = (payload as { type?: unknown }).type;
     return typeof type === 'string' && type.startsWith('sell_');
+  }
+
+  private extractEventType(payload: unknown): string {
+    if (typeof payload !== 'object' || payload === null) return '';
+    const type = (payload as { type?: unknown }).type;
+    return typeof type === 'string' ? type : '';
   }
 }

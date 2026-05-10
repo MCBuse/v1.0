@@ -40,6 +40,8 @@ export const offrampTransactions = pgTable(
     depositTxHash: text('deposit_tx_hash'),
     refundTxHash: text('refund_tx_hash'),
     trackerUrl: text('tracker_url'),
+    stripeTransferId: text('stripe_transfer_id'),
+    stripePayoutId: text('stripe_payout_id'),
     status: varchar('status', { length: 32 }).notNull().default('pending'),
     rawWebhookPayload: jsonb('raw_webhook_payload'),
     depositInitiatedAt: timestamp('deposit_initiated_at'),

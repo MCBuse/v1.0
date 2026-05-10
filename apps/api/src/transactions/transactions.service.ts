@@ -5,6 +5,50 @@ import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { ListTransactionsDto } from './dto/list-transactions.dto';
 
+export type LedgerDirection = 'credit' | 'debit' | 'neutral';
+
+type LedgerDirectionInput = Pick<
+  typeof schema.ledgerEntries.$inferSelect,
+  'debitWalletId' | 'creditWalletId' | 'currency' | 'type' | 'metadata'
+>;
+
+function parseMetadataObject(
+  raw: string | null,
+): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveLedgerDirection(
+  row: LedgerDirectionInput,
+  walletIds: ReadonlySet<string>,
+): LedgerDirection {
+  if (row.type === 'on_ramp') return 'credit';
+  if (row.type === 'off_ramp') return 'debit';
+
+  if (row.type === 'swap') {
+    const metadata = parseMetadataObject(row.metadata);
+    if (metadata?.toCurrency === row.currency) return 'credit';
+    if (metadata?.fromCurrency === row.currency) return 'debit';
+  }
+
+  const debitsOwnWallet = walletIds.has(row.debitWalletId);
+  const creditsOwnWallet = walletIds.has(row.creditWalletId);
+
+  if (creditsOwnWallet && !debitsOwnWallet) return 'credit';
+  if (debitsOwnWallet && !creditsOwnWallet) return 'debit';
+  if (creditsOwnWallet && debitsOwnWallet) return 'neutral';
+
+  return 'neutral';
+}
+
 @Injectable()
 export class TransactionsService {
   constructor(
@@ -33,13 +77,17 @@ export class TransactionsService {
     ];
 
     if (query.currency) {
-      conditions.push(eq(schema.ledgerEntries.currency, query.currency.toUpperCase()));
+      conditions.push(
+        eq(schema.ledgerEntries.currency, query.currency.toUpperCase()),
+      );
     }
     if (query.type) {
       conditions.push(eq(schema.ledgerEntries.type, query.type));
     }
     if (query.from) {
-      conditions.push(gte(schema.ledgerEntries.createdAt, new Date(query.from)));
+      conditions.push(
+        gte(schema.ledgerEntries.createdAt, new Date(query.from)),
+      );
     }
     if (query.to) {
       conditions.push(lte(schema.ledgerEntries.createdAt, new Date(query.to)));
@@ -56,8 +104,10 @@ export class TransactionsService {
       .limit(limit)
       .offset(offset);
 
+    const walletIdSet = new Set(walletIds);
+
     return {
-      data: rows.map((r) => this.serialize(r)),
+      data: rows.map((r) => this.serialize(r, walletIdSet)),
       limit,
       offset,
     };
@@ -96,11 +146,13 @@ export class TransactionsService {
     const summary: Record<string, { credited: string; debited: string }> = {};
 
     for (const row of creditRows) {
-      if (!summary[row.currency]) summary[row.currency] = { credited: '0', debited: '0' };
+      if (!summary[row.currency])
+        summary[row.currency] = { credited: '0', debited: '0' };
       summary[row.currency].credited = row.total ?? '0';
     }
     for (const row of debitRows) {
-      if (!summary[row.currency]) summary[row.currency] = { credited: '0', debited: '0' };
+      if (!summary[row.currency])
+        summary[row.currency] = { credited: '0', debited: '0' };
       summary[row.currency].debited = row.total ?? '0';
     }
 
@@ -116,7 +168,10 @@ export class TransactionsService {
           eq(schema.wallets.type, walletType),
           eq(schema.wallets.isActive, true),
         )
-      : and(eq(schema.wallets.userId, userId), eq(schema.wallets.isActive, true));
+      : and(
+          eq(schema.wallets.userId, userId),
+          eq(schema.wallets.isActive, true),
+        );
 
     const rows = await this.db
       .select({ id: schema.wallets.id })
@@ -126,13 +181,17 @@ export class TransactionsService {
     return rows.map((r) => r.id);
   }
 
-  private serialize(row: typeof schema.ledgerEntries.$inferSelect) {
+  private serialize(
+    row: typeof schema.ledgerEntries.$inferSelect,
+    walletIds: ReadonlySet<string>,
+  ) {
     return {
       id: row.id,
       debitWalletId: row.debitWalletId,
       creditWalletId: row.creditWalletId,
       amount: row.amount.toString(), // bigint → string
       currency: row.currency,
+      direction: resolveLedgerDirection(row, walletIds),
       type: row.type,
       status: row.status,
       solanaTxSignature: row.solanaTxSignature,

@@ -13,6 +13,7 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') ?? 4000;
+  const host = configService.get<string>('HOST') ?? '0.0.0.0';
   const apiPrefix = configService.get<string>('API_PREFIX') ?? 'api/v1';
 
   app.useLogger(app.get(Logger));
@@ -26,6 +27,6 @@ async function bootstrap() {
 
   setupSwagger(app);
 
-  await app.listen(port);
+  await app.listen(port, host);
 }
 bootstrap();

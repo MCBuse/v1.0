@@ -50,6 +50,13 @@
       "when": 1778976000000,
       "tag": "0006_invoice_line_items",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778976000001,
+      "tag": "0007_stripe_provider_fields",
+      "breakpoints": true
     }
   ]
 }

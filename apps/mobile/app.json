@@ -15,7 +15,10 @@
         "NSCameraUsageDescription": "This app uses the camera to scan QR codes and process transactions.",
         "NSPhotoLibraryUsageDescription": "Allow access to upload payment proofs or profile images.",
         "NSMicrophoneUsageDescription": "Used for voice-based features (optional).",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
@@ -30,7 +33,8 @@
       "package": "com.f_o_nyarko.mcbuse",
       "permissions": [
         "android.permission.NFC"
-      ]
+      ],
+      "usesCleartextTraffic": true
     },
     "web": {
       "output": "static",
@@ -56,7 +60,6 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "http://localhost:4000/api/v1",
       "router": {},
       "eas": {
         "projectId": "24d4d4c3-a3fa-4088-b6f1-db39e8b0e82f"

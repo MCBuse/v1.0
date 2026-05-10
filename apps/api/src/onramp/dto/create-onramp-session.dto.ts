@@ -1,11 +1,14 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
+
+export type OnrampProvider = 'stripe' | 'moonpay';
 
 export class CreateOnrampSessionDto {
-  @ApiProperty({ example: 'moonpay', enum: ['moonpay'] })
+  @ApiPropertyOptional({ example: 'stripe', enum: ['stripe', 'moonpay'], default: 'stripe' })
+  @IsOptional()
   @IsString()
-  @IsIn(['moonpay'])
-  provider: 'moonpay';
+  @IsIn(['stripe', 'moonpay'])
+  provider?: OnrampProvider;
 
   @ApiProperty({ description: 'Fiat amount as decimal string, e.g. "25.00"' })
   @IsString()

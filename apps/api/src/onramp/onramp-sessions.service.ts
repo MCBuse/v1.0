@@ -15,6 +15,8 @@ import { ConfigService } from '@nestjs/config';
 import { WalletsService } from '../wallets/wallets.service';
 import { CreateOnrampSessionDto } from './dto/create-onramp-session.dto';
 import { MoonpayWidgetProvider } from './widget/moonpay-widget.provider';
+import { StripeOnrampProvider } from './widget/stripe-onramp.provider';
+import type { OnrampWidgetProvider } from './widget/onramp-widget-provider.interface';
 import type { NormalizedOnrampEvent } from './widget/onramp-widget.types';
 import { WidgetOnrampSettlementService } from './widget-onramp-settlement.service';
 
@@ -30,6 +32,7 @@ export class OnrampSessionsService {
     private readonly config: ConfigService,
     private readonly walletsService: WalletsService,
     private readonly moonpay: MoonpayWidgetProvider,
+    private readonly stripeOnramp: StripeOnrampProvider,
     private readonly settlement: WidgetOnrampSettlementService,
   ) {}
 
@@ -40,8 +43,13 @@ export class OnrampSessionsService {
     return Number.isFinite(n) && n > 0 ? n : MIN_EUR_DEFAULT;
   }
 
+  private resolveProvider(provider: 'stripe' | 'moonpay'): OnrampWidgetProvider {
+    return provider === 'stripe' ? this.stripeOnramp : this.moonpay;
+  }
+
   async createSession(userId: string, dto: CreateOnrampSessionDto) {
-    if (dto.provider !== 'moonpay') {
+    const provider = (dto.provider ?? 'stripe') as 'stripe' | 'moonpay';
+    if (provider !== 'stripe' && provider !== 'moonpay') {
       throw new BadRequestException('Unsupported provider');
     }
 
@@ -49,9 +57,11 @@ export class OnrampSessionsService {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException('Invalid fiatAmount');
     }
-    const minEur = this.getMinEur();
-    if (amount < minEur) {
-      throw new BadRequestException(`Minimum amount is €${minEur} (sandbox guideline)`);
+    if (provider === 'moonpay') {
+      const minEur = this.getMinEur();
+      if (amount < minEur) {
+        throw new BadRequestException(`Minimum amount is €${minEur} (sandbox guideline)`);
+      }
     }
 
     const wallets = await this.walletsService.findByUserId(userId);
@@ -62,7 +72,8 @@ export class OnrampSessionsService {
     const redirectUrl =
       this.config.get<string>('APP_REDIRECT_URL') ?? 'mcbuse://onramp/complete';
 
-    const { widgetUrl } = await this.moonpay.createWidgetSession({
+    const widgetProvider = this.resolveProvider(provider);
+    const { widgetUrl } = await widgetProvider.createWidgetSession({
       userId,
       walletId: savings.id,
       walletAddress: savings.solanaPubkey,
@@ -79,7 +90,7 @@ export class OnrampSessionsService {
       .values({
         userId,
         walletId: savings.id,
-        provider: 'moonpay',
+        provider,
         internalReference,
         fiatAmount: dto.fiatAmount,
         fiatCurrency: dto.fiatCurrency.toUpperCase(),
@@ -90,9 +101,10 @@ export class OnrampSessionsService {
       })
       .returning({ id: schema.onrampTransactions.id });
 
-    this.logger.log(`Created MoonPay onramp session ${row.id} ref=${internalReference}`);
+    this.logger.log(`Created ${provider} onramp session ${row.id} ref=${internalReference}`);
 
     return {
+      provider,
       widgetUrl,
       transactionId: row.id,
       internalReference,
@@ -104,12 +116,7 @@ export class OnrampSessionsService {
     const rows = await this.db
       .select()
       .from(schema.onrampTransactions)
-      .where(
-        and(
-          eq(schema.onrampTransactions.userId, userId),
-          eq(schema.onrampTransactions.provider, 'moonpay'),
-        ),
-      )
+      .where(eq(schema.onrampTransactions.userId, userId))
       .orderBy(desc(schema.onrampTransactions.createdAt))
       .limit(safeLimit);
 
@@ -151,9 +158,29 @@ export class OnrampSessionsService {
    * Apply a verified MoonPay webhook: upsert row state and settle balance when appropriate.
    */
   async applyMoonpayWebhook(event: NormalizedOnrampEvent, rawPayload: unknown): Promise<void> {
+    return this.applyProviderWebhook('moonpay', event, rawPayload, {
+      externalIdOverride: event.moonpayTransactionId,
+    });
+  }
+
+  /**
+   * Apply a verified Stripe webhook (Crypto Onramp or Checkout fallback).
+   */
+  async applyStripeWebhook(event: NormalizedOnrampEvent, rawPayload: unknown): Promise<void> {
+    return this.applyProviderWebhook('stripe', event, rawPayload);
+  }
+
+  private async applyProviderWebhook(
+    provider: 'moonpay' | 'stripe',
+    event: NormalizedOnrampEvent,
+    rawPayload: unknown,
+    opts: { externalIdOverride?: string } = {},
+  ): Promise<void> {
     const internalRef = event.internalReference;
     if (!internalRef) {
-      this.logger.warn('MoonPay webhook missing externalTransactionId (internal ref) — cannot correlate');
+      this.logger.warn(
+        `${provider} webhook missing internalReference — cannot correlate (externalId=${event.externalTransactionId})`,
+      );
       return;
     }
 
@@ -163,7 +190,7 @@ export class OnrampSessionsService {
       .where(
         and(
           eq(schema.onrampTransactions.internalReference, internalRef),
-          eq(schema.onrampTransactions.provider, 'moonpay'),
+          eq(schema.onrampTransactions.provider, provider),
         ),
       )
       .orderBy(desc(schema.onrampTransactions.createdAt))
@@ -171,18 +198,17 @@ export class OnrampSessionsService {
 
     const row = rows[0];
     if (!row) {
-      this.logger.warn(`No onramp row for internalReference=${internalRef}`);
+      this.logger.warn(`No ${provider} onramp row for internalReference=${internalRef}`);
       return;
     }
 
     const newStatus = this.nextStatus(row.status, event.status);
-
-    const moonpayId = event.moonpayTransactionId ?? event.externalTransactionId;
+    const externalId = opts.externalIdOverride ?? event.externalTransactionId;
 
     await this.db
       .update(schema.onrampTransactions)
       .set({
-        externalTransactionId: moonpayId,
+        externalTransactionId: externalId,
         status: newStatus,
         cryptoAmount: event.cryptoAmount ?? row.cryptoAmount?.toString() ?? undefined,
         cryptoCurrency: event.cryptoCurrency ?? row.cryptoCurrency,

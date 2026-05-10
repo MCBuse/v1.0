@@ -14,6 +14,8 @@ import {
   useSignOfframpUrl,
   type CreateOfframpSessionResponse,
 } from '@/features/offramp';
+
+type MoonpaySession = Extract<CreateOfframpSessionResponse, { provider: 'moonpay' }>;
 import { takeOfframpWidgetSession } from '@/lib/offramp-widget-cache';
 import type { Theme } from '@/theme';
 
@@ -53,6 +55,13 @@ export default function CashOutCheckoutScreen() {
     );
   }
 
+  if (session.provider !== 'moonpay') {
+    router.replace(
+      `/(flows)/cashout/status?transactionId=${encodeURIComponent(transactionId)}`,
+    );
+    return null;
+  }
+
   return (
     <CashOutMoonPayCheckout
       session={session}
@@ -69,7 +78,7 @@ function CashOutMoonPayCheckout({
   insetsTop,
   colors,
 }: {
-  session: CreateOfframpSessionResponse;
+  session: MoonpaySession;
   transactionId: string;
   insetsTop: number;
   colors: Theme['colors'];

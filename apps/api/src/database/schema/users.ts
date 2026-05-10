@@ -15,6 +15,7 @@ export const users = pgTable('users', {
   isActive: boolean('is_active').default(true).notNull(),
   failedLoginAttempts: integer('failed_login_attempts').default(0).notNull(),
   lockedUntil: timestamp('locked_until'), // null = not locked
+  stripeAccountId: varchar('stripe_account_id', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'), // soft delete

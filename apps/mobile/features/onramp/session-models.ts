@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
+export const onrampProviderSchema = z.enum(['stripe', 'moonpay']);
+export type OnrampProvider = z.infer<typeof onrampProviderSchema>;
+
 export const createOnrampSessionResponseSchema = z.object({
+  provider: onrampProviderSchema.default('moonpay'),
   widgetUrl: z.string().min(1),
   transactionId: z.string().uuid(),
   internalReference: z.string().uuid(),
@@ -33,7 +37,7 @@ export const onrampTransactionListSchema = z.object({
 export type OnrampTransactionList = z.infer<typeof onrampTransactionListSchema>;
 
 export type CreateOnrampSessionInput = {
-  provider: 'moonpay';
+  provider?: OnrampProvider;
   fiatAmount: string;
   fiatCurrency: 'USD' | 'EUR';
 };

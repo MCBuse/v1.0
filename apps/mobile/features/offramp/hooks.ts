@@ -9,6 +9,8 @@ import type {
   OfframpResponse,
   OfframpTransactionStatus,
   SignOfframpUrlResponse,
+  StripeAccountStatus,
+  StripeOnboardingLink,
 } from './models';
 import { offrampRepository } from './repository';
 
@@ -66,5 +68,20 @@ export function useOfframpTransactions(limit = 10) {
       const hasOpen = q.state.data?.data.some((tx) => !TERMINAL.has(tx.status));
       return hasOpen ? 5000 : false;
     },
+  });
+}
+
+export function useStripeAccountStatus(enabled = true) {
+  return useDataScreen<StripeAccountStatus>({
+    queryKey: ['offramp', 'stripe', 'account-status'],
+    queryFn:  () => offrampRepository.getStripeAccountStatus(),
+    enabled,
+  });
+}
+
+export function useCreateStripeOnboardingLink() {
+  return useOperation<void, StripeOnboardingLink>({
+    mutationFn:     () => offrampRepository.createStripeOnboardingLink(),
+    invalidateKeys: [['offramp', 'stripe', 'account-status']],
   });
 }

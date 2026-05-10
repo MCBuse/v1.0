@@ -18,6 +18,7 @@ import { OfframpSessionsService } from './offramp-sessions.service';
 import { CreateOfframpSessionDto } from './dto/create-offramp-session.dto';
 import { SignOfframpUrlDto } from './dto/sign-offramp-url.dto';
 import { InitiateMoonpayDepositDto } from './dto/initiate-moonpay-deposit.dto';
+import { StripeOfframpProvider } from './stripe-offramp.provider';
 
 @ApiTags('offramp')
 @ApiBearerAuth('access-token')
@@ -27,7 +28,21 @@ export class OffRampController {
   constructor(
     private readonly offRampService: OffRampService,
     private readonly sessions: OfframpSessionsService,
+    private readonly stripeOfframp: StripeOfframpProvider,
   ) {}
+
+  @Post('stripe/onboarding-link')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Create a Stripe Connect Express onboarding link' })
+  createStripeOnboardingLink(@CurrentUser() user: { id: string }) {
+    return this.stripeOfframp.createOnboardingLink(user.id);
+  }
+
+  @Get('stripe/account-status')
+  @ApiOperation({ summary: 'Get Stripe Connect account status' })
+  getStripeAccountStatus(@CurrentUser() user: { id: string }) {
+    return this.stripeOfframp.getAccountStatus(user.id);
+  }
 
   @Post()
   @HttpCode(HttpStatus.OK)

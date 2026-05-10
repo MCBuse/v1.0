@@ -11,10 +11,12 @@ import { and, desc, eq, gte, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
+import { ConfigService } from '@nestjs/config';
 import { CreateOfframpSessionDto } from './dto/create-offramp-session.dto';
 import { InitiateMoonpayDepositDto } from './dto/initiate-moonpay-deposit.dto';
 import { SignOfframpUrlDto } from './dto/sign-offramp-url.dto';
 import { MoonpayOfframpProvider } from './moonpay-offramp.provider';
+import { StripeOfframpProvider, type NormalizedStripeOfframpEvent } from './stripe-offramp.provider';
 import type {
   MoonpaySellTransaction,
   NormalizedMoonpaySellEvent,
@@ -72,13 +74,18 @@ export class OfframpSessionsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly moonpay: MoonpayOfframpProvider,
+    private readonly stripeOfframp: StripeOfframpProvider,
     private readonly solanaDeposits: OfframpSolanaDepositService,
+    private readonly config: ConfigService,
   ) {}
 
   async createSession(userId: string, dto: CreateOfframpSessionDto) {
-    if (dto.provider !== 'moonpay') throw new BadRequestException('Unsupported provider');
+    const provider = (dto.provider ?? 'stripe') as 'stripe' | 'moonpay';
+    if (provider !== 'stripe' && provider !== 'moonpay') {
+      throw new BadRequestException('Unsupported provider');
+    }
     const currency = dto.cryptoCurrency ?? 'USDC';
-    if (currency !== 'USDC') throw new BadRequestException('MoonPay off-ramp currently supports USDC only');
+    if (currency !== 'USDC') throw new BadRequestException('Off-ramp currently supports USDC only');
 
     const amount = BigInt(dto.cryptoAmount);
     if (amount <= 0n) throw new BadRequestException('Amount must be positive');
@@ -86,15 +93,173 @@ export class OfframpSessionsService {
     const fiatCurrency = (dto.fiatCurrency ?? 'USD').toUpperCase();
     const savings = await this.getSavingsWallet(userId);
     const internalReference = randomUUID();
-    const displayAmount = baseUnitsToDecimalString(amount);
 
-    const row = await this.db.transaction(async (tx) => {
+    if (provider === 'stripe') {
+      return this.createStripeSession({ userId, savings, amount, fiatCurrency, internalReference });
+    }
+    return this.createMoonpaySession({ userId, savings, amount, fiatCurrency, internalReference });
+  }
+
+  private async createMoonpaySession(params: {
+    userId: string;
+    savings: typeof schema.wallets.$inferSelect;
+    amount: bigint;
+    fiatCurrency: string;
+    internalReference: string;
+  }) {
+    const { userId, savings, amount, fiatCurrency, internalReference } = params;
+    const displayAmount = baseUnitsToDecimalString(amount);
+    const row = await this.reserveAndCreateRow({
+      userId,
+      savings,
+      amount,
+      fiatCurrency,
+      internalReference,
+      provider: 'moonpay',
+    });
+
+    this.logger.log(`Created MoonPay off-ramp session ${row.id} ref=${internalReference}`);
+
+    return {
+      transactionId: row.id,
+      internalReference,
+      provider: 'moonpay' as const,
+      environment: this.moonpay.environment,
+      params: {
+        apiKey: this.moonpay.publicKey,
+        baseCurrencyCode: this.moonpay.usdcCurrencyCode,
+        baseCurrencyAmount: displayAmount,
+        lockAmount: 'true',
+        quoteCurrencyCode: fiatCurrency.toLowerCase(),
+        refundWalletAddress: savings.solanaPubkey,
+        externalTransactionId: internalReference,
+        externalCustomerId: userId,
+      },
+    };
+  }
+
+  private async createStripeSession(params: {
+    userId: string;
+    savings: typeof schema.wallets.$inferSelect;
+    amount: bigint;
+    fiatCurrency: string;
+    internalReference: string;
+  }) {
+    const { userId, savings, amount, fiatCurrency, internalReference } = params;
+
+    const account = await this.stripeOfframp.getAccountStatus(userId);
+    if (!account.payoutsEnabled || !account.accountId) {
+      throw new BadRequestException(
+        'Stripe payouts are not enabled for your account. Complete onboarding before cashing out.',
+      );
+    }
+
+    const treasuryAddress = this.config.get<string>('STRIPE_OFFRAMP_TREASURY_SOLANA_ADDRESS');
+    if (!treasuryAddress) {
+      throw new BadRequestException('Stripe off-ramp treasury wallet is not configured');
+    }
+
+    const amountCents = this.stripeOfframp.toFiatCents(amount, fiatCurrency);
+
+    const row = await this.reserveAndCreateRow({
+      userId,
+      savings,
+      amount,
+      fiatCurrency,
+      internalReference,
+      provider: 'stripe',
+    });
+
+    let depositTxHash: string;
+    try {
+      depositTxHash = await this.solanaDeposits.sendUsdcDeposit({
+        payerPubkey: savings.solanaPubkey,
+        payerEncryptedKeypair: savings.encryptedKeypair,
+        destinationAddress: treasuryAddress,
+        amount,
+      });
+    } catch (err) {
+      this.logger.error(`Stripe off-ramp on-chain sweep failed for ${row.id}: ${(err as Error).message}`);
+      await this.releaseReservedFunds(row.id, 'failed');
+      throw err;
+    }
+
+    let transferId: string;
+    let payoutId: string;
+    try {
+      const result = await this.stripeOfframp.executeTransferAndPayout({
+        stripeAccountId: account.accountId,
+        amountCents,
+        currency: fiatCurrency,
+        internalReference,
+        transferGroup: row.id,
+      });
+      transferId = result.transferId;
+      payoutId = result.payoutId;
+    } catch (err) {
+      this.logger.error(`Stripe transfer/payout failed for ${row.id}: ${(err as Error).message}`);
+      await this.db
+        .update(schema.offrampTransactions)
+        .set({
+          depositTxHash,
+          status: 'failed',
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.offrampTransactions.id, row.id));
+      throw err;
+    }
+
+    const fiatDisplay = (amountCents / 100).toString();
+
+    const [updated] = await this.db
+      .update(schema.offrampTransactions)
+      .set({
+        externalTransactionId: payoutId,
+        stripeTransferId: transferId,
+        stripePayoutId: payoutId,
+        depositTxHash,
+        depositInitiatedAt: new Date(),
+        fiatAmount: fiatDisplay,
+        status: 'processing',
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.offrampTransactions.id, row.id))
+      .returning();
+
+    this.logger.log(
+      `Created Stripe off-ramp session ${row.id} ref=${internalReference} payout=${payoutId} sweep=${depositTxHash}`,
+    );
+
+    return {
+      transactionId: updated.id,
+      internalReference,
+      provider: 'stripe' as const,
+      stripePayoutId: payoutId,
+      stripeTransferId: transferId,
+      depositTxHash,
+      fiatAmount: fiatDisplay,
+      fiatCurrency,
+      status: updated.status,
+    };
+  }
+
+  private async reserveAndCreateRow(params: {
+    userId: string;
+    savings: typeof schema.wallets.$inferSelect;
+    amount: bigint;
+    fiatCurrency: string;
+    internalReference: string;
+    provider: 'moonpay' | 'stripe';
+  }) {
+    const { userId, savings, amount, fiatCurrency, internalReference, provider } = params;
+
+    return this.db.transaction(async (tx) => {
       const [created] = await tx
         .insert(schema.offrampTransactions)
         .values({
           userId,
           walletId: savings.id,
-          provider: 'moonpay',
+          provider,
           internalReference,
           cryptoAmount: amount,
           cryptoCurrency: 'USDC',
@@ -133,12 +298,8 @@ export class OfframpSessionsService {
           currency: 'USDC',
           type: 'off_ramp',
           status: 'pending',
-          idempotencyKey: `offramp_moonpay_session:${created.id}`,
-          metadata: JSON.stringify({
-            provider: 'moonpay',
-            internalReference,
-            fiatCurrency,
-          }),
+          idempotencyKey: `offramp_${provider}_session:${created.id}`,
+          metadata: JSON.stringify({ provider, internalReference, fiatCurrency }),
         })
         .returning({ id: schema.ledgerEntries.id });
 
@@ -150,25 +311,6 @@ export class OfframpSessionsService {
 
       return updated;
     });
-
-    this.logger.log(`Created MoonPay off-ramp session ${row.id} ref=${internalReference}`);
-
-    return {
-      transactionId: row.id,
-      internalReference,
-      provider: 'moonpay',
-      environment: this.moonpay.environment,
-      params: {
-        apiKey: this.moonpay.publicKey,
-        baseCurrencyCode: this.moonpay.usdcCurrencyCode,
-        baseCurrencyAmount: displayAmount,
-        lockAmount: 'true',
-        quoteCurrencyCode: fiatCurrency.toLowerCase(),
-        refundWalletAddress: savings.solanaPubkey,
-        externalTransactionId: internalReference,
-        externalCustomerId: userId,
-      },
-    };
   }
 
   async signWidgetUrl(userId: string, id: string, dto: SignOfframpUrlDto) {
@@ -266,12 +408,7 @@ export class OfframpSessionsService {
     const rows = await this.db
       .select()
       .from(schema.offrampTransactions)
-      .where(
-        and(
-          eq(schema.offrampTransactions.userId, userId),
-          eq(schema.offrampTransactions.provider, 'moonpay'),
-        ),
-      )
+      .where(eq(schema.offrampTransactions.userId, userId))
       .orderBy(desc(schema.offrampTransactions.createdAt))
       .limit(safeLimit);
     return { data: rows.map((row) => this.serialize(row)), limit: safeLimit };
@@ -551,8 +688,99 @@ export class OfframpSessionsService {
       depositTxHash: row.depositTxHash,
       refundTxHash: row.refundTxHash,
       trackerUrl: row.trackerUrl,
+      stripeTransferId: row.stripeTransferId,
+      stripePayoutId: row.stripePayoutId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
+  }
+
+  async applyStripeWebhook(
+    event: NormalizedStripeOfframpEvent,
+    rawPayload: unknown,
+  ): Promise<void> {
+    if (event.accountId && event.payoutsEnabled !== undefined) {
+      this.logger.log(
+        `Stripe Connect account.updated ${event.accountId} payouts_enabled=${event.payoutsEnabled}`,
+      );
+      return;
+    }
+
+    const row = await this.findStripeRow(event);
+    if (!row) {
+      this.logger.warn(
+        `No off-ramp row for Stripe event ref=${event.internalReference ?? 'none'} payout=${event.payoutId ?? 'none'}`,
+      );
+      return;
+    }
+
+    const current = row.status as NormalizedOfframpStatus;
+    let nextStatus: NormalizedOfframpStatus = current;
+    if (current !== 'completed' && current !== 'failed' && current !== 'cancelled') {
+      nextStatus = event.status;
+    }
+
+    await this.db
+      .update(schema.offrampTransactions)
+      .set({
+        status: nextStatus,
+        stripePayoutId: event.payoutId ?? row.stripePayoutId,
+        stripeTransferId: event.transferId ?? row.stripeTransferId,
+        externalTransactionId:
+          event.payoutId ?? row.externalTransactionId ?? event.transferId,
+        rawWebhookPayload: rawPayload as Record<string, unknown>,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.offrampTransactions.id, row.id));
+
+    if (nextStatus === 'completed') {
+      await this.completeReservedFunds(row.id);
+    } else if (nextStatus === 'failed') {
+      await this.releaseReservedFunds(row.id, 'failed');
+    }
+  }
+
+  private async findStripeRow(event: NormalizedStripeOfframpEvent) {
+    if (event.payoutId) {
+      const [byPayout] = await this.db
+        .select()
+        .from(schema.offrampTransactions)
+        .where(
+          and(
+            eq(schema.offrampTransactions.provider, 'stripe'),
+            eq(schema.offrampTransactions.stripePayoutId, event.payoutId),
+          ),
+        )
+        .limit(1);
+      if (byPayout) return byPayout;
+    }
+    if (event.transferId) {
+      const [byTransfer] = await this.db
+        .select()
+        .from(schema.offrampTransactions)
+        .where(
+          and(
+            eq(schema.offrampTransactions.provider, 'stripe'),
+            eq(schema.offrampTransactions.stripeTransferId, event.transferId),
+          ),
+        )
+        .limit(1);
+      if (byTransfer) return byTransfer;
+    }
+    if (event.internalReference) {
+      const [byRef] = await this.db
+        .select()
+        .from(schema.offrampTransactions)
+        .where(
+          and(
+            eq(schema.offrampTransactions.provider, 'stripe'),
+            eq(schema.offrampTransactions.internalReference, event.internalReference),
+          ),
+        )
+        .orderBy(desc(schema.offrampTransactions.createdAt))
+        .limit(1);
+      if (byRef) return byRef;
+    }
+    return undefined;
   }
 }

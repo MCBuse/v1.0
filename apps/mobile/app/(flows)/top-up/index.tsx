@@ -63,7 +63,7 @@ export default function TopUpScreen() {
 
     try {
       const session = await createSession({
-        provider: 'moonpay',
+        provider: 'stripe',
         fiatAmount: numeric.toFixed(2),
         fiatCurrency: fiat,
       });

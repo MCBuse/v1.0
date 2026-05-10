@@ -7,13 +7,22 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 1. Install dependencies
 
    ```bash
-   npm install
+   pnpm install
    ```
 
-2. Start the app
+2. Start the API from the repository root
 
    ```bash
-   npx expo start
+   pnpm dev:api
+   ```
+
+   The API binds to `0.0.0.0:4000` in development so a physical device on the
+   same Wi-Fi network can reach it.
+
+3. Start the app
+
+   ```bash
+   pnpm --filter mobile start
    ```
 
 In the output, you'll find options to open the app in a
@@ -22,6 +31,11 @@ In the output, you'll find options to open the app in a
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+
+For local development, leave `EXPO_PUBLIC_API_BASE_URL` unset. The mobile app
+infers the host from Expo's dev server and calls `http://<your-computer-LAN-IP>:4000/api/v1`.
+If you set `EXPO_PUBLIC_API_BASE_URL` manually for a physical device, use your
+computer's LAN IP instead of `localhost`.
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
