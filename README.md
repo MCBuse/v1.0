@@ -1,159 +1,222 @@
-# Turborepo starter
+# MCBuse
 
-This Turborepo starter is maintained by the Turborepo core team.
+Stablecoin-native payment app built on Solana. Custodial dual-wallet model (Routine + Holding), fiat on/off-ramps via Stripe and MoonPay, QR and NFC P2P payments, mobile-first.
 
-## Using this example
+## Architecture
 
-Run the following command:
+Turborepo monorepo with pnpm workspaces.
 
-```sh
-npx create-turbo@latest
+| Path | Stack | Purpose |
+| --- | --- | --- |
+| `apps/api` | NestJS, Drizzle ORM, PostgreSQL, Solana web3.js | Backend API — auth, wallets, ledger, payments, on/off-ramp |
+| `apps/web` | Next.js | Marketing site / web companion |
+| `apps/mobile` | Expo (React Native, new arch enabled) | Mobile app — primary consumer surface |
+| `packages/ui` | React | Shared UI primitives (web) |
+| `packages/shared` | TypeScript | Cross-app types/utils |
+| `packages/eslint-config`, `packages/typescript-config` | Tooling | Shared lint/TS config |
+
+## Prerequisites
+
+- **Node.js** ≥ 20
+- **pnpm** ≥ 9 (`npm install -g pnpm`)
+- **PostgreSQL** ≥ 14 (local install or Docker)
+- **EAS CLI** for mobile builds: `npm install -g eas-cli`
+- **Fly CLI** for API deploys (optional): `brew install flyctl`
+- **Stripe CLI** for local webhook forwarding (optional): `brew install stripe/stripe-cli/stripe`
+- Xcode (iOS) and/or Android Studio (Android) for simulators/devices
+
+## Quick start
+
+```bash
+git clone <repo-url> mcbuse && cd mcbuse
+pnpm install
 ```
 
-## What's inside?
+### 1. Configure the API
 
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```bash
+cp apps/api/.env.example apps/api/.env
 ```
 
-Without global `turbo`, use your package manager:
+Fill in at minimum in `apps/api/.env`:
 
-```sh
-cd my-turborepo
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+- `DATABASE_URL` (or the split `DATABASE_HOST` / `DATABASE_USER` / etc.) — point at a local Postgres
+- `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` — any random 32+ char strings for dev
+- `STRIPE_SECRET_KEY` — your `sk_test_...` from https://dashboard.stripe.com/test/apikeys
+- `STRIPE_WEBHOOK_SECRET` — printed by `stripe listen` (see below)
+- `SOLANA_KEYPAIR_ENCRYPTION_KEY` — generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+MoonPay, Twilio, and Circle keys are optional — leave the defaults if you only need the Stripe flow.
+
+### 2. Set up the database
+
+```bash
+createdb mcbuse_dev
+
+cd apps/api
+pnpm db:migrate
+cd ../..
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+### 3. Configure the mobile app
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Create `apps/mobile/.env`:
 
-```sh
-turbo build --filter=docs
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://192.168.X.X:4000/api/v1
+EXPO_PUBLIC_ONRAMP_REDIRECT_URL=mcbuse://onramp/complete
 ```
 
-Without global `turbo`:
+Replace `192.168.X.X` with your machine's LAN IP (find it via `ipconfig getifaddr en0` on macOS). Localhost won't work from a physical device or Android emulator.
 
-```sh
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+### 4. Run everything
+
+From the repo root:
+
+```bash
+pnpm dev
 ```
 
-### Develop
+This starts the API on `:4000`, the web app on `:3000`, and the Expo dev server. Open the Expo URL in Expo Go, or press `i` / `a` to launch a simulator.
 
-To develop all apps and packages, run the following command:
+To run a single app:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
+```bash
+pnpm --filter api dev
+pnpm --filter mobile start
+pnpm --filter web dev
 ```
 
-Without global `turbo`, use your package manager:
+### 5. Forward Stripe webhooks (for on-ramp + off-ramp)
 
-```sh
-cd my-turborepo
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+In a separate terminal:
+
+```bash
+stripe listen --forward-to localhost:4000/api/v1/webhooks/stripe
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Copy the `whsec_...` it prints into `STRIPE_WEBHOOK_SECRET` in `apps/api/.env`, then restart the API.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+## Stripe test cards
 
-```sh
-turbo dev --filter=web
+Use these in the Stripe-hosted checkout opened by the in-app WebView. Any future expiry and any 3-digit CVC will work.
+
+| Number | Behaviour |
+| --- | --- |
+| `4242 4242 4242 4242` | Visa — succeeds, no 3DS |
+| `4000 0025 0000 3155` | Visa — requires 3DS authentication |
+| `5555 5555 5555 4444` | Mastercard — succeeds |
+| `4000 0000 0000 9995` | Declined (insufficient funds) |
+| `4000 0000 0000 0002` | Declined (generic) |
+| `4000 0000 0000 0069` | Declined (expired card) |
+
+Full list: https://docs.stripe.com/testing#cards
+
+For the Stripe Crypto Onramp specifically, the test flow accepts the same cards plus the demo postcode `42424` and any name.
+
+## Mobile app usage
+
+The signed-in home screen has two cards and two action rows.
+
+- **Routine Account** — what you spend from. Drives Send / Receive / Invoice / Scan / Top Up.
+- **Holding Account** — where you keep money. Drives Move / Swap / Cash Out.
+
+### Top up (fiat → USDC)
+
+1. Tap **Top Up** on the home screen.
+2. Pick USD or EUR, enter an amount (min 20, max 10,000).
+3. Tap **Continue with card**. The Stripe widget loads inside a WebView.
+4. Use one of the test cards above. Use any name, ZIP `42424`, and any future expiry.
+5. After payment, Stripe redirects to `mcbuse://onramp/complete`. The app navigates to the status screen and polls until the webhook lands.
+6. Funds appear in the Holding Account as USDC (displayed as USD).
+
+### Move between accounts
+
+Tap **Move** under the Holding Account to shift funds to the Routine Account (or vice versa). Instant, no fees.
+
+### Send
+
+1. Tap **Send**.
+2. Enter the recipient's username or scan their QR.
+3. Confirm amount and tap to send. Settlement is sub-second on Solana devnet.
+
+### Receive
+
+Tap **Receive** to show a QR code with your address and (optional) requested amount. The payer scans it from the **Scan** action.
+
+### NFC tap-to-pay
+
+With the app open on both phones, place them back-to-back. The sender approves the amount on their device and the recipient sees the credit immediately. Requires Android with NFC enabled (iOS NFC support is more constrained — use QR on iOS).
+
+### Cash out (USDC → fiat)
+
+1. From the Holding Account, tap **Cash Out**.
+2. Pick provider (Stripe or MoonPay), currency, and amount.
+3. Complete KYC + bank linking in the provider widget.
+4. The off-ramp status screen reflects webhook updates.
+
+### Swap
+
+Tap **Swap** to convert between USDC and EURC inside the Holding Account.
+
+## Useful commands
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | Run all apps |
+| `pnpm build` | Build all apps |
+| `pnpm lint` | Lint everything |
+| `pnpm check-types` | Type-check everything |
+| `pnpm --filter api test` | API unit tests |
+| `pnpm --filter api test:e2e` | API end-to-end tests |
+| `pnpm --filter api db:generate` | Generate a Drizzle migration from schema changes |
+| `pnpm --filter api db:migrate` | Apply pending migrations |
+| `pnpm --filter mobile ios` | Launch iOS simulator |
+| `pnpm --filter mobile android` | Launch Android emulator |
+
+## Deployment
+
+### API → Fly.io
+
+```bash
+cd apps/api
+fly secrets set STRIPE_SECRET_KEY=sk_live_... STRIPE_WEBHOOK_SECRET=whsec_... -a mcbuse-api
+fly deploy -a mcbuse-api
+fly logs -a mcbuse-api
 ```
 
-Without global `turbo`:
+After deploying, register the prod webhook endpoint in the Stripe Dashboard at `https://mcbuse-api.fly.dev/api/v1/webhooks/stripe` and copy the generated `whsec_...` back into Fly secrets.
 
-```sh
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+### Mobile → EAS
+
+Build profiles live in `apps/mobile/eas.json`. Each profile injects the right `EXPO_PUBLIC_API_BASE_URL` at build time.
+
+```bash
+cd apps/mobile
+
+# Internal test APK pointed at prod API
+eas build --profile preview --platform android
+
+# TestFlight
+eas build --profile production --platform ios
+eas submit --platform ios --latest
+
+# Play Store
+eas build --profile production --platform android
+eas submit --platform android --latest
 ```
 
-### Remote Caching
+## Troubleshooting
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+- **"Email verification required" when topping up** — currently disabled for new signups in dev. If you still hit it, your account predates the change. Flip the flag: `UPDATE users SET is_email_verified = true WHERE email = 'you@example.com';`
+- **Top-up stuck on "Waiting for payment"** — Stripe webhook isn't reaching the API. Confirm `stripe listen` is running locally, or that the prod webhook endpoint + signing secret are registered. Inspect with `fly logs -a mcbuse-api`.
+- **Mobile build can't reach API** — `EXPO_PUBLIC_API_BASE_URL` must be your LAN IP for physical devices, or `10.0.2.2` for Android emulator, or `localhost` only for iOS simulator. The app also auto-detects the Metro host in dev.
+- **Drizzle migrations out of sync** — `pnpm --filter api db:generate` then commit the new SQL file alongside the schema change.
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+## Tech notes
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+- Authentication: JWT (access + refresh), optional phone OTP (Twilio or mock).
+- Wallets: custodial — keypairs encrypted with `SOLANA_KEYPAIR_ENCRYPTION_KEY` at rest.
+- Ledger: double-entry, stored in Postgres. Solana settlement happens behind the API.
+- On/off-ramp: provider-agnostic adapter pattern in `apps/api/src/onramp/` and `apps/api/src/offramp/`. Switch defaults via `ONRAMP_PROVIDER` / `OFFRAMP_PROVIDER`.
+- Mobile state: React Query for server state, Zustand for app state, repository pattern per feature.
