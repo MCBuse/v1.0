@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { OffRampService } from './offramp.service';
 import { OffRampController } from './offramp.controller';
+import { StripeConnectCallbackController } from './stripe-connect-callback.controller';
 import { OfframpSessionsService } from './offramp-sessions.service';
 import { OfframpSolanaDepositService } from './offramp-solana-deposit.service';
 import { MoonpayOfframpProvider } from './moonpay-offramp.provider';
@@ -52,7 +53,7 @@ import { StripeModule } from '../stripe/stripe.module';
     MoonpayOfframpProvider,
     VerifiedEmailGuard,
   ],
-  controllers: [OffRampController],
+  controllers: [OffRampController, StripeConnectCallbackController],
   exports: [OfframpSessionsService, MoonpayOfframpProvider, StripeOfframpProvider],
 })
 export class OffRampModule {}
