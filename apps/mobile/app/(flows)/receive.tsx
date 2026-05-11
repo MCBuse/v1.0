@@ -25,7 +25,7 @@ export default function ReceiveScreen() {
 
   useEffect(() => {
     createRequest({ type: 'static' });
-  }, []);
+  }, [createRequest]);
 
   const routineAddress = wallets.data?.routine?.solanaPubkey ?? '';
   const isLoading      = isPending || wallets.isLoading;
@@ -186,7 +186,11 @@ export default function ReceiveScreen() {
 
       {/* Share button */}
       {data && !isLoading && (
-        <Box paddingHorizontal="2xl" marginTop="m">
+        <Box paddingHorizontal="2xl" marginTop="m" gap="m">
+          <Button
+            label="Create Invoice QR"
+            onPress={() => router.push('/(flows)/invoice' as any)}
+          />
           <Button
             label="Share QR Code"
             onPress={handleShare}

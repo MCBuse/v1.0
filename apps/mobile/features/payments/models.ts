@@ -28,6 +28,12 @@ export const executePaymentInput = z.object({
 });
 export type ExecutePaymentInput = z.infer<typeof executePaymentInput>;
 
+export const cancelPaymentRequestResponse = z.object({
+  id:     z.string(),
+  status: z.literal('cancelled'),
+});
+export type CancelPaymentRequestResponse = z.infer<typeof cancelPaymentRequestResponse>;
+
 export const executeUsernamePaymentInput = z.object({
   username: z.string(),
   amount:   z.string(),

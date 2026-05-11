@@ -7,6 +7,7 @@ import {
   ArrowSwapHorizontal,
   Bank,
   Notification,
+  ReceiptText,
   Scan,
   Send2,
   TransactionMinus,
@@ -54,6 +55,7 @@ type QuickAction = {
 const QUICK_ACTIONS: QuickAction[] = [
   { Icon: Send2, label: "Send", route: "/(flows)/send", primary: true },
   { Icon: ArrowCircleDown, label: "Receive", route: "/(flows)/receive" },
+  { Icon: ReceiptText, label: "Invoice", route: "/(flows)/invoice" },
   { Icon: Scan, label: "Scan", route: "/(flows)/scan" },
   { Icon: AddCircle, label: "Top Up", route: "/(flows)/top-up" },
 ];
@@ -641,9 +643,9 @@ const styles = StyleSheet.create({
   },
 
   actionBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
+    width: 54,
+    height: 54,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },

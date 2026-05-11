@@ -39,10 +39,12 @@ function devServerApiBaseUrl(): string | undefined {
   return host ? `http://${host}:${API_PORT}/${API_PREFIX}` : undefined;
 }
 
+const inferredDevBaseUrl = __DEV__ ? devServerApiBaseUrl() : undefined;
+
 const apiBaseUrl =
+  inferredDevBaseUrl ??
   normalizeBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL) ??
   normalizeBaseUrl(extra.apiBaseUrl) ??
-  devServerApiBaseUrl() ??
   FALLBACK_BASE_URL;
 
 export const env = {

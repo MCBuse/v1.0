@@ -1,10 +1,12 @@
 import { http } from '@/lib/api';
 
 import {
+  cancelPaymentRequestResponse,
   executePaymentResponse,
   onRampResponse,
   paymentRequest,
   resolveResponse,
+  type CancelPaymentRequestResponse,
   type CreatePaymentRequestInput,
   type ExecutePaymentInput,
   type ExecutePaymentResponse,
@@ -19,6 +21,16 @@ export const paymentRepository = {
   async createPaymentRequest(input: CreatePaymentRequestInput): Promise<PaymentRequest> {
     const raw = await http.post<unknown>('/payment-requests', input);
     return paymentRequest.parse(raw);
+  },
+
+  async getPaymentRequest(id: string): Promise<PaymentRequest> {
+    const raw = await http.get<unknown>(`/payment-requests/${id}`);
+    return paymentRequest.parse(raw);
+  },
+
+  async cancelPaymentRequest(id: string): Promise<CancelPaymentRequestResponse> {
+    const raw = await http.post<unknown>(`/payment-requests/${id}/cancel`);
+    return cancelPaymentRequestResponse.parse(raw);
   },
 
   async resolveNonce(nonce: string): Promise<ResolveResponse> {

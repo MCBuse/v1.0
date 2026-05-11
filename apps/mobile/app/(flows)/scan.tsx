@@ -1,194 +1,373 @@
 import { useTheme } from '@shopify/restyle';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { CloseCircle, ScanBarcode } from 'iconsax-react-native';
+import { CloseCircle, ScanBarcode, TickCircle } from 'iconsax-react-native';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Box, Button, Text } from '@/components/ui';
-import { useResolvePaymentRequest, type ResolveResponse } from '@/features/payments';
+import { Avatar, Box, Button, NumPad, Text } from '@/components/ui';
+import { useExecutePayment, useResolvePaymentRequest } from '@/features/payments';
+import type { ResolveResponse } from '@/features/payments';
+import { formatAmount, toBaseUnits } from '@/lib/format';
 import type { Theme } from '@/theme';
 
-const FRAME_SIZE   = 248;
-const CORNER_SIZE  = 28;
-const CORNER_WIDTH = 3;
+type Currency = 'USDC' | 'EURC';
+type Step = 'scan' | 'review' | 'amount' | 'success';
 
-function parseNonce(raw: string): string | null {
+const CENT_BASE_UNITS = 10_000n;
+
+function extractNonce(qrData: string): string | null {
   try {
-    const url = new URL(raw);
-    return url.searchParams.get('nonce');
+    const url = new URL(qrData);
+    const nonce = url.searchParams.get('nonce');
+    if (nonce) return nonce;
   } catch {
-    return null;
+    // Fall through to regex parsing for raw payloads.
   }
+
+  const match = qrData.match(/[?&]nonce=([0-9a-f-]{36})/i);
+  if (match?.[1]) return match[1];
+  if (/^[0-9a-f-]{36}$/i.test(qrData)) return qrData;
+  return null;
 }
 
-function CornerMarkers() {
-  return (
-    <>
-      {/* Top-left */}
-      <View style={[styles.corner, styles.cornerTL]} />
-      {/* Top-right */}
-      <View style={[styles.corner, styles.cornerTR]} />
-      {/* Bottom-left */}
-      <View style={[styles.corner, styles.cornerBL]} />
-      {/* Bottom-right */}
-      <View style={[styles.corner, styles.cornerBR]} />
-    </>
-  );
+function displayName(req: ResolveResponse): string {
+  return req.recipient.displayName || `@${req.recipient.username}`;
+}
+
+function isCentAmount(baseUnits: string): boolean {
+  const amount = BigInt(baseUnits);
+  return amount >= CENT_BASE_UNITS && amount % CENT_BASE_UNITS === 0n;
 }
 
 export default function ScanScreen() {
   const { colors } = useTheme<Theme>();
-  const insets     = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
+
   const [permission, requestPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState(false);
-  const resolving = useRef(false);
+  const [step, setStep] = useState<Step>('scan');
+  const [resolving, setResolving] = useState(false);
+  const [paymentReq, setPaymentReq] = useState<ResolveResponse | null>(null);
+  const [amount, setAmount] = useState('0');
+  const [currency, setCurrency] = useState<Currency>('USDC');
 
-  const { mutate: resolve, isPending, error, reset } = useResolvePaymentRequest();
+  const scannedRef = useRef(false);
+  const resolve = useResolvePaymentRequest();
+  const execute = useExecutePayment();
 
-  const handleBarcode = useCallback(
-    ({ data }: { data: string }) => {
-      if (scanned || resolving.current) return;
+  const handleBarcode = useCallback(async ({ data }: { data: string }) => {
+    if (scannedRef.current || resolving) return;
 
-      const nonce = parseNonce(data);
-      if (!nonce) return;
+    const nonce = extractNonce(data);
+    if (!nonce) return;
 
-      resolving.current = true;
-      setScanned(true);
+    scannedRef.current = true;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setResolving(true);
 
-      resolve(nonce, {
-        onSuccess: (resolved: ResolveResponse) => {
-          router.push(
-            `/(flows)/send/confirm?nonce=${encodeURIComponent(resolved.nonce)}&amount=${encodeURIComponent(resolved.amount ?? '')}&currency=${encodeURIComponent(resolved.currency ?? '')}&recipientAddress=${encodeURIComponent(resolved.creatorWallet.solanaPubkey)}&isStatic=${resolved.type === 'static' ? 'true' : 'false'}`,
-          );
-        },
-        onError: () => {
-          resolving.current = false;
-        },
-      });
-    },
-    [scanned, resolve],
-  );
+    try {
+      const req = await resolve.mutateAsync(nonce);
+      setPaymentReq(req);
+      setStep(req.type === 'dynamic' ? 'review' : 'amount');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'This QR code could not be recognised.';
+      Alert.alert('Invalid QR', message, [
+        { text: 'OK', onPress: () => { scannedRef.current = false; } },
+      ]);
+    } finally {
+      setResolving(false);
+    }
+  }, [resolving, resolve]);
 
-  const handleRetry = () => {
-    setScanned(false);
-    resolving.current = false;
-    reset();
-  };
+  const handlePay = useCallback(async () => {
+    if (!paymentReq) return;
 
-  if (!permission) {
+    const staticAmount = toBaseUnits(amount);
+    if (paymentReq.type === 'static' && !isCentAmount(staticAmount)) {
+      Alert.alert('Check amount', 'Enter at least 0.01.');
+      return;
+    }
+
+    try {
+      const input =
+        paymentReq.type === 'static'
+          ? { nonce: paymentReq.nonce, amount: staticAmount, currency }
+          : { nonce: paymentReq.nonce };
+      await execute.mutateAsync(input);
+      setStep('success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      Alert.alert('Payment Failed', message);
+    }
+  }, [paymentReq, amount, currency, execute]);
+
+  const resetScan = useCallback(() => {
+    scannedRef.current = false;
+    setStep('scan');
+    setPaymentReq(null);
+    setAmount('0');
+    resolve.reset();
+    execute.reset();
+  }, [execute, resolve]);
+
+  if (!permission) return <View style={styles.dark} />;
+
+  if (!permission.granted) {
     return (
-      <View style={[styles.center, { backgroundColor: '#000' }]}>
-        <ActivityIndicator color="#fff" />
+      <View style={[styles.screen, { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
+        <Box flex={1} alignItems="center" justifyContent="center" gap="xl" paddingHorizontal="2xl">
+          <ScanBarcode size={64} color={colors.textTertiary} variant="Linear" />
+          <Box alignItems="center" gap="s">
+            <Text variant="h2">Camera Access</Text>
+            <Text variant="body" color="textSecondary" style={styles.centered}>
+              We need camera access to scan QR codes.
+            </Text>
+          </Box>
+          <Box style={{ width: '100%' }} gap="m">
+            <Button label="Allow Camera" onPress={requestPermission} />
+            <Button label="Go Back" variant="secondary" onPress={() => router.back()} />
+          </Box>
+        </Box>
       </View>
     );
   }
 
-  if (!permission.granted) {
-    return (
-      <View
-        style={[
-          styles.center,
-          { backgroundColor: '#000', paddingBottom: insets.bottom + 24 },
-        ]}
-      >
-        <Pressable
-          onPress={() => router.back()}
-          style={[styles.closeBtn, { top: insets.top + 8 }]}
-        >
-          <CloseCircle size={24} color="#fff" variant="Linear" />
-        </Pressable>
+  if (step === 'success' && paymentReq) {
+    const paidAmount = paymentReq.type === 'dynamic' && paymentReq.amount
+      ? formatAmount(paymentReq.amount, paymentReq.currency ?? undefined)
+      : formatAmount(toBaseUnits(amount), currency);
 
-        <ScanBarcode size={56} color="#fff" variant="Linear" />
-        <Box gap="m" alignItems="center" marginTop="xl" paddingHorizontal="3xl">
-          <Text variant="h3" style={{ color: '#fff', textAlign: 'center' }}>
-            Camera access required
-          </Text>
-          <Text variant="caption" style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
-            Allow camera access to scan QR codes and send payments.
-          </Text>
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 8 }]}>
+        <Box flex={1} alignItems="center" justifyContent="center" gap="xl" paddingHorizontal="2xl">
+          <Box
+            width={80}
+            height={80}
+            borderRadius="full"
+            backgroundColor="bgSecondary"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <TickCircle size={44} color={colors.textPrimary} variant="Bold" />
+          </Box>
+          <Box alignItems="center" gap="s">
+            <Text variant="h2">Payment Sent</Text>
+            <Text variant="body" color="textSecondary" style={styles.centered}>
+              {paidAmount} sent to {displayName(paymentReq)}.
+            </Text>
+          </Box>
+          <Box style={{ width: '100%' }} gap="m">
+            <Button label="Done" onPress={() => router.back()} />
+            <Button label="Scan Another" variant="secondary" onPress={resetScan} />
+          </Box>
         </Box>
-        <Box marginTop="3xl" paddingHorizontal="2xl" style={{ width: '100%' }}>
-          <Button label="Allow Camera" onPress={requestPermission} />
+      </View>
+    );
+  }
+
+  if (step === 'amount' && paymentReq) {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 8 }]}>
+        <Box
+          flexDirection="row"
+          alignItems="center"
+          justifyContent="space-between"
+          paddingHorizontal="2xl"
+          marginBottom="xl"
+        >
+          <Text variant="h2">Enter Amount</Text>
+          <Pressable onPress={resetScan} hitSlop={12}>
+            <CloseCircle size={28} color={colors.textSecondary} variant="Linear" />
+          </Pressable>
+        </Box>
+
+        <Box flexDirection="row" alignItems="center" gap="m" paddingHorizontal="2xl" marginBottom="l">
+          <Avatar name={displayName(paymentReq)} size="md" />
+          <Box flex={1} gap="xs">
+            <Text variant="captionMedium" color="textSecondary">Paying to</Text>
+            <Text variant="bodySemibold" numberOfLines={1}>
+              {displayName(paymentReq)}
+            </Text>
+            <Text variant="caption" color="textTertiary">@{paymentReq.recipient.username}</Text>
+          </Box>
+        </Box>
+
+        <Box flexDirection="row" gap="s" paddingHorizontal="2xl" marginBottom="m">
+          {(['USDC', 'EURC'] as Currency[]).map((c) => (
+            <Pressable
+              key={c}
+              onPress={() => setCurrency(c)}
+              style={[
+                styles.currencyChip,
+                {
+                  backgroundColor: currency === c ? colors.brand : colors.bgSecondary,
+                  borderColor:     currency === c ? colors.brand : colors.borderDefault,
+                },
+              ]}
+            >
+              <Text
+                variant="captionMedium"
+                style={{ color: currency === c ? colors.textInverse : colors.textPrimary }}
+              >
+                {c === 'EURC' ? 'EUR' : 'USD'}
+              </Text>
+            </Pressable>
+          ))}
+        </Box>
+
+        <Box flex={1}>
+          <NumPad
+            amount={amount}
+            onAmountChange={setAmount}
+            currency={currency === 'EURC' ? '€' : '$'}
+            primaryAction={{
+              label: execute.isPending ? 'Sending...' : 'Pay',
+              onPress: handlePay,
+            }}
+          />
+        </Box>
+      </View>
+    );
+  }
+
+  if (step === 'review' && paymentReq) {
+    const displayAmt = paymentReq.amount
+      ? formatAmount(paymentReq.amount, paymentReq.currency ?? undefined)
+      : '-';
+    const items = paymentReq.lineItems ?? [];
+    const hasItems = items.length > 0;
+
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 8 }]}>
+        <Box
+          flexDirection="row"
+          alignItems="center"
+          justifyContent="space-between"
+          paddingHorizontal="2xl"
+          marginBottom="xl"
+        >
+          <Text variant="h2">Confirm Payment</Text>
+          <Pressable onPress={resetScan} hitSlop={12}>
+            <CloseCircle size={28} color={colors.textSecondary} variant="Linear" />
+          </Pressable>
+        </Box>
+
+        <ScrollView
+          contentContainerStyle={[styles.reviewContent, { paddingBottom: insets.bottom + 16 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Box flexDirection="row" alignItems="center" gap="m" marginBottom="l">
+            <Avatar name={displayName(paymentReq)} size="lg" />
+            <Box flex={1} gap="xs">
+              <Text variant="captionMedium" color="textSecondary">Paying to</Text>
+              <Text variant="bodySemibold" numberOfLines={1}>
+                {displayName(paymentReq)}
+              </Text>
+              <Text variant="caption" color="textTertiary">@{paymentReq.recipient.username}</Text>
+            </Box>
+          </Box>
+
+          <Box
+            backgroundColor="bgSecondary"
+            borderRadius="2xl"
+            padding="2xl"
+            alignItems="center"
+            gap="xs"
+            marginBottom="l"
+          >
+            <Text variant="caption" color="textSecondary">You are paying</Text>
+            <Text variant="display">{displayAmt}</Text>
+            {paymentReq.description && (
+              <Text variant="caption" color="textSecondary" style={styles.centered}>
+                {paymentReq.description}
+              </Text>
+            )}
+          </Box>
+
+          {hasItems && (
+            <Box
+              backgroundColor="bgSecondary"
+              borderRadius="l"
+              padding="l"
+              gap="s"
+              marginBottom="l"
+            >
+              <Text variant="captionMedium" color="textSecondary" marginBottom="xs">
+                Items
+              </Text>
+              {items.map((it, idx) => {
+                const lineBase = (BigInt(it.unitAmount) * BigInt(it.quantity)).toString();
+                return (
+                  <Box key={`${it.name}_${idx}`} flexDirection="row" justifyContent="space-between" gap="m">
+                    <Text variant="body" style={styles.itemName} numberOfLines={1}>
+                      {it.quantity} x {it.name}
+                    </Text>
+                    <Text variant="bodyMedium">
+                      {formatAmount(lineBase, paymentReq.currency ?? undefined)}
+                    </Text>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </ScrollView>
+
+        <Box gap="m" paddingHorizontal="2xl" paddingTop="m" style={{ paddingBottom: insets.bottom + 12 }}>
+          <Button
+            label={execute.isPending ? 'Sending...' : 'Confirm & Pay'}
+            loading={execute.isPending}
+            onPress={handlePay}
+          />
+          <Button label="Cancel" variant="secondary" onPress={resetScan} />
         </Box>
       </View>
     );
   }
 
   return (
-    <View style={styles.root}>
+    <View style={styles.dark}>
       <CameraView
-        style={StyleSheet.absoluteFill}
+        style={StyleSheet.absoluteFillObject}
         facing="back"
-        onBarcodeScanned={scanned && !error ? undefined : handleBarcode}
+        onBarcodeScanned={resolving ? undefined : handleBarcode}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
       />
 
-      {/* Dimmed overlay — hole punched by the frame */}
-      <View style={styles.overlay} pointerEvents="none">
-        <View style={styles.overlayTop} />
-        <View style={styles.overlayMiddle}>
-          <View style={styles.overlaySide} />
-          <View style={styles.frameClear} />
-          <View style={styles.overlaySide} />
+      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.closeBtn}
+          hitSlop={12}
+        >
+          <CloseCircle size={32} color="#fff" variant="Linear" />
+        </Pressable>
+        <Text variant="h3" style={styles.white}>Scan QR to Pay</Text>
+        <View style={styles.closeBtn} />
+      </View>
+
+      <View style={styles.finderWrapper} pointerEvents="none">
+        <View style={styles.finder}>
+          <View style={[styles.corner, styles.topLeft]} />
+          <View style={[styles.corner, styles.topRight]} />
+          <View style={[styles.corner, styles.bottomLeft]} />
+          <View style={[styles.corner, styles.bottomRight]} />
         </View>
-        <View style={styles.overlayBottom} />
       </View>
 
-      {/* Corner markers */}
-      <View style={styles.frameContainer} pointerEvents="none">
-        <View style={styles.frameArea}>
-          <CornerMarkers />
-        </View>
-      </View>
-
-      {/* Close button */}
-      <Pressable
-        onPress={() => router.back()}
-        style={[styles.closeBtn, { top: insets.top + 8 }]}
-      >
-        <CloseCircle size={24} color="#fff" variant="Linear" />
-      </Pressable>
-
-      {/* Top label */}
-      <View style={[styles.topLabel, { top: insets.top + 60 }]}>
-        <Text variant="h3" style={{ color: '#fff', textAlign: 'center' }}>
-          Scan QR Code
-        </Text>
-        <Text variant="caption" style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: 4 }}>
-          Align the code within the frame
-        </Text>
-      </View>
-
-      {/* Bottom status area */}
-      <View style={[styles.bottom, { paddingBottom: insets.bottom + 24 }]}>
-        {isPending && (
-          <Box alignItems="center" gap="s">
-            <ActivityIndicator color="#fff" />
-            <Text variant="caption" style={{ color: 'rgba(255,255,255,0.8)' }}>
-              Resolving payment…
-            </Text>
-          </Box>
-        )}
-
-        {error && (
-          <Box alignItems="center" gap="m" paddingHorizontal="2xl">
-            <Text
-              variant="captionMedium"
-              style={{ color: '#F87171', textAlign: 'center' }}
-            >
-              {error.kind === 'not-found'
-                ? 'This QR code has expired or is invalid.'
-                : error.message}
-            </Text>
-            <Button label="Scan again" variant="secondary" onPress={handleRetry} />
-          </Box>
-        )}
-
-        {!isPending && !error && (
-          <Text variant="caption" style={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
-            Point your camera at a MCBuse QR code
+      <View style={[styles.bottomHint, { paddingBottom: insets.bottom + 24 }]}>
+        {resolving ? (
+          <Text variant="body" style={styles.dimWhite}>Reading...</Text>
+        ) : (
+          <Text variant="caption" style={styles.dimWhite}>
+            Point your camera at a payment QR code
           </Text>
         )}
       </View>
@@ -197,106 +376,92 @@ export default function ScanScreen() {
 }
 
 const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#000' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  closeBtn: {
-    position:       'absolute',
-    left:           20,
-    width:          40,
-    height:         40,
-    alignItems:     'center',
-    justifyContent: 'center',
-    zIndex:         10,
+  screen: { flex: 1 },
+  dark:   { flex: 1, backgroundColor: '#000' },
+  centered: {
+    textAlign: 'center',
   },
-
-  // Dimmed overlay with transparent hole
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  overlayTop: {
-    flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  overlayMiddle: {
+  topBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 10,
     flexDirection: 'row',
-    height:        FRAME_SIZE,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
   },
-  overlaySide: {
-    flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  frameClear: {
-    width:  FRAME_SIZE,
-    height: FRAME_SIZE,
-  },
-  overlayBottom: {
-    flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-
-  // Corner markers container
-  frameContainer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems:     'center',
+  closeBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  frameArea: {
-    width:    FRAME_SIZE,
-    height:   FRAME_SIZE,
+  white: { color: '#fff' },
+  finderWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  finder: {
+    width: 250,
+    height: 250,
     position: 'relative',
   },
-
-  // Corner marker base
   corner: {
-    position:    'absolute',
-    width:       CORNER_SIZE,
-    height:      CORNER_SIZE,
+    position: 'absolute',
+    width: 34,
+    height: 34,
     borderColor: '#fff',
   },
-  cornerTL: {
-    top:         0,
-    left:        0,
-    borderTopWidth:  CORNER_WIDTH,
-    borderLeftWidth: CORNER_WIDTH,
-    borderTopLeftRadius: 6,
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 12,
   },
-  cornerTR: {
-    top:         0,
-    right:       0,
-    borderTopWidth:   CORNER_WIDTH,
-    borderRightWidth: CORNER_WIDTH,
-    borderTopRightRadius: 6,
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 12,
   },
-  cornerBL: {
-    bottom:      0,
-    left:        0,
-    borderBottomWidth: CORNER_WIDTH,
-    borderLeftWidth:   CORNER_WIDTH,
-    borderBottomLeftRadius: 6,
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 12,
   },
-  cornerBR: {
-    bottom:      0,
-    right:       0,
-    borderBottomWidth: CORNER_WIDTH,
-    borderRightWidth:  CORNER_WIDTH,
-    borderBottomRightRadius: 6,
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 12,
   },
-
-  topLabel: {
-    position:   'absolute',
-    left:       0,
-    right:      0,
+  bottomHint: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
+    paddingHorizontal: 24,
   },
-
-  bottom: {
-    position:   'absolute',
-    bottom:     0,
-    left:       0,
-    right:      0,
-    alignItems: 'center',
-    gap:        12,
-    paddingTop: 16,
+  dimWhite: {
+    color: 'rgba(255,255,255,0.72)',
+    textAlign: 'center',
   },
+  currencyChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 99,
+    borderWidth: 1,
+  },
+  reviewContent: {
+    paddingHorizontal: 24,
+  },
+  itemName: { flex: 1 },
 });
