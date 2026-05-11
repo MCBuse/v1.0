@@ -594,6 +594,7 @@ const styles = StyleSheet.create({
   cardsContainer: {
     paddingHorizontal: 24,
     paddingVertical: 4,
+    alignItems: 'flex-start',
   },
   balanceCard: {
     borderRadius: 28,
