@@ -45,10 +45,11 @@ export class CreatePaymentRequestDto {
   type: string;
 
   @ApiPropertyOptional({
-    description: 'Required for dynamic. Amount in base units (6 decimals). E.g. "5000000" = 5 USDC',
+    description:
+      'Amount in base units (6 decimals). Required for amount-only dynamic requests. Omit when lineItems are provided.',
     example: '5000000',
   })
-  @ValidateIf((o) => o.type === 'dynamic' || o.amount !== undefined)
+  @ValidateIf((o) => o.amount !== undefined)
   @IsString()
   @Matches(/^\d+$/, { message: 'amount must be a non-negative integer string' })
   amount?: string;
