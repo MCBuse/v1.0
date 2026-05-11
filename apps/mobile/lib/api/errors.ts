@@ -16,21 +16,21 @@ export type ApiErrorKind =
   | 'unknown';
 
 export class ApiError extends Error {
-  readonly kind:        ApiErrorKind;
-  readonly status?:     number;
+  readonly kind: ApiErrorKind;
+  readonly status?: number;
   readonly fieldErrors?: Record<string, string>;
 
   constructor(params: {
-    kind:         ApiErrorKind;
-    message:      string;
-    status?:      number;
+    kind: ApiErrorKind;
+    message: string;
+    status?: number;
     fieldErrors?: Record<string, string>;
-    cause?:       unknown;
+    cause?: unknown;
   }) {
     super(params.message);
-    this.name        = 'ApiError';
-    this.kind        = params.kind;
-    this.status      = params.status;
+    this.name = 'ApiError';
+    this.kind = params.kind;
+    this.status = params.status;
     this.fieldErrors = params.fieldErrors;
     if (params.cause !== undefined) {
       (this as { cause?: unknown }).cause = params.cause;
@@ -40,8 +40,8 @@ export class ApiError extends Error {
 
 type ErrorBody = {
   message?: string | string[];
-  error?:   string;
-  errors?:  Record<string, string> | { property: string; message: string }[];
+  error?: string;
+  errors?: Record<string, string> | { property: string; message: string }[];
 };
 
 /**
@@ -53,40 +53,39 @@ export function toApiError(err: unknown): ApiError {
 
   if (!axios.isAxiosError(err)) {
     return new ApiError({
-      kind:    'unknown',
+      kind: 'unknown',
       message: err instanceof Error ? err.message : 'Something went wrong.',
-      cause:   err,
+      cause: err,
     });
   }
 
   const axErr = err as AxiosError<ErrorBody>;
-
   if (!axErr.response) {
     return new ApiError({
-      kind:    'network',
+      kind: 'network',
       message: 'Can’t reach the server. Check your connection and try again.',
-      cause:   axErr,
+      cause: axErr,
     });
   }
 
   const status = axErr.response.status;
-  const body   = axErr.response.data;
+  const body = axErr.response.data;
 
   const kind: ApiErrorKind =
-    status === 401                  ? 'unauthorized'
-    : status === 403                ? 'forbidden'
-    : status === 404                ? 'not-found'
-    : status === 409                ? 'conflict'
-    : status === 400 || status === 422 ? 'validation'
-    : status === 429                ? 'rate-limited'
-    : status >= 500                 ? 'server'
-    : 'unknown';
+    status === 401 ? 'unauthorized'
+      : status === 403 ? 'forbidden'
+        : status === 404 ? 'not-found'
+          : status === 409 ? 'conflict'
+            : status === 400 || status === 422 ? 'validation'
+              : status === 429 ? 'rate-limited'
+                : status >= 500 ? 'server'
+                  : 'unknown';
 
   const messageRaw = body?.message;
-  const message    =
+  const message =
     Array.isArray(messageRaw) ? messageRaw[0] ?? 'Request failed.'
-    : typeof messageRaw === 'string' ? messageRaw
-    : body?.error ?? fallbackMessageFor(kind);
+      : typeof messageRaw === 'string' ? messageRaw
+        : body?.error ?? fallbackMessageFor(kind);
 
   const fieldErrors = extractFieldErrors(body);
 
@@ -96,13 +95,13 @@ export function toApiError(err: unknown): ApiError {
 function fallbackMessageFor(kind: ApiErrorKind): string {
   switch (kind) {
     case 'unauthorized': return 'Please sign in again.';
-    case 'forbidden':    return 'You don’t have permission to do that.';
-    case 'not-found':    return 'We couldn’t find that.';
-    case 'conflict':     return 'That conflicts with something that already exists.';
-    case 'validation':   return 'Please check the details and try again.';
+    case 'forbidden': return 'You don’t have permission to do that.';
+    case 'not-found': return 'We couldn’t find that.';
+    case 'conflict': return 'That conflicts with something that already exists.';
+    case 'validation': return 'Please check the details and try again.';
     case 'rate-limited': return 'Too many attempts. Please wait a moment.';
-    case 'server':       return 'Server error. Please try again.';
-    default:             return 'Something went wrong.';
+    case 'server': return 'Server error. Please try again.';
+    default: return 'Something went wrong.';
   }
 }
 

@@ -6,9 +6,10 @@ export const users = pgTable('users', {
   phone: varchar('phone', { length: 20 }).unique(),
   username: varchar('username', { length: 30 }).notNull().unique(),
   primaryCurrency: varchar('primary_currency', { length: 10 }).default('USDC').notNull(),
-  firstName: varchar('first_name', { length: 100 }).notNull(),
-  lastName: varchar('last_name', { length: 100 }).notNull(),
+  firstName: varchar('first_name', { length: 100 }),
+  lastName: varchar('last_name', { length: 100 }),
   passwordHash: text('password_hash'),
+  privyUserId: varchar('privy_user_id', { length: 100 }).unique(),
   isEmailVerified: boolean('is_email_verified').default(false).notNull(),
   isPhoneVerified: boolean('is_phone_verified').default(false).notNull(),
   pendingPhone: varchar('pending_phone', { length: 20 }), // phone awaiting OTP verification
