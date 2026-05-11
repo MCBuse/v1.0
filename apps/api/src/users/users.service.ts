@@ -132,6 +132,7 @@ export class UsersService {
           firstName: data.firstName,
           lastName: data.lastName,
           phone: data.phone ?? null,
+          isEmailVerified: true,
         })
         .returning({
           id: schema.users.id,
