@@ -2,6 +2,10 @@
 
 Stablecoin-native payment app built on Solana. Custodial dual-wallet model (Routine + Holding), fiat on/off-ramps via Stripe and MoonPay, QR and NFC P2P payments, mobile-first.
 
+## Download & Test here
+- [iOS](https://testflight.apple.com/join/bEe7rw2b)
+- [Android](https://drive.google.com/drive/folders/157D7JMd9fJ3R5699YLho2795krfbabBH)
+
 ## Architecture
 
 Turborepo monorepo with pnpm workspaces.
