@@ -1,50 +1,55 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #faf7f2;
+  --color-surface: #ffffff;
+  --color-text: #1a1714;
+  --color-muted: #6b635a;
+  --color-subtle: #918879;
+  --color-border: #e8e2d8;
+  --color-border-strong: #d6cdbd;
+  --color-accent: #c9551a;
+  --color-accent-hover: #b14913;
+  --color-accent-soft: #fbefe6;
+  --color-success: #5c7a3a;
+  --color-success-soft: #ecf1e2;
+  --color-warning: #c28a1f;
+  --color-warning-soft: #fbf1da;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-card: 14px;
+  --shadow-card: 0 1px 0 rgba(26, 23, 20, 0.04), 0 8px 24px -12px rgba(26, 23, 20, 0.08);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.imgDark {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+@layer base {
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  .imgLight {
-    display: none;
+  body {
+    text-rendering: optimizeLegibility;
   }
-  .imgDark {
-    display: unset;
+
+  ::selection {
+    background: var(--color-accent-soft);
+    color: var(--color-accent-hover);
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
   }
 }
