@@ -3,46 +3,64 @@ import { DashboardCard, MockRow, MetricBlock } from "./DashboardMock";
 
 export function Hero() {
   return (
-    <section id="top" className="px-6 pb-20 pt-12 sm:px-10 md:pb-28 md:pt-20">
+    <section
+      id="top"
+      className="relative overflow-hidden px-6 pb-24 pt-16 sm:px-10 md:pb-32 md:pt-24"
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-0 top-0 h-[640px] w-[640px] -translate-y-1/4 translate-x-1/4 rounded-full bg-accent/5 blur-3xl"
+      />
       <div className="mx-auto w-full max-w-[1180px]">
-        <div className="grid items-center gap-14 md:grid-cols-[1.05fr_1fr] md:gap-12">
+        <div className="grid items-center gap-14 md:grid-cols-[1.1fr_1fr] md:gap-12">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-muted">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-70" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+              </span>
               Pilot live — Munich &amp; Berlin
             </span>
-            <h1 className="mt-5 text-[40px] font-semibold leading-[1.05] tracking-tight text-text sm:text-5xl md:text-[56px]">
-              Small payments.
+
+            <h1 className="mt-5 text-[42px] font-semibold leading-[1.04] tracking-[-0.04em] text-text sm:text-5xl md:text-[58px]">
+              Payment reconciliation
               <br />
-              Clear payouts.
+              infrastructure for
               <br />
-              <span className="text-accent">Better business records.</span>
+              <span className="text-accent">small merchants.</span>
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted">
-              MCBuse helps small merchants capture QR/NFC payments, track expected
-              payouts, spot exceptions, and understand daily sales activity — from
-              one simple dashboard.
+
+            <p className="mt-6 max-w-[460px] text-[17px] leading-relaxed text-muted">
+              MCBuse connects QR and NFC payments to expected payouts —
+              matching every transaction automatically and surfacing exceptions
+              the moment they happen.
             </p>
+
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <a
                 href={PILOT_FORM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-11 items-center rounded-full bg-accent px-6 text-sm font-medium text-bg transition-colors hover:bg-accent-hover"
+                className="inline-flex h-11 items-center rounded-full bg-accent px-6 text-sm font-semibold text-bg transition-colors hover:bg-accent-hover"
               >
                 Join the pilot
               </a>
               <a
                 href="#how-it-works"
-                className="inline-flex h-11 items-center gap-1.5 rounded-full border border-border bg-surface px-6 text-sm font-medium text-text transition-colors hover:border-border-strong"
+                className="inline-flex h-11 items-center gap-1.5 rounded-full border border-border px-6 text-sm font-medium text-muted transition-colors hover:border-border-strong hover:text-text"
               >
                 See how it works
                 <span aria-hidden>→</span>
               </a>
             </div>
-            <p className="mt-6 text-xs text-subtle">
-              Powered by licensed payment partners. No long-term contracts.
-            </p>
+
+            <div className="mt-8 flex items-center gap-5 border-t border-border pt-6">
+              <HeroStat value="23" label="transactions today" />
+              <div className="h-8 w-px bg-border" aria-hidden />
+              <HeroStat value="€847" label="expected payout" />
+              <div className="h-8 w-px bg-border" aria-hidden />
+              <HeroStat value="<2s" label="match latency" />
+            </div>
           </div>
 
           <HeroMock />
@@ -52,12 +70,23 @@ export function Hero() {
   );
 }
 
+function HeroStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="font-mono text-lg font-semibold tabular-nums text-text">
+        {value}
+      </span>
+      <span className="text-[12px] text-subtle">{label}</span>
+    </div>
+  );
+}
+
 function HeroMock() {
   return (
     <div className="relative">
       <div
         aria-hidden
-        className="absolute -inset-x-4 -bottom-6 -top-6 -z-10 rounded-[24px] bg-accent-soft/60 blur-2xl"
+        className="absolute -inset-4 -z-10 rounded-[28px] border border-accent/20 bg-accent/5"
       />
       <DashboardCard label="Today · Tue 23 May" meta="LIVE">
         <div className="grid grid-cols-2 divide-x divide-border/70 border-b border-border/70">
@@ -70,7 +99,6 @@ function HeroMock() {
             label="Expected payout"
             value="€847.20"
             hint="Settles Wed 24 May"
-            tone="default"
           />
         </div>
         <div>
@@ -103,7 +131,7 @@ function HeroMock() {
             tone="success"
           />
         </div>
-        <div className="flex items-center justify-between border-t border-border/70 bg-warning-soft/50 px-5 py-3">
+        <div className="flex items-center justify-between border-t border-border/70 bg-warning-soft px-5 py-3">
           <span className="text-[12px] font-medium text-warning">
             1 exception flagged
           </span>

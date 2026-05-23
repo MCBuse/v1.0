@@ -32,15 +32,15 @@ const benefits: Array<{ icon: ReactNode; title: string; body: string }> = [
 export function Benefits() {
   return (
     <Section eyebrow="What you get" title="Built for the operations of a small shop.">
-      <div className="grid gap-4 md:grid-cols-2">
-        {benefits.map((b) => (
+      <div className="grid gap-0 border border-border md:grid-cols-2">
+        {benefits.map((b, i) => (
           <div
             key={b.title}
-            className="flex items-start gap-4 rounded-[14px] border border-border bg-surface p-6"
+            className={`flex items-start gap-5 border-border p-7 transition-colors hover:bg-surface ${
+              i < benefits.length - 1 ? "border-b" : ""
+            } ${i % 2 === 0 && i < benefits.length - 1 ? "md:border-r" : ""}`}
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
-              {b.icon}
-            </div>
+            <div className="mt-0.5 shrink-0 text-accent">{b.icon}</div>
             <div>
               <h3 className="text-[15px] font-semibold text-text">{b.title}</h3>
               <p className="mt-1.5 text-[15px] leading-relaxed text-muted">

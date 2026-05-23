@@ -48,7 +48,7 @@ function EventCard({
   return (
     <div
       className={`rounded-[14px] border bg-surface p-6 ${
-        tone === "accent" ? "border-accent/40" : "border-border"
+        tone === "accent" ? "border-accent/30" : "border-border"
       }`}
     >
       <p

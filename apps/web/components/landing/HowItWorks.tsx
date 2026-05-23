@@ -35,26 +35,13 @@ export function HowItWorks() {
       eyebrow="How it works"
       title="Five quiet steps. One clear record."
     >
-      <ol className="grid gap-3 md:grid-cols-5">
-        {steps.map((s, i) => (
-          <li
-            key={s.n}
-            className="relative rounded-[14px] border border-border bg-surface p-5"
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] tracking-[0.14em] text-accent">
-                {s.n}
-              </span>
-              {i < steps.length - 1 && (
-                <span
-                  aria-hidden
-                  className="hidden text-border-strong md:inline"
-                >
-                  →
-                </span>
-              )}
-            </div>
-            <h3 className="mt-3 text-[15px] font-semibold text-text">
+      <ol className="relative grid gap-px bg-border md:grid-cols-5">
+        {steps.map((s) => (
+          <li key={s.n} className="bg-bg p-6 transition-colors hover:bg-surface">
+            <span className="font-mono text-[28px] font-semibold tabular-nums leading-none text-border-strong">
+              {s.n}
+            </span>
+            <h3 className="mt-4 text-[15px] font-semibold text-text">
               {s.title}
             </h3>
             <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">

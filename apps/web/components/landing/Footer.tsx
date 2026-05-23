@@ -6,10 +6,10 @@ export function Footer() {
       <div className="mx-auto w-full max-w-[1180px] px-6 py-12 sm:px-10">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="max-w-md">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span
                 aria-hidden
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-text text-[13px] font-semibold text-bg"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent text-[13px] font-bold text-bg"
               >
                 M
               </span>
@@ -20,6 +20,9 @@ export function Footer() {
             <p className="mt-4 text-[13px] leading-relaxed text-muted">
               MCBuse is not a bank or licensed payment institution. Regulated
               payment processing is handled by licensed partners.
+            </p>
+            <p className="mt-3 font-mono text-[11px] text-subtle">
+              Built on Solana
             </p>
           </div>
 

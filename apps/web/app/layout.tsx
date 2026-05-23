@@ -12,13 +12,13 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "MCBuse — Small payments. Clear payouts. Better business records.",
+  title: "MCBuse — Payment reconciliation infrastructure for small merchants.",
   description:
-    "MCBuse helps small merchants capture QR/NFC payments, track expected payouts, spot exceptions, and understand daily sales activity from one simple dashboard.",
+    "MCBuse connects QR and NFC payments to expected payouts — matching every transaction automatically and surfacing exceptions in real time. Piloting in Munich and Berlin.",
   openGraph: {
-    title: "MCBuse — Small payments. Clear payouts. Better business records.",
+    title: "MCBuse — Payment reconciliation infrastructure for small merchants.",
     description:
-      "Capture QR/NFC payments, track expected payouts, spot exceptions, and understand daily sales activity. Pilot now in Munich and Berlin.",
+      "Automated payout matching, exception detection, and real-time reconciliation for small merchants. Built on Solana. Piloting now in Germany.",
     type: "website",
   },
 };

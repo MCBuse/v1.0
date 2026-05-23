@@ -19,25 +19,28 @@ const criteria = [
 export function PilotFocus() {
   return (
     <Section id="pilot">
-      <div className="overflow-hidden rounded-[20px] border border-border bg-surface">
-        <div className="grid gap-10 p-8 md:grid-cols-[1.2fr_1fr] md:gap-12 md:p-12">
+      <div className="overflow-hidden rounded-[4px] border border-border">
+        <div className="border-b border-border bg-surface px-8 py-5 md:px-12">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-accent">
+            Pilot focus
+          </p>
+        </div>
+        <div className="grid gap-10 bg-bg p-8 md:grid-cols-[1.2fr_1fr] md:gap-12 md:p-12">
           <div>
-            <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-accent">
-              Pilot focus
-            </p>
             <h2 className="text-3xl font-semibold leading-[1.1] tracking-tight text-text sm:text-4xl">
               Built first for small merchants in Munich and Berlin.
             </h2>
             <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-muted">
-              We&apos;re piloting with a small group of shops with lots of little
-              transactions. If that sounds like you, we&apos;d love to talk.
+              We&apos;re piloting with a small group of shops with lots of
+              little transactions. If that sounds like you, we&apos;d love
+              to talk.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-2">
               {archetypes.map((a) => (
                 <span
                   key={a}
-                  className="rounded-full border border-border bg-bg px-3 py-1 text-[13px] text-muted"
+                  className="rounded-full border border-border px-3 py-1 text-[13px] text-subtle"
                 >
                   {a}
                 </span>
@@ -49,7 +52,7 @@ export function PilotFocus() {
                 href={PILOT_FORM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-11 items-center rounded-full bg-accent px-6 text-sm font-medium text-bg transition-colors hover:bg-accent-hover"
+                className="inline-flex h-11 items-center rounded-full bg-accent px-6 text-sm font-semibold text-bg transition-colors hover:bg-accent-hover"
               >
                 Join the pilot
               </a>
@@ -59,11 +62,11 @@ export function PilotFocus() {
             </div>
           </div>
 
-          <div className="rounded-[14px] border border-border bg-bg p-6">
+          <div className="rounded-[4px] border border-border bg-surface p-6">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">
               Good fit if you
             </p>
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-4 space-y-4">
               {criteria.map((c) => (
                 <li key={c} className="flex items-start gap-3">
                   <span

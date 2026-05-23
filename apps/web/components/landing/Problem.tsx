@@ -22,14 +22,17 @@ export function Problem() {
       eyebrow="The problem"
       title="Small payments happen fast. Records, payouts, and issues fall behind."
     >
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-px bg-border md:grid-cols-3">
         {problems.map((p) => (
           <div
             key={p.label}
-            className="rounded-[14px] border border-border bg-surface p-6 transition-colors hover:border-border-strong"
+            className="group bg-bg px-8 py-8 transition-colors hover:bg-surface"
           >
+            <div className="mb-4 h-px w-8 bg-accent transition-all group-hover:w-12" />
             <h3 className="text-[15px] font-semibold text-text">{p.label}</h3>
-            <p className="mt-2 text-[15px] leading-relaxed text-muted">{p.body}</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-muted">
+              {p.body}
+            </p>
           </div>
         ))}
       </div>

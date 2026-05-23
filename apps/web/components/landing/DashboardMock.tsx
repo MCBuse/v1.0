@@ -22,7 +22,7 @@ export function DashboardCard({
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-[14px] border border-border bg-surface shadow-[0_1px_0_rgba(26,23,20,0.04),0_18px_40px_-22px_rgba(26,23,20,0.18)] ${className ?? ""}`}
+      className={`overflow-hidden rounded-[14px] border border-border bg-surface shadow-[0_1px_0_rgba(255,240,220,0.04),0_24px_48px_-16px_rgba(0,0,0,0.7)] ${className ?? ""}`}
     >
       {(label || meta) && (
         <div className="flex items-center justify-between border-b border-border/70 px-5 py-3">
@@ -32,7 +32,7 @@ export function DashboardCard({
             </span>
           )}
           {meta && (
-            <span className="font-mono text-[11px] text-subtle">{meta}</span>
+            <span className="font-mono text-[11px] text-accent">{meta}</span>
           )}
         </div>
       )}
@@ -63,7 +63,10 @@ export function MockRow({
   return (
     <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 last:border-b-0">
       <div className="flex min-w-0 items-center gap-3">
-        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotTone}`} aria-hidden />
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotTone}`}
+          aria-hidden
+        />
         <span className="font-mono text-[11px] text-subtle">{time}</span>
         <span className="truncate text-sm text-text">{title}</span>
       </div>
@@ -73,7 +76,9 @@ export function MockRow({
             {status}
           </span>
         )}
-        <span className="font-mono text-sm tabular-nums text-text">{amount}</span>
+        <span className="font-mono text-sm tabular-nums text-text">
+          {amount}
+        </span>
       </div>
     </div>
   );

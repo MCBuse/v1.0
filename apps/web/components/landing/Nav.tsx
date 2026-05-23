@@ -2,12 +2,13 @@ import { PILOT_FORM_URL } from "./constants";
 
 export function Nav() {
   return (
-    <header className="sticky top-0 z-30 border-b border-border/70 bg-bg/85 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border bg-bg/90 backdrop-blur">
+      <div className="absolute inset-x-0 top-0 h-[1.5px] bg-accent opacity-80" />
       <div className="mx-auto flex h-16 w-full max-w-[1180px] items-center justify-between px-6 sm:px-10">
-        <a href="#top" className="flex items-center gap-2">
+        <a href="#top" className="flex items-center gap-2.5">
           <span
             aria-hidden
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-text text-[13px] font-semibold text-bg"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent text-[13px] font-bold text-bg"
           >
             M
           </span>
@@ -33,7 +34,7 @@ export function Nav() {
           href={PILOT_FORM_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-9 items-center rounded-full bg-text px-4 text-sm font-medium text-bg transition-colors hover:bg-accent"
+          className="inline-flex h-9 items-center rounded-full bg-accent px-4 text-sm font-medium text-bg transition-colors hover:bg-accent-hover"
         >
           Join the pilot
         </a>

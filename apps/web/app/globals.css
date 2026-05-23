@@ -1,26 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #faf7f2;
-  --color-surface: #ffffff;
-  --color-text: #1a1714;
-  --color-muted: #6b635a;
-  --color-subtle: #918879;
-  --color-border: #e8e2d8;
-  --color-border-strong: #d6cdbd;
+  --color-bg: #0d0b09;
+  --color-surface: #161310;
+  --color-text: #f2efe9;
+  --color-muted: #8a817a;
+  --color-subtle: #5c554e;
+  --color-border: #272219;
+  --color-border-strong: #3c352a;
   --color-accent: #c9551a;
   --color-accent-hover: #b14913;
-  --color-accent-soft: #fbefe6;
-  --color-success: #5c7a3a;
-  --color-success-soft: #ecf1e2;
-  --color-warning: #c28a1f;
-  --color-warning-soft: #fbf1da;
+  --color-accent-soft: #261408;
+  --color-success: #7faf48;
+  --color-success-soft: #162208;
+  --color-warning: #e0a020;
+  --color-warning-soft: #261b06;
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   --radius-card: 14px;
-  --shadow-card: 0 1px 0 rgba(26, 23, 20, 0.04), 0 8px 24px -12px rgba(26, 23, 20, 0.08);
+  --shadow-card: 0 1px 0 rgba(255, 240, 220, 0.04),
+    0 24px 48px -16px rgba(0, 0, 0, 0.7);
 }
 
 @layer base {
@@ -39,13 +40,13 @@
 
   ::selection {
     background: var(--color-accent-soft);
-    color: var(--color-accent-hover);
+    color: var(--color-accent);
   }
 
   h1,
   h2,
   h3 {
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
   }
 
   a {
