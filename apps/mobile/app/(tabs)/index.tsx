@@ -255,7 +255,12 @@ export default function HomeScreen() {
         style={{ marginBottom: 24 }}
         renderItem={({ item }) =>
           walletsQuery.isLoading ? (
-            <View style={[styles.cardSkeleton, { width: cardWidth }]} />
+            <View
+              style={[
+                styles.cardSkeleton,
+                { width: cardWidth, backgroundColor: colors.bgSecondary },
+              ]}
+            />
           ) : (
             <AccountCard card={item as AccountCardData} width={cardWidth} />
           )
@@ -464,10 +469,16 @@ function AccountCard({
   const { colors } = useTheme<Theme>();
   return (
     <View
-      style={[styles.balanceCard, { width, backgroundColor: colors.bgInverse }]}
+      style={[
+        styles.balanceCard,
+        { width, backgroundColor: colors.accountCardBg },
+      ]}
     >
       <View style={styles.accountHeader}>
-        <Text variant="h3" style={styles.accountTitle}>
+        <Text
+          variant="h3"
+          style={[styles.accountTitle, { color: colors.accountCardText }]}
+        >
           {card.title}
         </Text>
         {/* <View style={styles.currencyBadge}>
@@ -480,20 +491,28 @@ function AccountCard({
         </View> */}
       </View>
 
-      <View style={styles.divider} />
+      <View
+        style={[styles.divider, { backgroundColor: colors.accountCardDivider }]}
+      />
 
       <View style={styles.balanceRows}>
         {card.balances.map((balance) => (
           <View key={balance.currency} style={styles.balanceRow}>
             <View>
-              <Text variant="caption" style={styles.dimTextSm}>
+              <Text
+                variant="caption"
+                style={[
+                  styles.dimTextSm,
+                  { color: colors.accountCardMutedText },
+                ]}
+              >
                 {balance.label}
               </Text>
               {/* <Text variant="label" style={styles.assetCode}>
                 {balance.currency}
               </Text> */}
             </View>
-            <Text variant="h2" style={styles.rowBalance}>
+            <Text variant="h2" style={{ color: colors.accountCardText }}>
               {balance.symbol}
               {formatTokenAmount(balance.available)}
             </Text>
@@ -609,7 +628,6 @@ const styles = StyleSheet.create({
   cardSkeleton: {
     height: 168,
     borderRadius: 28,
-    backgroundColor: "#E5E7EB",
   },
   accountHeader: {
     flexDirection: "row",
@@ -617,7 +635,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
-  accountTitle: { color: "#fff", flex: 1 },
+  accountTitle: { flex: 1 },
   currencyBadge: {
     alignSelf: "flex-start",
     backgroundColor: "rgba(255,255,255,0.1)",
@@ -634,12 +652,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 16,
   },
-  dimTextSm: { color: "rgba(255,255,255,0.52)", fontSize: 12 },
+  dimTextSm: { fontSize: 12 },
   assetCode: { color: "rgba(255,255,255,0.42)", marginTop: 2 },
-  rowBalance: { color: "#fff" },
   divider: {
     height: 1,
-    backgroundColor: "rgba(255,255,255,0.12)",
     marginVertical: 16,
   },
 
