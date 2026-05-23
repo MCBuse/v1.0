@@ -24,7 +24,7 @@ export function Solution() {
 
         <EventCard
           label="Activity record"
-          tone="accent"
+          tone="highlight"
           rows={[
             ["amount", "€18.40"],
             ["expected payout", "Wed 24 May"],
@@ -43,17 +43,19 @@ function EventCard({
 }: {
   label: string;
   rows: Array<[string, string]>;
-  tone?: "default" | "accent";
+  tone?: "default" | "highlight";
 }) {
   return (
     <div
       className={`rounded-[14px] border bg-surface p-6 ${
-        tone === "accent" ? "border-accent/30" : "border-border"
+        tone === "highlight"
+          ? "border-white/20"
+          : "border-border"
       }`}
     >
       <p
         className={`text-[11px] font-medium uppercase tracking-[0.14em] ${
-          tone === "accent" ? "text-accent" : "text-subtle"
+          tone === "highlight" ? "text-text" : "text-subtle"
         }`}
       >
         {label}

@@ -22,7 +22,7 @@ export function DashboardCard({
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-[14px] border border-border bg-surface shadow-[0_1px_0_rgba(255,240,220,0.04),0_24px_48px_-16px_rgba(0,0,0,0.7)] ${className ?? ""}`}
+      className={`overflow-hidden rounded-[14px] border border-border bg-surface shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_48px_-16px_rgba(0,0,0,0.12)] ${className ?? ""}`}
     >
       {(label || meta) && (
         <div className="flex items-center justify-between border-b border-border/70 px-5 py-3">
@@ -32,7 +32,7 @@ export function DashboardCard({
             </span>
           )}
           {meta && (
-            <span className="font-mono text-[11px] text-accent">{meta}</span>
+            <span className="font-mono text-[11px] text-text">{meta}</span>
           )}
         </div>
       )}

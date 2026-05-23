@@ -9,7 +9,7 @@ export function Footer() {
             <div className="flex items-center gap-2.5">
               <span
                 aria-hidden
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent text-[13px] font-bold text-bg"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border-strong bg-surface text-[13px] font-bold text-text"
               >
                 M
               </span>

@@ -21,7 +21,7 @@ export function PilotFocus() {
     <Section id="pilot">
       <div className="overflow-hidden rounded-[4px] border border-border">
         <div className="border-b border-border bg-surface px-8 py-5 md:px-12">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-accent">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">
             Pilot focus
           </p>
         </div>
@@ -71,7 +71,7 @@ export function PilotFocus() {
                 <li key={c} className="flex items-start gap-3">
                   <span
                     aria-hidden
-                    className="mt-[7px] inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
+                    className="mt-[7px] inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-muted"
                   />
                   <span className="text-[14.5px] leading-relaxed text-text">
                     {c}

@@ -19,7 +19,7 @@ export function Section({ id, children, className, eyebrow, title, intro }: Prop
         {(eyebrow || title || intro) && (
           <div className="mb-12 max-w-2xl md:mb-16">
             {eyebrow && (
-              <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-accent">
+              <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-muted">
                 {eyebrow}
               </p>
             )}
@@ -29,9 +29,7 @@ export function Section({ id, children, className, eyebrow, title, intro }: Prop
               </h2>
             )}
             {intro && (
-              <p className="mt-4 text-lg leading-relaxed text-muted">
-                {intro}
-              </p>
+              <p className="mt-4 text-lg leading-relaxed text-muted">{intro}</p>
             )}
           </div>
         )}

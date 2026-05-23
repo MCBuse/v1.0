@@ -35,7 +35,7 @@ export function HowItWorks() {
       eyebrow="How it works"
       title="Five quiet steps. One clear record."
     >
-      <ol className="relative grid gap-px bg-border md:grid-cols-5">
+      <ol className="grid gap-px bg-border md:grid-cols-5">
         {steps.map((s) => (
           <li key={s.n} className="bg-bg p-6 transition-colors hover:bg-surface">
             <span className="font-mono text-[28px] font-semibold tabular-nums leading-none text-border-strong">

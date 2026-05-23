@@ -7,17 +7,25 @@ export function Hero() {
       id="top"
       className="relative overflow-hidden px-6 pb-24 pt-16 sm:px-10 md:pb-32 md:pt-24"
     >
+      {/* Animated background blobs */}
       <div
         aria-hidden
-        className="pointer-events-none absolute right-0 top-0 h-[640px] w-[640px] -translate-y-1/4 translate-x-1/4 rounded-full bg-accent/5 blur-3xl"
+        className="pointer-events-none absolute left-1/4 top-0 h-[700px] w-[700px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-black/[0.04] blur-[120px]"
+        style={{ animation: "blob-drift 22s ease-in-out infinite" }}
       />
-      <div className="mx-auto w-full max-w-[1180px]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-0 top-1/3 h-[500px] w-[500px] translate-x-1/3 rounded-full bg-black/[0.03] blur-[100px]"
+        style={{ animation: "blob-drift-alt 30s ease-in-out infinite" }}
+      />
+
+      <div className="relative mx-auto w-full max-w-[1180px]">
         <div className="grid items-center gap-14 md:grid-cols-[1.1fr_1fr] md:gap-12">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-muted">
               <span className="relative flex h-1.5 w-1.5 shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-70" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-text opacity-40" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-text" />
               </span>
               Pilot live — Munich &amp; Berlin
             </span>
@@ -27,7 +35,7 @@ export function Hero() {
               <br />
               infrastructure for
               <br />
-              <span className="text-accent">small merchants.</span>
+              <span className="text-muted">small merchants.</span>
             </h1>
 
             <p className="mt-6 max-w-[460px] text-[17px] leading-relaxed text-muted">
@@ -86,7 +94,7 @@ function HeroMock() {
     <div className="relative">
       <div
         aria-hidden
-        className="absolute -inset-4 -z-10 rounded-[28px] border border-accent/20 bg-accent/5"
+        className="absolute -inset-4 -z-10 rounded-[28px] border border-black/[0.06] bg-black/[0.02]"
       />
       <DashboardCard label="Today · Tue 23 May" meta="LIVE">
         <div className="grid grid-cols-2 divide-x divide-border/70 border-b border-border/70">
@@ -132,10 +140,10 @@ function HeroMock() {
           />
         </div>
         <div className="flex items-center justify-between border-t border-border/70 bg-warning-soft px-5 py-3">
-          <span className="text-[12px] font-medium text-warning">
+          <span className="text-[12px] font-medium text-muted">
             1 exception flagged
           </span>
-          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-warning">
+          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">
             Review
           </span>
         </div>
