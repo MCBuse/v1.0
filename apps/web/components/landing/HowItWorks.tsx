@@ -1,55 +1,31 @@
-import { Section } from "./Section";
+import { ArrowRight } from "lucide-react";
+import { IcebergVisual } from "./DashboardMock";
+import { secondaryButtonClass, Section } from "./Section";
 
-const steps = [
-  {
-    n: "01",
-    title: "Onboard",
-    body: "Tell us about your shop. We connect you with a licensed payment partner.",
-  },
-  {
-    n: "02",
-    title: "Capture",
-    body: "Take QR or NFC payments at the counter, table, or stall.",
-  },
-  {
-    n: "03",
-    title: "Match",
-    body: "Each payment is matched to its expected payout — automatically.",
-  },
-  {
-    n: "04",
-    title: "Flag",
-    body: "Delayed, missing, or mismatched payouts surface as exceptions.",
-  },
-  {
-    n: "05",
-    title: "Insights",
-    body: "See your daily totals, your busy hours, and your weekly rhythm.",
-  },
-];
-
-export function HowItWorks() {
+export function WhyStarted() {
   return (
     <Section
-      id="how-it-works"
-      eyebrow="How it works"
-      title="Five quiet steps. One clear record."
+      id="why"
+      tone="surface"
+      eyebrow="Why MCBuse exists"
+      title="Everyday financial activity is real. Too much of it stays invisible."
+      intro="Billions of people and small businesses transact every day, but cash payments, informal lending, low-ticket purchases, delayed settlements, fragmented wallets, and repeated onboarding checks often leave no clean financial record."
     >
-      <ol className="grid gap-px bg-border md:grid-cols-5">
-        {steps.map((s) => (
-          <li key={s.n} className="bg-bg p-6 transition-colors hover:bg-surface">
-            <span className="font-mono text-[28px] font-semibold tabular-nums leading-none text-border-strong">
-              {s.n}
-            </span>
-            <h3 className="mt-4 text-[15px] font-semibold text-text">
-              {s.title}
-            </h3>
-            <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
-              {s.body}
-            </p>
-          </li>
-        ))}
-      </ol>
+      <div className="grid items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+        <div>
+          <p className="text-lg leading-8 text-muted">
+            MCBuse was founded to make everyday financial activity visible,
+            structured, and usable, starting with micro-transactions and
+            merchant payment data.
+          </p>
+          <a href="#solution" className={`mt-7 ${secondaryButtonClass}`}>
+            See How It Works
+            <ArrowRight aria-hidden size={16} />
+          </a>
+        </div>
+
+        <IcebergVisual />
+      </div>
     </Section>
   );
 }

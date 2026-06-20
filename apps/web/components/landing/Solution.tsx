@@ -1,93 +1,47 @@
+import { CaptureFlowVisual } from "./DashboardMock";
 import { Section } from "./Section";
+
+const stages = [
+  {
+    title: "Capture",
+    body: "QR/NFC payments, P2P activity, merchant transactions, and financial events.",
+  },
+  {
+    title: "Structure",
+    body: "Convert raw events into clean records with amount, timestamp, status, merchant or user ID, and activity type.",
+  },
+  {
+    title: "Verify",
+    body: "Use blockchain-backed infrastructure and partner-enabled workflows to support data integrity and traceability.",
+  },
+  {
+    title: "Activate",
+    body: "Turn activity records into merchant insights, credit signals, partner matching, and access opportunities.",
+  },
+];
 
 export function Solution() {
   return (
     <Section
       id="solution"
+      tone="soft"
       eyebrow="The solution"
-      title="Every payment, a clean record."
-      intro="MCBuse turns each QR or NFC payment into a structured activity record — linked to the expected payout, with exceptions surfaced as they happen."
+      title="A Micro-Banking Infrastructure for Everyday Financial Activity"
+      intro="MCBuse captures micro-financial activity and turns it into structured records that people, merchants, and financial institutions can use."
     >
-      <div className="grid items-center gap-6 md:grid-cols-[1fr_auto_1fr]">
-        <EventCard
-          label="Payment event"
-          rows={[
-            ["channel", "QR · table 4"],
-            ["amount", "€18.40"],
-            ["time", "14:32"],
-          ]}
-        />
+      <CaptureFlowVisual />
 
-        <div className="flex justify-center" aria-hidden>
-          <Arrow />
-        </div>
-
-        <EventCard
-          label="Activity record"
-          tone="highlight"
-          rows={[
-            ["amount", "€18.40"],
-            ["expected payout", "Wed 24 May"],
-            ["status", "Matched"],
-          ]}
-        />
+      <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {stages.map((stage) => (
+          <article
+            key={stage.title}
+            className="rounded-lg border border-border bg-surface p-5"
+          >
+            <h3 className="text-base font-semibold text-text">{stage.title}</h3>
+            <p className="mt-3 text-sm leading-6 text-muted">{stage.body}</p>
+          </article>
+        ))}
       </div>
     </Section>
-  );
-}
-
-function EventCard({
-  label,
-  rows,
-  tone = "default",
-}: {
-  label: string;
-  rows: Array<[string, string]>;
-  tone?: "default" | "highlight";
-}) {
-  return (
-    <div
-      className={`rounded-[14px] border bg-surface p-6 ${
-        tone === "highlight"
-          ? "border-white/20"
-          : "border-border"
-      }`}
-    >
-      <p
-        className={`text-[11px] font-medium uppercase tracking-[0.14em] ${
-          tone === "highlight" ? "text-text" : "text-subtle"
-        }`}
-      >
-        {label}
-      </p>
-      <dl className="mt-4 space-y-2.5">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between gap-4">
-            <dt className="text-[13px] text-muted">{k}</dt>
-            <dd className="font-mono text-[13px] tabular-nums text-text">{v}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
-function Arrow() {
-  return (
-    <svg
-      width="44"
-      height="44"
-      viewBox="0 0 44 44"
-      fill="none"
-      className="rotate-90 text-border-strong md:rotate-0"
-    >
-      <path
-        d="M6 22h32M28 12l10 10-10 10"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

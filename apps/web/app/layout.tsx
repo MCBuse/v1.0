@@ -12,13 +12,13 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "MCBuse — Payment reconciliation infrastructure for small merchants.",
+  title: "MCBuse | Micro-Banking Infrastructure for Financial Visibility",
   description:
-    "MCBuse connects QR and NFC payments to expected payouts — matching every transaction automatically and surfacing exceptions in real time. Piloting in Munich and Berlin.",
+    "MCBuse turns micro-payments, merchant activity, and peer-to-peer financial behavior into structured financial data for merchants, partners, and future banking access.",
   openGraph: {
-    title: "MCBuse — Payment reconciliation infrastructure for small merchants.",
+    title: "MCBuse | Micro-Banking Infrastructure for Financial Visibility",
     description:
-      "Automated payout matching, exception detection, and real-time reconciliation for small merchants. Built on Solana. Piloting now in Germany.",
+      "Blockchain-powered micro-banking infrastructure for low-ticket payments, merchant activity records, and financial visibility.",
     type: "website",
   },
 };

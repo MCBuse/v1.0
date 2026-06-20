@@ -1,78 +1,112 @@
-import { PILOT_FORM_URL } from "./constants";
-import { DashboardCard, MockRow, MetricBlock } from "./DashboardMock";
+import {
+  ArrowRight,
+  Download,
+  Mail,
+  Play,
+  ShieldCheck,
+  Smartphone,
+} from "lucide-react";
+import {
+  EXTERNAL_LINKS,
+  hasConfiguredUrl,
+  linkOrRequestAccess,
+  outboundProps,
+} from "./constants";
+import { HeroProductVisual } from "./DashboardMock";
+import {
+  linkFocusClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "./Section";
 
 export function Hero() {
+  const demoHref = linkOrRequestAccess(
+    EXTERNAL_LINKS.demoVideo,
+    "Request MCBuse demo video access",
+  );
+  const deckHref = linkOrRequestAccess(
+    EXTERNAL_LINKS.pitchDeck,
+    "Request MCBuse pitch deck access",
+  );
+  const apkHref = linkOrRequestAccess(
+    EXTERNAL_LINKS.apk,
+    "Request MCBuse APK access",
+  );
+
   return (
-    <section
-      id="top"
-      className="relative overflow-hidden px-6 pb-24 pt-16 sm:px-10 md:pb-32 md:pt-24"
-    >
-      {/* Animated background blobs */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-1/4 top-0 h-[700px] w-[700px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-black/[0.04] blur-[120px]"
-        style={{ animation: "blob-drift 22s ease-in-out infinite" }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-0 top-1/3 h-[500px] w-[500px] translate-x-1/3 rounded-full bg-black/[0.03] blur-[100px]"
-        style={{ animation: "blob-drift-alt 30s ease-in-out infinite" }}
-      />
-
-      <div className="relative mx-auto w-full max-w-[1180px]">
-        <div className="grid items-center gap-14 md:grid-cols-[1.1fr_1fr] md:gap-12">
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-muted">
-              <span className="relative flex h-1.5 w-1.5 shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-text opacity-40" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-text" />
-              </span>
-              Pilot live — Munich &amp; Berlin
-            </span>
-
-            <h1 className="mt-5 text-[42px] font-semibold leading-[1.04] tracking-[-0.04em] text-text sm:text-5xl md:text-[58px]">
-              Payment reconciliation
-              <br />
-              infrastructure for
-              <br />
-              <span className="text-muted">small merchants.</span>
-            </h1>
-
-            <p className="mt-6 max-w-[460px] text-[17px] leading-relaxed text-muted">
-              MCBuse connects QR and NFC payments to expected payouts —
-              matching every transaction automatically and surfacing exceptions
-              the moment they happen.
-            </p>
-
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <a
-                href={PILOT_FORM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-11 items-center rounded-full bg-accent px-6 text-sm font-semibold text-bg transition-colors hover:bg-accent-hover"
-              >
-                Join the pilot
-              </a>
-              <a
-                href="#how-it-works"
-                className="inline-flex h-11 items-center gap-1.5 rounded-full border border-border px-6 text-sm font-medium text-muted transition-colors hover:border-border-strong hover:text-text"
-              >
-                See how it works
-                <span aria-hidden>→</span>
-              </a>
-            </div>
-
-            <div className="mt-8 flex items-center gap-5 border-t border-border pt-6">
-              <HeroStat value="23" label="transactions today" />
-              <div className="h-8 w-px bg-border" aria-hidden />
-              <HeroStat value="€847" label="expected payout" />
-              <div className="h-8 w-px bg-border" aria-hidden />
-              <HeroStat value="<2s" label="match latency" />
-            </div>
+    <section id="top" className="bg-bg px-5 py-16 sm:px-8 lg:py-24">
+      <div className="mx-auto grid w-full max-w-6xl items-center gap-12 lg:grid-cols-[1fr_1.05fr]">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-muted">
+            <ShieldCheck aria-hidden className="text-accent" size={17} />
+            Sandbox demo stage. MVP development underway.
           </div>
 
-          <HeroMock />
+          <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-tight text-text sm:text-5xl lg:text-6xl">
+            Turning Micro-Payments into Financial Visibility
+          </h1>
+
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
+            MCBuse is building a blockchain-powered micro-banking infrastructure
+            that captures everyday transaction activity, from low-ticket
+            merchant payments to peer-to-peer financial behavior, and transforms
+            it into structured, usable financial data.
+          </p>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a href={demoHref} className={primaryButtonClass} {...outboundProps(demoHref)}>
+              <Play aria-hidden size={16} />
+              {hasConfiguredUrl(EXTERNAL_LINKS.demoVideo)
+                ? "Watch Demo"
+                : "Request Demo"}
+            </a>
+            <a
+              href={EXTERNAL_LINKS.pilot}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={secondaryButtonClass}
+            >
+              Join the Pilot
+              <ArrowRight aria-hidden size={16} />
+            </a>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-3 text-sm font-semibold text-muted">
+            <a
+              href={deckHref}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-2 transition-colors hover:text-accent ${linkFocusClass}`}
+              {...outboundProps(deckHref)}
+            >
+              <Download aria-hidden size={16} />
+              {hasConfiguredUrl(EXTERNAL_LINKS.pitchDeck)
+                ? "Download Pitch Deck"
+                : "Request Pitch Deck"}
+            </a>
+            <a
+              href={apkHref}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-2 transition-colors hover:text-accent ${linkFocusClass}`}
+              {...outboundProps(apkHref)}
+            >
+              <Smartphone aria-hidden size={16} />
+              {hasConfiguredUrl(EXTERNAL_LINKS.apk) ? "Test APK" : "Request APK"}
+            </a>
+            <a
+              href={EXTERNAL_LINKS.contact}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-2 transition-colors hover:text-accent ${linkFocusClass}`}
+            >
+              <Mail aria-hidden size={16} />
+              Contact Us
+            </a>
+          </div>
+
+          <dl className="mt-8 grid max-w-xl grid-cols-3 gap-3 border-t border-border pt-6">
+            <HeroStat value="QR/NFC" label="payment capture" />
+            <HeroStat value="P2P" label="activity events" />
+            <HeroStat value="API" label="partner direction" />
+          </dl>
         </div>
+
+        <HeroProductVisual />
       </div>
     </section>
   );
@@ -80,74 +114,9 @@ export function Hero() {
 
 function HeroStat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="font-mono text-lg font-semibold tabular-nums text-text">
-        {value}
-      </span>
-      <span className="text-[12px] text-subtle">{label}</span>
-    </div>
-  );
-}
-
-function HeroMock() {
-  return (
-    <div className="relative">
-      <div
-        aria-hidden
-        className="absolute -inset-4 -z-10 rounded-[28px] border border-black/[0.06] bg-black/[0.02]"
-      />
-      <DashboardCard label="Today · Tue 23 May" meta="LIVE">
-        <div className="grid grid-cols-2 divide-x divide-border/70 border-b border-border/70">
-          <MetricBlock
-            label="Payments captured"
-            value="23"
-            hint="QR · 18  ·  NFC · 5"
-          />
-          <MetricBlock
-            label="Expected payout"
-            value="€847.20"
-            hint="Settles Wed 24 May"
-          />
-        </div>
-        <div>
-          <MockRow
-            time="14:32"
-            title="QR · table 4"
-            amount="€18.40"
-            status="Matched"
-            tone="success"
-          />
-          <MockRow
-            time="14:18"
-            title="NFC · counter"
-            amount="€6.20"
-            status="Matched"
-            tone="success"
-          />
-          <MockRow
-            time="13:55"
-            title="QR · table 2"
-            amount="€42.00"
-            status="Payout delayed"
-            tone="warning"
-          />
-          <MockRow
-            time="13:41"
-            title="NFC · counter"
-            amount="€3.80"
-            status="Matched"
-            tone="success"
-          />
-        </div>
-        <div className="flex items-center justify-between border-t border-border/70 bg-warning-soft px-5 py-3">
-          <span className="text-[12px] font-medium text-muted">
-            1 exception flagged
-          </span>
-          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">
-            Review
-          </span>
-        </div>
-      </DashboardCard>
+    <div>
+      <dt className="font-mono text-lg font-semibold text-text">{value}</dt>
+      <dd className="mt-1 text-xs text-muted">{label}</dd>
     </div>
   );
 }

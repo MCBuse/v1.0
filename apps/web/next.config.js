@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack(config) {
+allowedDevOrigins: ['b436-153-67-73-47.ngrok-free.app'],  
+webpack(config) {
     // Find the existing rule that handles SVG as static files
     const fileLoaderRule = config.module.rules.find((rule) =>
       rule.test?.test?.('.svg'),

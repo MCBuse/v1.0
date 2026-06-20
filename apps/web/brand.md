@@ -1,58 +1,60 @@
-# MCBuse Brand — Web
+# MCBuse Brand - Web
 
-Source of truth for the MCBuse web surface. Direction: **warm monochrome + operational**. The product is small-merchant tooling; the visual should feel quiet, trustworthy, and ledger-like — not flashy fintech.
+Source of truth for the MCBuse public web surface. Direction: **modern European fintech infrastructure with a subtle blockchain/data layer**. The product should feel credible to banks, fintechs, ecosystem reviewers, investors, and pilot merchants without looking like a generic crypto site.
 
 ## Voice
 
-- Short sentences. Plain words. Concrete nouns (payouts, exceptions, payments) over abstract ones (solutions, ecosystems).
-- Merchant-friendly. Avoid fintech jargon (PSP, acquirer, ledger, settlement) in public copy. Internal docs can use them.
-- Never overclaim. We are **not a bank** and **not a licensed payment institution**. Regulated processing is handled by licensed partners.
-- Active voice. The merchant is the subject.
+- Clear, professional, and partner-friendly.
+- Simple enough for merchants, strong enough for financial partners.
+- Use stage-safe language: "we are building," "sandbox demo," "MVP development," "pilot preparation," and "partner-enabled infrastructure."
+- Never overclaim. MCBuse is **not a bank** and **not a licensed payment institution**. Regulated processing is handled by licensed partners.
+- Keep blockchain behind the scenes. Lead with financial visibility, payment data, merchant records, and partner infrastructure.
 
-## Color tokens
+## Color Tokens
 
-All consumed as Tailwind utilities via `@theme` in `app/globals.css`. Use the semantic name, not the hex.
+All consumed as Tailwind utilities via `@theme` in `app/globals.css`. Use semantic token names, not inline hex values.
 
 | Token | Hex | Tailwind class | Use |
 |---|---|---|---|
-| `--color-bg` | `#FAF7F2` | `bg-bg` | Page background, cream |
-| `--color-surface` | `#FFFFFF` | `bg-surface` | Cards, dashboard mocks |
-| `--color-text` | `#1A1714` | `text-text` | Primary text |
-| `--color-muted` | `#6B635A` | `text-muted` | Secondary text, captions |
-| `--color-subtle` | `#918879` | `text-subtle` | Metadata, micro-labels |
-| `--color-border` | `#E8E2D8` | `border-border` | Hairlines, default card borders |
-| `--color-border-strong` | `#D6CDBD` | `border-border-strong` | Emphasized dividers |
-| `--color-accent` | `#C9551A` | `bg-accent` / `text-accent` | Primary CTA, key data points (terracotta) |
-| `--color-accent-hover` | `#B14913` | `hover:bg-accent-hover` | CTA hover |
-| `--color-accent-soft` | `#FBEFE6` | `bg-accent-soft` | Accent backgrounds (badges, chips) |
-| `--color-success` | `#5C7A3A` | `text-success` | Paid / matched states (olive) |
-| `--color-success-soft` | `#ECF1E2` | `bg-success-soft` | Success chips |
-| `--color-warning` | `#C28A1F` | `text-warning` | Exception flags (amber) |
-| `--color-warning-soft` | `#FBF1DA` | `bg-warning-soft` | Warning chips |
-
-**Accent discipline.** Terracotta is used sparingly — primary CTAs and one or two key data points per view. Don't tint icons, dividers, or links unless they are the call-to-action.
+| `--color-bg` | `#F7FBFF` | `bg-bg` | Page background |
+| `--color-surface` | `#FFFFFF` | `bg-surface` | Cards, panels, mockups |
+| `--color-text` | `#071A33` | `text-text` | Primary text |
+| `--color-muted` | `#50647A` | `text-muted` | Body copy, secondary labels |
+| `--color-subtle` | `#7890A8` | `text-subtle` | Metadata, helper text |
+| `--color-border` | `#D7E6F5` | `border-border` | Default hairlines |
+| `--color-border-strong` | `#AFC8E5` | `border-border-strong` | Emphasized dividers |
+| `--color-accent` | `#0B84F3` | `bg-accent` / `text-accent` | Primary CTA and key data |
+| `--color-accent-hover` | `#076CC8` | `hover:bg-accent-hover` | Primary CTA hover |
+| `--color-accent-soft` | `#EAF5FF` | `bg-accent-soft` | Light blue bands, badges |
+| `--color-navy` | `#071A33` | `bg-navy` / `text-navy` | Deep trust blocks |
+| `--color-navy-soft` | `#10284A` | `bg-navy-soft` | Secondary navy surfaces |
+| `--color-success` | `#16885D` | `text-success` | Verified, matched, ready states |
+| `--color-success-soft` | `#E7F6EE` | `bg-success-soft` | Success chips |
+| `--color-warning` | `#B76B00` | `text-warning` | Sandbox, review, pending states |
+| `--color-warning-soft` | `#FFF3D8` | `bg-warning-soft` | Warning chips |
 
 ## Type
 
-- Geist Sans for UI. Geist Mono for numbers in dashboard mocks (amounts, IDs, counts).
-- Headlines: tight tracking (`tracking-tight`, applied in base layer).
-- Body: 16px base; `text-muted` for secondary lines.
+- Geist Sans for UI. Geist Mono for amounts, identifiers, and activity records.
+- Headlines should be confident and readable. Do not use negative letter spacing.
+- Body copy uses 16px base sizing, with `text-muted` for secondary lines.
 
 ## Layout
 
-- Max content width `~1180px` for marketing sections. Hero can breathe slightly wider.
-- Generous vertical rhythm — sections breathe at 80–120px on desktop, 56–72px on mobile.
-- Cards: 14px radius, hairline border + soft shadow (see `--shadow-card`).
+- One-page MVP with stable anchor sections.
+- Max content width around `max-w-6xl`.
+- Full-width bands are allowed; do not turn whole page sections into floating cards.
+- Use individual cards for repeated items, mock dashboard panels, team members, and CTAs.
+- Cards use 8px radius or less.
 
-## Don'ts
+## Visual Rules
 
-- No gradients in v1. Flat surfaces only.
-- No emoji in product copy or marketing copy.
-- No stock photography. Use built-in-code dashboard mocks.
-- No dark mode in v1 — warm monochrome is light-first.
+- Use blue, white, soft gray, navy, green, and orange with restraint.
+- Use product mockups, transaction records, QR/NFC flows, data pipelines, and dashboard previews.
+- Avoid stock banking imagery, crypto coin motifs, dark-only Web3 styling, decorative blobs, and unsupported third-party logos.
 
-## Disclaimer line (verbatim)
+## Disclaimer Line
 
 > MCBuse is not a bank or licensed payment institution. Regulated payment processing is handled by licensed partners.
 
-Must appear in the footer of every public page.
+This must appear in the footer of every public page.
