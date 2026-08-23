@@ -12,18 +12,18 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown:          false,
-        tabBarButton:         HapticTab,
-        tabBarActiveTintColor:   colors.textPrimary,
+        headerShown: false,
+        tabBarButton: HapticTab,
+        tabBarActiveTintColor: colors.textPrimary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
           backgroundColor: colors.bgPrimary,
-          borderTopColor:  colors.borderDefault,
+          borderTopColor: colors.borderDefault,
         },
         tabBarLabelStyle: {
-          fontSize:     11,
-          fontWeight:   '500',
-          marginBottom:  2,
+          fontSize: 11,
+          fontWeight: '500',
+          marginBottom: 2,
         },
       }}
     >

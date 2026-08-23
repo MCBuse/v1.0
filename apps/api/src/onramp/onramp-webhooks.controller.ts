@@ -35,8 +35,6 @@ export class OnrampWebhooksController {
   ) {}
 
   @Post('onramp/webhooks/:provider')
-  @Post('offramp/webhooks/:provider')
-  @Post('webhooks/:provider')
   @HttpCode(HttpStatus.OK)
   async handle(
     @Param('provider') provider: string,
@@ -47,7 +45,9 @@ export class OnrampWebhooksController {
   ) {
     const rawBody = req.rawBody;
     if (!rawBody) {
-      this.logger.error('Missing rawBody on webhook request — enable Nest rawBody option');
+      this.logger.error(
+        'Missing rawBody on webhook request — enable Nest rawBody option',
+      );
       throw new UnauthorizedException('Missing raw body');
     }
 
@@ -109,6 +109,42 @@ export class OnrampWebhooksController {
     }
 
     throw new BadRequestException(`Unsupported webhook provider: ${provider}`);
+  }
+
+  @Post('offramp/webhooks/:provider')
+  @HttpCode(HttpStatus.OK)
+  async handleOfframp(
+    @Param('provider') provider: string,
+    @Req() req: ReqWithRaw,
+    @Headers('moonpay-signature-v2') moonpaySigV2: string | undefined,
+    @Headers('stripe-signature') stripeSignature: string | undefined,
+    @Headers() allHeaders: Record<string, string | string[] | undefined>,
+  ) {
+    return this.handle(
+      provider,
+      req,
+      moonpaySigV2,
+      stripeSignature,
+      allHeaders,
+    );
+  }
+
+  @Post('webhooks/:provider')
+  @HttpCode(HttpStatus.OK)
+  async handleGeneric(
+    @Param('provider') provider: string,
+    @Req() req: ReqWithRaw,
+    @Headers('moonpay-signature-v2') moonpaySigV2: string | undefined,
+    @Headers('stripe-signature') stripeSignature: string | undefined,
+    @Headers() allHeaders: Record<string, string | string[] | undefined>,
+  ) {
+    return this.handle(
+      provider,
+      req,
+      moonpaySigV2,
+      stripeSignature,
+      allHeaders,
+    );
   }
 
   private isMoonpaySellWebhook(payload: unknown): boolean {
