@@ -1,6 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
 allowedDevOrigins: ['b436-153-67-73-47.ngrok-free.app'],  
+  // Path aliases only. Hash fragments (/#product) never reach the server, so
+  // those are handled client-side by components/site/HashRedirect.tsx.
+  async redirects() {
+    return [
+      { source: '/product-systems', destination: '/product', permanent: true },
+      { source: '/for-merchants', destination: '/merchants', permanent: true },
+      { source: '/for-partners', destination: '/partners', permanent: true },
+      { source: '/about', destination: '/company', permanent: true },
+      { source: '/team', destination: '/company', permanent: true },
+      { source: '/sandbox', destination: '/demo', permanent: true },
+    ];
+  },
 webpack(config) {
     // Find the existing rule that handles SVG as static files
     const fileLoaderRule = config.module.rules.find((rule) =>

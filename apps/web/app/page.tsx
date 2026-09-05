@@ -1,36 +1,30 @@
-import { BusinessModel, EcosystemValidation, WhyBlockchain } from "../components/landing/Business";
-import { ProductStack } from "../components/landing/Benefits";
-import { Demo } from "../components/landing/Demo";
-import { FinalCta } from "../components/landing/FinalCta";
-import { Footer } from "../components/landing/Footer";
-import { Hero } from "../components/landing/Hero";
-import { WhyStarted } from "../components/landing/HowItWorks";
-import { Nav } from "../components/landing/Nav";
-import { AudienceSections, MarketEntry } from "../components/landing/PilotFocus";
-import { Problem } from "../components/landing/Problem";
-import { Solution } from "../components/landing/Solution";
-import { TeamAndRoadmap } from "../components/landing/TeamRoadmap";
+import { CtaStrip } from "../components/site/CtaStrip";
+import { HashRedirect } from "../components/site/HashRedirect";
+import { Hero } from "../components/home/Hero";
+import {
+  AudienceSplit,
+  BoundaryBand,
+  Problem,
+  Solution,
+  ValueSnapshot,
+} from "../components/home/sections";
 
 export default function Home() {
   return (
     <>
-      <Nav />
-      <main>
-        <Hero />
-        <WhyStarted />
-        <Problem />
-        <Solution />
-        <ProductStack />
-        <Demo />
-        <AudienceSections />
-        <MarketEntry />
-        <WhyBlockchain />
-        <BusinessModel />
-        <EcosystemValidation />
-        <TeamAndRoadmap />
-        <FinalCta />
-      </main>
-      <Footer />
+      <HashRedirect />
+      <Hero />
+      <AudienceSplit />
+      <Problem />
+      <Solution />
+      <ValueSnapshot />
+      <BoundaryBand />
+      <CtaStrip
+        title="Help build financial visibility for micro-merchants"
+        body="We are talking to merchants, banks, fintechs, payment service providers and investors."
+        primary={{ label: "Join the Pilot", href: "/contact#merchant-form" }}
+        secondary={{ label: "Schedule a partner call", href: "/contact#partner-form" }}
+      />
     </>
   );
 }
