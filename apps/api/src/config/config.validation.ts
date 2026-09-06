@@ -125,6 +125,10 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  MERCHANT_PORTAL_ENABLED?: string;
+
+  @IsOptional()
+  @IsString()
   CIRCLE_API_KEY?: string;
 
   @IsOptional()
@@ -237,7 +241,8 @@ export function validate(config: Record<string, unknown>) {
     ] as const;
 
     const missingDatabaseFields = requiredDatabaseFields.filter(
-      (field) => validatedConfig[field] === undefined || validatedConfig[field] === '',
+      (field) =>
+        validatedConfig[field] === undefined || validatedConfig[field] === '',
     );
 
     if (missingDatabaseFields.length > 0) {
@@ -248,7 +253,7 @@ export function validate(config: Record<string, unknown>) {
   }
 
   // In production, reject known placeholder secrets that pass length checks
-  if (validatedConfig.NODE_ENV === 'production') {
+  if (validatedConfig.NODE_ENV === Environment.Production) {
     const secretFields = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const;
     for (const field of secretFields) {
       const value = config[field] as string;

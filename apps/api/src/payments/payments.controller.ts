@@ -1,4 +1,11 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import { ExecutePaymentDto } from './dto/execute-payment.dto';
@@ -22,10 +29,7 @@ export class PaymentsController {
       'For dynamic QR the amount is fixed server-side. ' +
       'For static QR supply amount + currency in the body.',
   })
-  execute(
-    @CurrentUser() user: { id: string },
-    @Body() dto: ExecutePaymentDto,
-  ) {
+  execute(@CurrentUser() user: { id: string }, @Body() dto: ExecutePaymentDto) {
     return this.paymentsService.execute(user.id, dto);
   }
 

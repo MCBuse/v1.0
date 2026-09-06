@@ -11,7 +11,9 @@
     "db:migrate": "pnpm --filter api db:migrate",
     "db:push": "pnpm --filter api db:push",
     "deploy:api:fly": "fly deploy -c fly.toml",
-    "dev:api": "pnpm --filter api start:dev"
+    "dev:api": "pnpm --filter api start:dev",
+    "dev:portal": "pnpm --filter portal dev",
+    "test:portal": "pnpm --filter portal test && pnpm --filter portal test:e2e"
   },
   "devDependencies": {
     "prettier": "^3.7.4",

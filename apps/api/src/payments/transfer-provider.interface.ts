@@ -7,15 +7,17 @@ export interface TransferParams {
   amount: bigint;
   currency: string;
   idempotencyKey: string;
+  onSubmitted?: (txSignature: string) => Promise<void>;
 }
 
 export interface TransferResult {
   txSignature: string | null;
-  status: 'completed' | 'failed';
+  status: 'completed' | 'pending' | 'failed';
 }
 
 export interface TransferProvider {
   execute(params: TransferParams): Promise<TransferResult>;
+  getStatus(txSignature: string): Promise<'finalized' | 'pending' | 'failed'>;
 }
 
 export const TRANSFER_PROVIDER = 'TRANSFER_PROVIDER';

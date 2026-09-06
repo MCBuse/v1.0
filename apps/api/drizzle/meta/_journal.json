@@ -57,6 +57,13 @@
       "when": 1778976000001,
       "tag": "0007_stripe_provider_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788721200000,
+      "tag": "0008_merchant_portal",
+      "breakpoints": true
     }
   ]
 }

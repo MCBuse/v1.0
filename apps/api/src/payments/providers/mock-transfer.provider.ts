@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import type { TransferProvider, TransferParams, TransferResult } from '../transfer-provider.interface';
+import type {
+  TransferProvider,
+  TransferParams,
+  TransferResult,
+} from '../transfer-provider.interface';
 
 /**
  * Mock P2P transfer provider — DB-only, no Solana interaction.
@@ -13,10 +17,15 @@ export class MockTransferProvider implements TransferProvider {
 
   async execute(params: TransferParams): Promise<TransferResult> {
     const txSignature = `mock_${randomUUID().replace(/-/g, '')}`;
+    await params.onSubmitted?.(txSignature);
     this.logger.log(
       `[MockTransfer] ${params.amount} ${params.currency}: ` +
-      `${params.payerPubkey.slice(0, 8)}… → ${params.payeePubkey.slice(0, 8)}… (${txSignature})`,
+        `${params.payerPubkey.slice(0, 8)}… → ${params.payeePubkey.slice(0, 8)}… (${txSignature})`,
     );
     return { txSignature, status: 'completed' };
+  }
+
+  getStatus(): Promise<'finalized'> {
+    return Promise.resolve('finalized');
   }
 }

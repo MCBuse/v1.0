@@ -25,6 +25,7 @@ import { NfcModule } from './nfc/nfc.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RatesModule } from './rates/rates.module';
 import { ChainWatcherModule } from './chain-watcher/chain-watcher.module';
+import { DataCaptureModule } from './data-capture/data-capture.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { ChainWatcherModule } from './chain-watcher/chain-watcher.module';
     NfcModule,
     RatesModule,
     ChainWatcherModule,
+    DataCaptureModule,
   ],
   controllers: [AppController],
   providers: [

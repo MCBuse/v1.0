@@ -1,16 +1,20 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import {
-  PublicKey,
-  Transaction,
-  sendAndConfirmTransaction,
-} from '@solana/web3.js';
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import { PublicKey, Transaction } from '@solana/web3.js';
 import {
   getOrCreateAssociatedTokenAccount,
   createTransferCheckedInstruction,
   getMint,
 } from '@solana/spl-token';
 import { SolanaService } from '../../solana/solana.service';
-import type { TransferProvider, TransferParams, TransferResult } from '../transfer-provider.interface';
+import type {
+  TransferProvider,
+  TransferParams,
+  TransferResult,
+} from '../transfer-provider.interface';
 
 /**
  * USDC/EURC mint addresses on Solana devnet.
@@ -30,11 +34,15 @@ export class SolanaTransferProvider implements TransferProvider {
   async execute(params: TransferParams): Promise<TransferResult> {
     const mintAddress = DEVNET_MINTS[params.currency];
     if (!mintAddress) {
-      throw new InternalServerErrorException(`No mint address for currency: ${params.currency}`);
+      throw new InternalServerErrorException(
+        `No mint address for currency: ${params.currency}`,
+      );
     }
 
     const connection = this.solanaService.getConnection();
-    const payerKeypair = this.solanaService.decryptKeypair(params.payerEncryptedKeypair);
+    const payerKeypair = this.solanaService.decryptKeypair(
+      params.payerEncryptedKeypair,
+    );
     const payerPubkey = new PublicKey(params.payerPubkey);
     const payeePubkey = new PublicKey(params.payeePubkey);
     const mint = new PublicKey(mintAddress);
@@ -50,14 +58,25 @@ export class SolanaTransferProvider implements TransferProvider {
 
     this.logger.log(
       `[SolanaTransfer] Initiating ${params.amount} ${params.currency}: ` +
-      `${params.payerPubkey.slice(0, 8)}… → ${params.payeePubkey.slice(0, 8)}…`,
+        `${params.payerPubkey.slice(0, 8)}… → ${params.payeePubkey.slice(0, 8)}…`,
     );
 
+    let submittedSignature: string | null = null;
     try {
       // Get or create ATAs for both wallets (payer pays for ATA creation)
       const [payerAta, payeeAta] = await Promise.all([
-        getOrCreateAssociatedTokenAccount(connection, payerKeypair, mint, payerPubkey),
-        getOrCreateAssociatedTokenAccount(connection, payerKeypair, mint, payeePubkey),
+        getOrCreateAssociatedTokenAccount(
+          connection,
+          payerKeypair,
+          mint,
+          payerPubkey,
+        ),
+        getOrCreateAssociatedTokenAccount(
+          connection,
+          payerKeypair,
+          mint,
+          payeePubkey,
+        ),
       ]);
 
       const mintInfo = await getMint(connection, mint);
@@ -72,15 +91,47 @@ export class SolanaTransferProvider implements TransferProvider {
       );
 
       const tx = new Transaction().add(ix);
-      const txSignature = await sendAndConfirmTransaction(connection, tx, [payerKeypair], {
-        commitment: 'confirmed',
+      const txSignature = await connection.sendTransaction(tx, [payerKeypair], {
+        preflightCommitment: 'confirmed',
       });
+      submittedSignature = txSignature;
+      await params.onSubmitted?.(txSignature);
+      const confirmation = await connection.confirmTransaction(
+        txSignature,
+        'finalized',
+      );
+      if (confirmation.value.err)
+        throw new Error('Transaction failed before finalization');
 
-      this.logger.log(`[SolanaTransfer] Confirmed: ${txSignature}`);
+      this.logger.log(`[SolanaTransfer] Finalized: ${txSignature}`);
       return { txSignature, status: 'completed' };
     } catch (err) {
-      this.logger.error('[SolanaTransfer] Failed', err instanceof Error ? err.stack : err);
+      this.logger.error(
+        '[SolanaTransfer] Failed',
+        err instanceof Error ? err.stack : err,
+      );
+      if (submittedSignature) {
+        const status = await this.getStatus(submittedSignature).catch(
+          () => 'pending' as const,
+        );
+        if (status !== 'failed')
+          return { txSignature: submittedSignature, status: 'pending' };
+      }
       return { txSignature: null, status: 'failed' };
     }
+  }
+
+  async getStatus(
+    txSignature: string,
+  ): Promise<'finalized' | 'pending' | 'failed'> {
+    const response = await this.solanaService
+      .getConnection()
+      .getSignatureStatuses([txSignature], {
+        searchTransactionHistory: true,
+      });
+    const status = response.value[0];
+    if (!status) return 'pending';
+    if (status.err) return 'failed';
+    return status.confirmationStatus === 'finalized' ? 'finalized' : 'pending';
   }
 }

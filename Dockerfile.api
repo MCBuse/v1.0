@@ -19,12 +19,14 @@ FROM build-base AS deps
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
+COPY packages/shared/package.json packages/shared/package.json
 
-RUN pnpm install --filter api --frozen-lockfile
+RUN pnpm install --filter api... --frozen-lockfile
 
 FROM deps AS build
 
 COPY apps/api apps/api
+COPY packages/shared packages/shared
 
 RUN pnpm --filter api build
 
@@ -32,8 +34,9 @@ FROM build-base AS prod-deps
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
+COPY packages/shared/package.json packages/shared/package.json
 
-RUN pnpm install --filter api --prod --frozen-lockfile
+RUN pnpm install --filter api... --prod --frozen-lockfile
 
 FROM base AS runner
 

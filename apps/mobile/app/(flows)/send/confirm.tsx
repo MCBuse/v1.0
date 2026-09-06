@@ -1,55 +1,59 @@
-import { useTheme } from '@shopify/restyle';
-import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft } from 'iconsax-react-native';
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from "@shopify/restyle";
+import { randomUUID } from "expo-crypto";
+import { router, useLocalSearchParams } from "expo-router";
+import { ArrowLeft } from "iconsax-react-native";
+import React, { useRef, useState } from "react";
+import { Pressable, ScrollView, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Box, Button, Text } from '@/components/ui';
-import { AmountInput } from '@/components/ui/AmountInput';
-import { useExecutePayment, type ExecutePaymentResponse } from '@/features/payments';
-import { formatCurrency, toBaseUnits, truncateAddress } from '@/lib/currency';
-import type { Theme } from '@/theme';
+import { Box, Button, Text } from "@/components/ui";
+import { AmountInput } from "@/components/ui/AmountInput";
+import {
+  useExecutePayment,
+  type ExecutePaymentResponse,
+} from "@/features/payments";
+import { formatCurrency, toBaseUnits, truncateAddress } from "@/lib/currency";
+import type { Theme } from "@/theme";
 
-type Currency = 'USDC' | 'EURC';
+type Currency = "USDC" | "EURC";
 
 export default function SendConfirmScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
-    nonce:            string;
-    amount:           string;
-    currency:         string;
+    nonce: string;
+    amount: string;
+    currency: string;
     recipientAddress: string;
-    isStatic:         string;
+    isStatic: string;
   }>();
 
-  const isStatic = params.isStatic === 'true';
-  const lockedAmount = params.amount || '';
+  const isStatic = params.isStatic === "true";
+  const lockedAmount = params.amount || "";
   const lockedCurrency = (params.currency as Currency) || null;
 
   // For static QR, user must enter amount + currency
-  const [displayAmount, setDisplayAmount] = useState('0');
-  const [currency, setCurrency] = useState<Currency>(lockedCurrency ?? 'USDC');
+  const [displayAmount, setDisplayAmount] = useState("0");
+  const [currency, setCurrency] = useState<Currency>(lockedCurrency ?? "USDC");
 
   const { mutate: execute, isPending, error } = useExecutePayment();
+  const idempotencyKey = useRef(randomUUID());
 
   const handleConfirm = () => {
-    const baseUnits = isStatic
-      ? toBaseUnits(displayAmount)
-      : lockedAmount;
+    const baseUnits = isStatic ? toBaseUnits(displayAmount) : lockedAmount;
 
-    if (isStatic && (displayAmount === '0' || displayAmount === '')) return;
+    if (isStatic && (displayAmount === "0" || displayAmount === "")) return;
 
     execute(
       {
-        nonce:    params.nonce,
+        nonce: params.nonce,
+        idempotencyKey: idempotencyKey.current,
         ...(isStatic && { amount: baseUnits, currency }),
       },
       {
         onSuccess: (data: ExecutePaymentResponse) => {
           router.replace(
-            `/(flows)/send/success?txSignature=${encodeURIComponent(data.txSignature ?? '')}&amount=${encodeURIComponent(data.amount)}&currency=${encodeURIComponent(data.currency)}&recipientAddress=${encodeURIComponent(params.recipientAddress)}`,
+            `/(flows)/send/success?txSignature=${encodeURIComponent(data.txSignature ?? "")}&amount=${encodeURIComponent(data.amount)}&currency=${encodeURIComponent(data.currency)}&recipientAddress=${encodeURIComponent(params.recipientAddress)}`,
           );
         },
       },
@@ -57,12 +61,18 @@ export default function SendConfirmScreen() {
   };
 
   const displayedAmount = isStatic
-    ? (displayAmount === '0' ? '—' : formatCurrency(toBaseUnits(displayAmount), currency))
-    : formatCurrency(lockedAmount, lockedCurrency ?? 'USDC');
+    ? displayAmount === "0"
+      ? "—"
+      : formatCurrency(toBaseUnits(displayAmount), currency)
+    : formatCurrency(lockedAmount, lockedCurrency ?? "USDC");
 
   if (isStatic) {
     return (
-      <Box flex={1} backgroundColor="bgPrimary" style={{ paddingBottom: insets.bottom }}>
+      <Box
+        flex={1}
+        backgroundColor="bgPrimary"
+        style={{ paddingBottom: insets.bottom }}
+      >
         <Box
           flexDirection="row"
           alignItems="center"
@@ -86,7 +96,9 @@ export default function SendConfirmScreen() {
             backgroundColor="bgSecondary"
             borderRadius="l"
           >
-            <Text variant="caption" color="textSecondary">Recipient</Text>
+            <Text variant="caption" color="textSecondary">
+              Recipient
+            </Text>
             <Text variant="captionMedium">
               {truncateAddress(params.recipientAddress)}
             </Text>
@@ -98,9 +110,9 @@ export default function SendConfirmScreen() {
           currency={currency}
           onChangeAmount={setDisplayAmount}
           onChangeCurrency={setCurrency}
-          primaryLabel={isPending ? 'Sending…' : 'Send'}
+          primaryLabel={isPending ? "Sending…" : "Send"}
           onPrimary={handleConfirm}
-          disabled={isPending || displayAmount === '0'}
+          disabled={isPending || displayAmount === "0"}
         />
 
         {error && (
@@ -145,10 +157,10 @@ export default function SendConfirmScreen() {
           alignItems="center"
           gap="xs"
         >
-          <Text variant="caption" style={{ color: 'rgba(255,255,255,0.55)' }}>
+          <Text variant="caption" style={{ color: "rgba(255,255,255,0.55)" }}>
             {"You're sending"}
           </Text>
-          <Text variant="display" style={{ color: '#fff' }}>
+          <Text variant="display" style={{ color: "#fff" }}>
             {displayedAmount}
           </Text>
         </Box>
@@ -163,8 +175,12 @@ export default function SendConfirmScreen() {
             borderBottomWidth={1}
             borderBottomColor="borderDefault"
           >
-            <Text variant="caption" color="textSecondary">Recipient</Text>
-            <Text variant="captionMedium">{truncateAddress(params.recipientAddress)}</Text>
+            <Text variant="caption" color="textSecondary">
+              Recipient
+            </Text>
+            <Text variant="captionMedium">
+              {truncateAddress(params.recipientAddress)}
+            </Text>
           </Box>
           <Box
             flexDirection="row"
@@ -172,7 +188,9 @@ export default function SendConfirmScreen() {
             alignItems="center"
             padding="l"
           >
-            <Text variant="caption" color="textSecondary">Network fee</Text>
+            <Text variant="caption" color="textSecondary">
+              Network fee
+            </Text>
             <Text variant="captionMedium">Free</Text>
           </Box>
         </Box>
@@ -184,7 +202,7 @@ export default function SendConfirmScreen() {
         )}
 
         <Button
-          label={isPending ? 'Sending…' : 'Confirm & Send'}
+          label={isPending ? "Sending…" : "Confirm & Send"}
           onPress={handleConfirm}
           loading={isPending}
           disabled={isPending}
@@ -195,14 +213,14 @@ export default function SendConfirmScreen() {
 }
 
 const styles = StyleSheet.create({
-  root:    { flex: 1 },
+  root: { flex: 1 },
   content: { flexGrow: 1 },
   backBtn: {
-    width:          36,
-    height:         36,
-    borderRadius:   10,
-    alignItems:     'center',
-    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  errorText: { textAlign: 'center' },
+  errorText: { textAlign: "center" },
 });

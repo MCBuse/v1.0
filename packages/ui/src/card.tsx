@@ -1,27 +1,36 @@
-import { type JSX } from "react";
+import * as React from "react";
+import { cn } from "./cn";
 
 export function Card({
   className,
-  title,
-  children,
-  href,
-}: {
-  className?: string;
-  title: string;
-  children: React.ReactNode;
-  href: string;
-}): JSX.Element {
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <a
-      className={className}
-      href={`${href}?utm_source=create-turbo&utm_medium=basic&utm_campaign=create-turbo"`}
-      rel="noopener noreferrer"
-      target="_blank"
-    >
-      <h2>
-        {title} <span>→</span>
-      </h2>
-      <p>{children}</p>
-    </a>
+    <section
+      className={cn("rounded-xl border border-slate-200 bg-white", className)}
+      {...props}
+    />
   );
+}
+
+export function CardHeader({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn(
+        "flex items-start justify-between gap-4 p-5 pb-3",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export function CardContent({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("p-5 pt-2", className)} {...props} />;
 }

@@ -59,11 +59,19 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
         0n,
       );
       if (!dto.currency) {
-        throw new BadRequestException('currency is required when lineItems are provided');
+        throw new BadRequestException(
+          'currency is required when lineItems are provided',
+        );
       }
     } else if (dto.type === 'dynamic') {
-      if (!dto.amount) throw new BadRequestException('amount is required for dynamic payment requests');
-      if (!dto.currency) throw new BadRequestException('currency is required for dynamic payment requests');
+      if (!dto.amount)
+        throw new BadRequestException(
+          'amount is required for dynamic payment requests',
+        );
+      if (!dto.currency)
+        throw new BadRequestException(
+          'currency is required for dynamic payment requests',
+        );
       computedAmount = this.parseCentAmount(dto.amount, 'amount');
     }
 
@@ -87,7 +95,8 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
         creatorWalletId: routine.id,
         type: dto.type,
         amount: computedAmount,
-        currency: dto.type === 'dynamic' ? dto.currency?.toUpperCase() ?? null : null,
+        currency:
+          dto.type === 'dynamic' ? (dto.currency?.toUpperCase() ?? null) : null,
         description: dto.description ?? null,
         lineItems: hasLineItems ? dto.lineItems! : null,
         nonce,
@@ -99,12 +108,22 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
     const pr = rows[0];
     const qrString = this.buildQrString(pr);
 
-    this.logger.log(`Payment request created: ${pr.id} type=${pr.type} nonce=${nonce}`);
+    this.logger.log(
+      `Payment request created: ${pr.id} type=${pr.type} nonce=${nonce}`,
+    );
 
     return { ...this.sanitize(pr), qrString };
   }
 
   async resolve(nonce: string) {
+    return this.resolveInternal(nonce, false);
+  }
+
+  async resolveForExecution(nonce: string) {
+    return this.resolveInternal(nonce, true);
+  }
+
+  private async resolveInternal(nonce: string, allowProcessing: boolean) {
     const rows = await this.db
       .select()
       .from(schema.paymentRequests)
@@ -113,7 +132,10 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
 
     const pr = rows[0];
     if (!pr) throw new NotFoundException('Payment request not found');
-    if (pr.status !== 'pending') {
+    if (
+      pr.status !== 'pending' &&
+      !(allowProcessing && pr.status === 'processing')
+    ) {
       throw new BadRequestException(`Payment request is ${pr.status}`);
     }
     if (pr.expiresAt && pr.expiresAt < new Date()) {
@@ -128,31 +150,55 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
     // Return creator wallet pubkey + creator identity so payer sees who they're paying
     const rows2 = await this.db
       .select({
-        walletId:     schema.wallets.id,
+        walletId: schema.wallets.id,
         solanaPubkey: schema.wallets.solanaPubkey,
-        walletType:   schema.wallets.type,
-        username:     schema.users.username,
-        firstName:    schema.users.firstName,
-        lastName:     schema.users.lastName,
+        walletType: schema.wallets.type,
+        username: schema.users.username,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
       })
       .from(schema.wallets)
       .innerJoin(schema.users, eq(schema.users.id, schema.wallets.userId))
-      .where(and(eq(schema.wallets.id, pr.creatorWalletId), eq(schema.wallets.isActive, true)))
+      .where(
+        and(
+          eq(schema.wallets.id, pr.creatorWalletId),
+          eq(schema.wallets.isActive, true),
+        ),
+      )
       .limit(1);
 
     const row = rows2[0];
     if (!row) throw new NotFoundException('Creator wallet not found');
 
+    let merchantName: string | null = null;
+    if (pr.merchantId) {
+      const merchantRows = await this.db
+        .select({ businessName: schema.merchants.businessName })
+        .from(schema.merchants)
+        .where(
+          and(
+            eq(schema.merchants.id, pr.merchantId),
+            eq(schema.merchants.isActive, true),
+          ),
+        )
+        .limit(1);
+      merchantName = merchantRows[0]?.businessName ?? null;
+    }
+
     return {
       ...this.sanitize(pr),
+      merchantId: pr.merchantId,
+      displayAmountMinor: pr.displayAmountMinor?.toString() ?? null,
+      quoteRateScaled: pr.quoteRateScaled?.toString() ?? null,
       creatorWallet: {
-        id:           row.walletId,
+        id: row.walletId,
         solanaPubkey: row.solanaPubkey,
-        type:         row.walletType,
+        type: row.walletType,
       },
       recipient: {
-        username:    row.username,
-        displayName: `${row.firstName} ${row.lastName}`.trim(),
+        username: row.username,
+        displayName: merchantName ?? `${row.firstName} ${row.lastName}`.trim(),
+        businessName: merchantName,
       },
     };
   }
@@ -162,15 +208,25 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
     return this.sanitize(pr);
   }
 
-  async list(userId: string, filters: { status?: string; type?: string; limit?: number; offset?: number }) {
+  async list(
+    userId: string,
+    filters: {
+      status?: string;
+      type?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ) {
     // Get user's routine wallet id first
     const wallets = await this.walletsService.findByUserId(userId);
     const routine = wallets['routine'];
     if (!routine) return [];
 
     const conditions = [eq(schema.paymentRequests.creatorWalletId, routine.id)];
-    if (filters.status) conditions.push(eq(schema.paymentRequests.status, filters.status));
-    if (filters.type) conditions.push(eq(schema.paymentRequests.type, filters.type));
+    if (filters.status)
+      conditions.push(eq(schema.paymentRequests.status, filters.status));
+    if (filters.type)
+      conditions.push(eq(schema.paymentRequests.type, filters.type));
 
     const rows = await this.db
       .select()
@@ -201,7 +257,9 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
 
     if (result.length === 0) {
       const current = await this.loadAndOwn(userId, id);
-      throw new BadRequestException(`Cannot cancel a ${current.status} payment request`);
+      throw new BadRequestException(
+        `Cannot cancel a ${current.status} payment request`,
+      );
     }
 
     this.logger.log(`Payment request cancelled: ${id}`);
@@ -223,7 +281,9 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
       .returning({ id: schema.paymentRequests.id });
 
     if (result.length !== 1) {
-      throw new BadRequestException('Payment request cannot be completed in its current state');
+      throw new BadRequestException(
+        'Payment request cannot be completed in its current state',
+      );
     }
   }
 
@@ -266,7 +326,9 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
     return pr;
   }
 
-  private buildQrString(pr: typeof schema.paymentRequests.$inferSelect): string {
+  private buildQrString(
+    pr: typeof schema.paymentRequests.$inferSelect,
+  ): string {
     const params = new URLSearchParams({ nonce: pr.nonce, v: QR_VERSION });
     if (pr.amount) params.set('amount', pr.amount.toString());
     if (pr.currency) params.set('currency', pr.currency);
@@ -275,12 +337,16 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
 
   private parseCentAmount(value: string, fieldName: string) {
     if (!/^\d+$/.test(value)) {
-      throw new BadRequestException(`${fieldName} must be a non-negative integer string`);
+      throw new BadRequestException(
+        `${fieldName} must be a non-negative integer string`,
+      );
     }
 
     const amount = BigInt(value);
     if (amount < BASE_UNITS_PER_CENT) {
-      throw new BadRequestException(`${fieldName} must be at least 0.01 USDC/EURC`);
+      throw new BadRequestException(
+        `${fieldName} must be at least 0.01 USDC/EURC`,
+      );
     }
     if (amount % BASE_UNITS_PER_CENT !== 0n) {
       throw new BadRequestException(`${fieldName} must be cent-denominated`);
