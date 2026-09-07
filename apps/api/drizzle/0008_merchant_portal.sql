@@ -150,4 +150,12 @@ ALTER TABLE "merchant_transactions" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
 ALTER TABLE "merchant_capture_exceptions" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
-REVOKE ALL ON TABLE "merchants", "merchant_memberships", "merchant_consent_records", "merchant_payment_attempts", "merchant_transactions", "merchant_capture_exceptions" FROM anon, authenticated;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON TABLE "merchants", "merchant_memberships", "merchant_consent_records", "merchant_payment_attempts", "merchant_transactions", "merchant_capture_exceptions" FROM anon;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON TABLE "merchants", "merchant_memberships", "merchant_consent_records", "merchant_payment_attempts", "merchant_transactions", "merchant_capture_exceptions" FROM authenticated;
+  END IF;
+END $$;

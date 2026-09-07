@@ -35,7 +35,7 @@ export function SignInForm() {
     }
   }
   return (
-    <form className="mt-8 grid gap-5" onSubmit={submit}>
+    <form className="mt-8 grid gap-5" method="post" onSubmit={submit}>
       {error ? (
         <Alert className="border-red-200 bg-red-50 text-red-800">{error}</Alert>
       ) : null}

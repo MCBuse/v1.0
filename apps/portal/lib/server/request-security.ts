@@ -4,6 +4,7 @@ import { timingSafeEqual } from "crypto";
 import { NextRequest } from "next/server";
 import { CSRF_COOKIE } from "./session";
 import { PORTAL_ORIGIN } from "./config";
+import { isTrustedPortalOrigin } from "./trusted-origin";
 
 function equal(left: string, right: string) {
   const a = Buffer.from(left);
@@ -12,7 +13,11 @@ function equal(left: string, right: string) {
 }
 
 export function hasTrustedOrigin(request: NextRequest) {
-  return request.headers.get("origin") === PORTAL_ORIGIN;
+  return isTrustedPortalOrigin(
+    request.headers.get("origin"),
+    PORTAL_ORIGIN,
+    process.env.NODE_ENV,
+  );
 }
 
 export function hasValidCsrf(request: NextRequest) {

@@ -6,47 +6,25 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { Logger } from 'nestjs-pino';
+import {
+  HTTP_LOG_ERROR,
+  LoggableResponse,
+} from '../../logging/http-logger.config';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
-  constructor(private readonly logger: Logger) {}
-
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const correlationId = response.getHeader('x-correlation-id') as string;
+    const correlationId = String(
+      response.getHeader('x-correlation-id') ?? 'unknown',
+    );
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
-
-    // Log the full error internally
-    if (status >= 500) {
-      this.logger.error(
-        {
-          correlationId,
-          method: request.method,
-          url: request.url,
-          statusCode: status,
-          error: exception instanceof Error ? exception.message : String(exception),
-          stack: exception instanceof Error ? exception.stack : undefined,
-        },
-        'Unhandled exception',
-      );
-    } else {
-      this.logger.warn(
-        {
-          correlationId,
-          method: request.method,
-          url: request.url,
-          statusCode: status,
-        },
-        'HTTP exception',
-      );
-    }
 
     // Build safe response — no internal details for 5xx
     let message: string | string[];
@@ -54,14 +32,28 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const exceptionResponse = exception.getResponse();
       if (status >= 500) {
         message = 'An unexpected error occurred. Please try again later.';
-      } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
         const res = exceptionResponse as Record<string, unknown>;
         message = (res.message as string | string[]) ?? exception.message;
       } else {
-        message = exceptionResponse as string;
+        message = exceptionResponse;
       }
     } else {
       message = 'An unexpected error occurred. Please try again later.';
+    }
+
+    const loggableResponse = response as LoggableResponse;
+    loggableResponse.locals ??= {};
+    if (status >= 500) {
+      loggableResponse.err =
+        exception instanceof Error ? exception : new Error(String(exception));
+    } else {
+      loggableResponse.locals[HTTP_LOG_ERROR] = Array.isArray(message)
+        ? message.join('; ')
+        : message;
     }
 
     response.status(status).json({

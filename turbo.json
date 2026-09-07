@@ -3,6 +3,7 @@
   "ui": "tui",
   "globalEnv": [
     "MCBUSE_API_URL",
+    "NODE_ENV",
     "PORTAL_ORIGIN",
     "SESSION_COOKIE_SECURE",
     "NEXT_PUBLIC_AUTH_BACKGROUND_URL"
