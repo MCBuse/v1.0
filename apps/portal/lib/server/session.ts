@@ -82,8 +82,11 @@ export async function remoteRequest(path: string, init: RequestInit = {}) {
       signal: AbortSignal.timeout(12_000),
       headers: {
         Accept: "application/json",
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.body && !new Headers(init.headers).has("Content-Type")
+          ? { "Content-Type": "application/json" }
+          : {}),
+        ...init.headers,
       },
     });
 

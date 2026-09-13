@@ -14,12 +14,13 @@ export async function portalApi<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const method = init.method?.toUpperCase() ?? "GET";
+  const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
   const response = await fetch(`/api/merchant/${path.replace(/^\//, "")}`, {
     ...init,
     cache: "no-store",
     headers: {
       Accept: "application/json",
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...(method !== "GET" ? { "X-CSRF-Token": getCsrfToken() } : {}),
       ...init.headers,
     },

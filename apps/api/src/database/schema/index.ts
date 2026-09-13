@@ -9,3 +9,4 @@ export * from './audit-logs';
 export * from './refresh-tokens';
 export * from './password-reset-codes';
 export * from './merchants';
+export * from './merchant-inventory';

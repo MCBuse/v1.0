@@ -31,6 +31,7 @@ export const paymentRequests = pgTable('payment_requests', {
   completedAt: timestamp('completed_at'),
   ledgerEntryId: uuid('ledger_entry_id'), // set when paid
   merchantId: uuid('merchant_id'), // FK added in migration to avoid a circular schema import
+  invoiceNumber: varchar('invoice_number', { length: 32 }),
   displayAmountMinor: bigint('display_amount_minor', { mode: 'bigint' }),
   displayCurrency: varchar('display_currency', { length: 3 }),
   quoteRateScaled: bigint('quote_rate_scaled', { mode: 'bigint' }), // EUR per USDC, scaled to 1e6

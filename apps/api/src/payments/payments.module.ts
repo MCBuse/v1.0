@@ -8,9 +8,15 @@ import { TRANSFER_PROVIDER } from './transfer-provider.interface';
 import { PaymentRequestsModule } from '../payment-requests/payment-requests.module';
 import { UsersModule } from '../users/users.module';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
+import { DataCaptureModule } from '../data-capture/data-capture.module';
 
 @Module({
-  imports: [ConfigModule, PaymentRequestsModule, UsersModule],
+  imports: [
+    ConfigModule,
+    PaymentRequestsModule,
+    UsersModule,
+    DataCaptureModule,
+  ],
   providers: [
     MockTransferProvider,
     SolanaTransferProvider,

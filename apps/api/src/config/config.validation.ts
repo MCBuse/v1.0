@@ -129,6 +129,14 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  PRODUCT_IMAGE_BUCKET?: string;
+
+  @IsOptional()
+  @IsString()
+  PRODUCT_IMAGE_PUBLIC_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
   CIRCLE_API_KEY?: string;
 
   @IsOptional()

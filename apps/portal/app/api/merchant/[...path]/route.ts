@@ -12,6 +12,8 @@ const allowed = [
   /^me\/transactions$/,
   /^me\/payment-requests$/,
   /^me\/payment-requests\/[0-9a-f-]{36}$/i,
+  /^me\/products(?:\/[0-9a-f-]{36}(?:\/(?:image|stock-adjustments))?)?$/i,
+  /^me\/invoices(?:\/[0-9a-f-]{36}(?:\/cancel)?)?$/i,
   /^me\/consents$/,
   /^me\/evidence-readiness$/,
 ];
@@ -30,11 +32,21 @@ async function forward(
       { status: 403 },
     );
   const search = request.nextUrl.search;
-  const body = request.method === "GET" ? undefined : await request.text();
+  const contentType = request.headers.get("content-type") ?? undefined;
+  const body =
+    request.method === "GET" || request.method === "DELETE"
+      ? undefined
+      : contentType?.startsWith("multipart/form-data")
+        ? await request.arrayBuffer()
+        : await request.text();
   try {
     const { upstream, rotatedTokens } = await remoteRequest(
       `/merchants/${relative}${search}`,
-      { method: request.method, body },
+      {
+        method: request.method,
+        body,
+        headers: contentType ? { "Content-Type": contentType } : undefined,
+      },
     );
     const payload = await upstream.text();
     const response = new NextResponse(payload || null, {
@@ -57,3 +69,5 @@ async function forward(
 
 export const GET = forward;
 export const POST = forward;
+export const PATCH = forward;
+export const DELETE = forward;

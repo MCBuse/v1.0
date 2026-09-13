@@ -64,6 +64,13 @@
       "when": 1788721200000,
       "tag": "0008_merchant_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789319972000,
+      "tag": "0009_merchant_inventory_invoices",
+      "breakpoints": true
     }
   ]
 }

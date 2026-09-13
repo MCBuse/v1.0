@@ -9,7 +9,12 @@ repository="${MCBUSE_ARTIFACT_REPOSITORY:-mcbuse}"
 service="${MCBUSE_RUN_SERVICE:-mcbuse-api}"
 service_account_name="${MCBUSE_RUN_SERVICE_ACCOUNT:-mcbuse-api}"
 service_account_email="${service_account_name}@${project_id}.iam.gserviceaccount.com"
+product_image_bucket="${MCBUSE_PRODUCT_IMAGE_BUCKET:-${project_id}-merchant-products}"
 environment_file="$repo_root/deploy/cloud-run/api.env.yaml"
+runtime_environment_file="$(mktemp)"
+trap 'rm -f "$runtime_environment_file"' EXIT
+cp "$environment_file" "$runtime_environment_file"
+printf '\nPRODUCT_IMAGE_BUCKET: "%s"\n' "$product_image_bucket" >>"$runtime_environment_file"
 
 if [[ ! -f "$backup_dir/database.dump" || ! -f "$backup_dir/SHA256SUMS" ]]; then
   echo "The backup directory must contain database.dump and SHA256SUMS." >&2
@@ -17,6 +22,11 @@ if [[ ! -f "$backup_dir/database.dump" || ! -f "$backup_dir/SHA256SUMS" ]]; then
 fi
 
 shasum -a 256 -c "$backup_dir/SHA256SUMS"
+
+if ! gcloud storage buckets describe "gs://${product_image_bucket}" --project="$project_id" >/dev/null 2>&1; then
+  echo "Product image bucket gs://${product_image_bucket} is missing. Run scripts/cloud-run/provision-product-images.sh first." >&2
+  exit 1
+fi
 
 required_secrets=(
   DATABASE_URL
@@ -70,7 +80,7 @@ gcloud run deploy "$service" \
   --region="$region" \
   --image="$image" \
   --service-account="$service_account_email" \
-  --env-vars-file="$environment_file" \
+  --env-vars-file="$runtime_environment_file" \
   --set-secrets=DATABASE_URL=DATABASE_URL:latest,JWT_ACCESS_SECRET=JWT_ACCESS_SECRET:latest,JWT_REFRESH_SECRET=JWT_REFRESH_SECRET:latest,SOLANA_KEYPAIR_ENCRYPTION_KEY=SOLANA_KEYPAIR_ENCRYPTION_KEY:latest,MOONPAY_PUBLIC_KEY=MOONPAY_PUBLIC_KEY:latest,MOONPAY_SECRET_KEY=MOONPAY_SECRET_KEY:latest,MOONPAY_WEBHOOK_SECRET=MOONPAY_WEBHOOK_SECRET:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest \
   --allow-unauthenticated \
   --ingress=all \

@@ -11,6 +11,7 @@ import { NavigationItem } from "@repo/ui/navigation";
 import {
   Building2,
   CircleDollarSign,
+  Package,
   LayoutDashboard,
   ReceiptText,
 } from "lucide-react";
@@ -22,6 +23,8 @@ import { ReceivePayment } from "./receive-payment";
 const navigation = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", icon: ReceiptText },
+  { href: "/inventory", label: "Inventory", icon: Package },
+  { href: "/invoices", label: "Invoices", icon: CircleDollarSign },
   { href: "/business-profile", label: "Business profile", icon: Building2 },
 ];
 

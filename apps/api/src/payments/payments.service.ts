@@ -15,6 +15,7 @@ import { randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { PaymentRequestsService } from '../payment-requests/payment-requests.service';
+import { MerchantInventoryService } from '../data-capture/merchant-inventory.service';
 import { UsersService } from '../users/users.service';
 import { ExecutePaymentDto } from './dto/execute-payment.dto';
 import { ExecuteUsernamePaymentDto } from './dto/execute-username-payment.dto';
@@ -45,6 +46,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     private readonly transferProvider: TransferProvider,
     private readonly paymentRequestsService: PaymentRequestsService,
     private readonly usersService: UsersService,
+    private readonly merchantInventory: MerchantInventoryService,
   ) {}
 
   onModuleInit() {
@@ -491,6 +493,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         .returning({ id: schema.paymentRequests.id });
       if (completed.length !== 1)
         throw new BadRequestException('Payment request cannot be finalized');
+      await this.merchantInventory.settleReservedInventory(tx, request.id);
       await tx.insert(schema.merchantTransactions).values({
         receiptNumber: `MCB-${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
         merchantId: request.merchantId,
@@ -714,6 +717,10 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         .update(schema.paymentRequests)
         .set({ status: 'failed' })
         .where(eq(schema.paymentRequests.id, paymentRequestId));
+      await this.merchantInventory.releaseReservedInventory(
+        tx,
+        paymentRequestId,
+      );
       if (payment.merchantId) {
         await tx
           .update(schema.merchantCaptureExceptions)

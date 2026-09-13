@@ -81,6 +81,65 @@ export type MerchantPaymentRequest = {
   createdAt: string;
 };
 
+export type MerchantProductStatus = 'active' | 'archived';
+
+export type MerchantProduct = {
+  id: string;
+  name: string;
+  sku: string | null;
+  description: string | null;
+  unitPrice: MoneyValue;
+  onHandQuantity: number;
+  reservedQuantity: number;
+  availableQuantity: number;
+  lowStockThreshold: number;
+  lowStock: boolean;
+  imageUrl: string | null;
+  status: MerchantProductStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MerchantProductPage = {
+  items: MerchantProduct[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
+export type MerchantInvoiceLine = {
+  id: string;
+  type: 'product' | 'custom';
+  productId: string | null;
+  name: string;
+  sku: string | null;
+  quantity: number;
+  unitPrice: MoneyValue;
+  lineTotal: MoneyValue;
+};
+
+export type MerchantInvoice = {
+  id: string;
+  invoiceNumber: string;
+  description: string | null;
+  lines: MerchantInvoiceLine[];
+  amount: MoneyValue;
+  status: MerchantPaymentRequestStatus;
+  expiresAt: string;
+  qrPayload: string;
+  completedAt: string | null;
+  createdAt: string;
+};
+
+export type MerchantInvoicePage = {
+  items: MerchantInvoice[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
 export type MerchantReadinessStage =
   | "integrity_review"
   | "insufficient_evidence"

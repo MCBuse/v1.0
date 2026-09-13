@@ -26,6 +26,13 @@ function paymentRequest(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  if (typeof value === 'object' && value !== null) {
+    return value as Record<string, unknown>;
+  }
+  throw new Error('Expected an insert record');
+}
+
 function selectChain(rows: unknown[]) {
   const chain: Record<string, jest.Mock> = {};
   chain.from = jest.fn(() => chain);
@@ -51,9 +58,17 @@ function createService(dbOverrides: Record<string, unknown> = {}) {
       routine: { id: ROUTINE_WALLET_ID },
     }),
   };
+  const merchantInventory = {
+    cancelInvoiceByPaymentRequestId: jest.fn().mockResolvedValue(undefined),
+    expireInvoice: jest.fn().mockResolvedValue(true),
+  };
   const db = dbOverrides;
-  const service = new PaymentRequestsService(db as never, walletsService as never);
-  return { service, db, walletsService };
+  const service = new PaymentRequestsService(
+    db as never,
+    walletsService as never,
+    merchantInventory as never,
+  );
+  return { service, db, walletsService, merchantInventory };
 }
 
 describe('PaymentRequestsService', () => {
@@ -67,9 +82,11 @@ describe('PaymentRequestsService', () => {
 
   it('creates an amount-only dynamic invoice with the default five-minute expiry', async () => {
     let inserted: Record<string, unknown> | undefined;
-    const returning = jest.fn(async () => [paymentRequest(inserted ?? {})]);
-    const values = jest.fn((value) => {
-      inserted = value;
+    const returning = jest.fn(() =>
+      Promise.resolve([paymentRequest(inserted ?? {})]),
+    );
+    const values = jest.fn((value: unknown) => {
+      inserted = asRecord(value);
       return { returning };
     });
 
@@ -92,16 +109,20 @@ describe('PaymentRequestsService', () => {
       description: 'Counter sale',
       status: 'pending',
     });
-    expect((inserted?.expiresAt as Date).toISOString()).toBe('2026-05-11T12:05:00.000Z');
+    expect((inserted?.expiresAt as Date).toISOString()).toBe(
+      '2026-05-11T12:05:00.000Z',
+    );
     expect(result.qrString).toContain(`nonce=${result.nonce}`);
     expect(result.qrString).toContain('amount=1250000');
   });
 
   it('computes dynamic invoice totals from line items and ignores client amount', async () => {
     let inserted: Record<string, unknown> | undefined;
-    const returning = jest.fn(async () => [paymentRequest(inserted ?? {})]);
-    const values = jest.fn((value) => {
-      inserted = value;
+    const returning = jest.fn(() =>
+      Promise.resolve([paymentRequest(inserted ?? {})]),
+    );
+    const values = jest.fn((value: unknown) => {
+      inserted = asRecord(value);
       return { returning };
     });
 
@@ -182,7 +203,7 @@ describe('PaymentRequestsService', () => {
       select: jest.fn(() => selects.shift()),
     });
 
-    await expect(service.resolve(pr.nonce as string)).resolves.toMatchObject({
+    await expect(service.resolve(pr.nonce)).resolves.toMatchObject({
       id: PR_ID,
       recipient: {
         username: 'ama_shop',
@@ -218,7 +239,7 @@ describe('PaymentRequestsService', () => {
       select: jest.fn(() => selects.shift()),
     });
 
-    await expect(service.resolve(pr.nonce as string)).resolves.toMatchObject({
+    await expect(service.resolve(pr.nonce)).resolves.toMatchObject({
       merchantId,
       recipient: {
         username: 'ama_shop',
@@ -239,7 +260,20 @@ describe('PaymentRequestsService', () => {
       update: jest.fn(() => update),
     });
 
-    await expect(service.resolve(stale.nonce as string)).rejects.toThrow('expired');
+    await expect(service.resolve(stale.nonce)).rejects.toThrow('expired');
+  });
+
+  it('expires an itemised merchant invoice through inventory so stock is released', async () => {
+    const stale = paymentRequest({
+      invoiceNumber: 'INV-20260511-ABC123',
+      expiresAt: new Date(NOW.getTime() - 1_000),
+    });
+    const { service, merchantInventory } = createService({
+      select: jest.fn(() => selectChain([stale])),
+    });
+
+    await expect(service.resolve(stale.nonce)).rejects.toThrow('expired');
+    expect(merchantInventory.expireInvoice).toHaveBeenCalledWith(PR_ID);
   });
 
   it('cancels a pending invoice owned by the user', async () => {
@@ -256,6 +290,22 @@ describe('PaymentRequestsService', () => {
     });
   });
 
+  it('routes itemised merchant invoice cancellation through inventory to release stock', async () => {
+    const { service, merchantInventory } = createService({
+      select: jest.fn(() =>
+        selectChain([paymentRequest({ invoiceNumber: 'INV-20260511-ABC123' })]),
+      ),
+    });
+
+    await expect(service.cancel(USER_ID, PR_ID)).resolves.toEqual({
+      id: PR_ID,
+      status: 'cancelled',
+    });
+    expect(
+      merchantInventory.cancelInvoiceByPaymentRequestId,
+    ).toHaveBeenCalledWith(PR_ID);
+  });
+
   it('marks a dynamic invoice completed with the ledger entry id', async () => {
     const update = updateChain([{ id: PR_ID }]);
 
@@ -263,6 +313,8 @@ describe('PaymentRequestsService', () => {
       update: jest.fn(() => update),
     });
 
-    await expect(service.markCompleted(PR_ID, LEDGER_ID)).resolves.toBeUndefined();
+    await expect(
+      service.markCompleted(PR_ID, LEDGER_ID),
+    ).resolves.toBeUndefined();
   });
 });

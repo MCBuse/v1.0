@@ -9,12 +9,13 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, lt, desc } from 'drizzle-orm';
+import { eq, and, lt, desc, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { WalletsService } from '../wallets/wallets.service';
 import { CreatePaymentRequestDto } from './dto/create-payment-request.dto';
+import { MerchantInventoryService } from '../data-capture/merchant-inventory.service';
 
 const DEFAULT_EXPIRY_SECONDS = 300; // 5 minutes for dynamic QR
 const BASE_UNITS_PER_CENT = 10_000n; // USDC/EURC use 6 decimals: 0.01 = 10_000
@@ -29,6 +30,7 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly walletsService: WalletsService,
+    private readonly merchantInventory: MerchantInventoryService,
   ) {}
 
   onModuleInit() {
@@ -139,11 +141,12 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException(`Payment request is ${pr.status}`);
     }
     if (pr.expiresAt && pr.expiresAt < new Date()) {
-      // Mark expired inline for immediate consistency
-      await this.db
-        .update(schema.paymentRequests)
-        .set({ status: 'expired' })
-        .where(eq(schema.paymentRequests.id, pr.id));
+      if (pr.invoiceNumber) await this.merchantInventory.expireInvoice(pr.id);
+      else
+        await this.db
+          .update(schema.paymentRequests)
+          .set({ status: 'expired' })
+          .where(eq(schema.paymentRequests.id, pr.id));
       throw new BadRequestException('Payment request has expired');
     }
 
@@ -184,6 +187,17 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
         .limit(1);
       merchantName = merchantRows[0]?.businessName ?? null;
     }
+    const invoiceItems = pr.invoiceNumber
+      ? await this.db
+          .select({
+            name: schema.merchantInvoiceItems.name,
+            quantity: schema.merchantInvoiceItems.quantity,
+            unitPriceMinor: schema.merchantInvoiceItems.unitPriceMinor,
+            lineTotalMinor: schema.merchantInvoiceItems.lineTotalMinor,
+          })
+          .from(schema.merchantInvoiceItems)
+          .where(eq(schema.merchantInvoiceItems.paymentRequestId, pr.id))
+      : [];
 
     return {
       ...this.sanitize(pr),
@@ -200,6 +214,19 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
         displayName: merchantName ?? `${row.firstName} ${row.lastName}`.trim(),
         businessName: merchantName,
       },
+      merchantInvoice: pr.invoiceNumber
+        ? {
+            invoiceNumber: pr.invoiceNumber,
+            displayAmountMinor: pr.displayAmountMinor?.toString() ?? null,
+            displayCurrency: pr.displayCurrency,
+            lines: invoiceItems.map((item) => ({
+              name: item.name,
+              quantity: item.quantity,
+              unitPriceMinor: item.unitPriceMinor.toString(),
+              lineTotalMinor: item.lineTotalMinor.toString(),
+            })),
+          }
+        : null,
     };
   }
 
@@ -241,6 +268,14 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
 
   async cancel(userId: string, id: string) {
     const pr = await this.loadAndOwn(userId, id);
+
+    // Itemised merchant invoices use the same underlying payment-request table,
+    // but cancelling one must also release its product reservation.
+    if (pr.invoiceNumber) {
+      await this.merchantInventory.cancelInvoiceByPaymentRequestId(id);
+      this.logger.log(`Merchant invoice cancelled: ${id}`);
+      return { id, status: 'cancelled' };
+    }
 
     // Atomic conditional UPDATE — prevents race with concurrent completion/expiry
     const result = await this.db
@@ -296,6 +331,7 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
         .where(
           and(
             eq(schema.paymentRequests.status, 'pending'),
+            isNull(schema.paymentRequests.invoiceNumber),
             lt(schema.paymentRequests.expiresAt, new Date()),
           ),
         )

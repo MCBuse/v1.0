@@ -46,6 +46,14 @@ function isCentAmount(baseUnits: string): boolean {
   return amount >= CENT_BASE_UNITS && amount % CENT_BASE_UNITS === 0n;
 }
 
+function formatEurMinor(minor: string) {
+  return new Intl.NumberFormat('en-IE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+  }).format(Number(BigInt(minor)) / 100);
+}
+
 export default function ScanScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
@@ -330,6 +338,7 @@ export default function ScanScreen() {
       : "-";
     const items = paymentReq.lineItems ?? [];
     const hasItems = items.length > 0;
+    const merchantInvoice = paymentReq.merchantInvoice;
 
     return (
       <View
@@ -389,6 +398,11 @@ export default function ScanScreen() {
               You are paying
             </Text>
             <Text variant="display">{displayAmt}</Text>
+            {merchantInvoice?.displayAmountMinor ? (
+              <Text variant="caption" color="textSecondary">
+                {merchantInvoice.invoiceNumber} · {formatEurMinor(merchantInvoice.displayAmountMinor)} invoice total
+              </Text>
+            ) : null}
             {paymentReq.description && (
               <Text
                 variant="caption"
@@ -441,6 +455,33 @@ export default function ScanScreen() {
               })}
             </Box>
           )}
+
+          {merchantInvoice?.lines.length ? (
+            <Box
+              backgroundColor="bgSecondary"
+              borderRadius="l"
+              padding="l"
+              gap="s"
+              marginBottom="l"
+            >
+              <Text variant="captionMedium" color="textSecondary" marginBottom="xs">
+                Invoice items
+              </Text>
+              {merchantInvoice.lines.map((item, index) => (
+                <Box
+                  key={`${item.name}_${index}`}
+                  flexDirection="row"
+                  justifyContent="space-between"
+                  gap="m"
+                >
+                  <Text variant="body" style={styles.itemName} numberOfLines={1}>
+                    {item.quantity} x {item.name}
+                  </Text>
+                  <Text variant="bodyMedium">{formatEurMinor(item.lineTotalMinor)}</Text>
+                </Box>
+              ))}
+            </Box>
+          ) : null}
         </ScrollView>
 
         <Box

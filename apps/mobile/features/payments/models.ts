@@ -82,6 +82,22 @@ export const resolveResponse = paymentRequest.extend({
     displayName: z.string(),
     businessName: z.string().nullable().optional(),
   }),
+  merchantInvoice: z
+    .object({
+      invoiceNumber: z.string(),
+      displayAmountMinor: z.string().nullable(),
+      displayCurrency: z.string().nullable(),
+      lines: z.array(
+        z.object({
+          name: z.string(),
+          quantity: z.number().int(),
+          unitPriceMinor: z.string(),
+          lineTotalMinor: z.string(),
+        }),
+      ),
+    })
+    .nullable()
+    .optional(),
 });
 export type ResolveResponse = z.infer<typeof resolveResponse>;
 

@@ -41,7 +41,7 @@ const QR_SCHEME = 'mcbuse://pay';
 const QR_VERSION = '1';
 const REQUEST_TTL_MS = 10 * 60 * 1000;
 
-type MerchantContext = {
+export type MerchantContext = {
   merchantId: string;
   publicId: string;
   businessName: string;
@@ -425,7 +425,7 @@ export class MerchantService {
     });
   }
 
-  private async requireMerchant(userId: string): Promise<MerchantContext> {
+  async requireMerchant(userId: string): Promise<MerchantContext> {
     this.assertEnabled();
     const rows = await this.db
       .select({
@@ -455,7 +455,7 @@ export class MerchantService {
     return rows[0];
   }
 
-  private assertEnabled() {
+  assertEnabled() {
     const configured = this.config.get<string>('MERCHANT_PORTAL_ENABLED');
     if (
       configured === 'false' ||

@@ -29,6 +29,7 @@ import { Box, Text } from "@/components/ui";
 import { useTransactions } from "@/features/transactions";
 import type { LedgerEntry } from "@/features/transactions";
 import { useProfile } from "@/features/users";
+import { useMerchantProfile } from "@/features/merchant";
 import { useWallets } from "@/features/wallets";
 import {
   displayCurrencyLabel,
@@ -138,6 +139,7 @@ export default function HomeScreen() {
   const walletsQuery = useWallets();
   const profileQuery = useProfile();
   const txQuery = useTransactions({ limit: 5 });
+  const merchantQuery = useMerchantProfile();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -243,6 +245,25 @@ export default function HomeScreen() {
           </Box>
         </Box>
       </Box>
+
+      {merchantQuery.data ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/(flows)/merchant-invoices" as any)}
+          style={[styles.merchantShortcut, { backgroundColor: colors.bgSecondary, borderColor: colors.borderDefault }]}
+        >
+          <Box flexDirection="row" alignItems="center" gap="m">
+            <ReceiptText size={22} color={colors.textPrimary} variant="Linear" />
+            <Box>
+              <Text variant="bodyMedium">Merchant invoices</Text>
+              <Text variant="caption" color="textSecondary">
+                Create and show payment QR codes
+              </Text>
+            </Box>
+          </Box>
+          <Text variant="captionMedium">Open</Text>
+        </Pressable>
+      ) : null}
 
       {/* ── Balance cards (horizontal scroll) ────────────────────────── */}
       <FlatList
@@ -674,6 +695,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarLetter: { fontSize: 14 },
+  merchantShortcut: {
+    marginHorizontal: 24,
+    marginBottom: 24,
+    minHeight: 68,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
 
   txRow: { borderBottomWidth: StyleSheet.hairlineWidth },
   statusBadge: {
