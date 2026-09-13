@@ -173,16 +173,19 @@ test("overview renders money records and responsive navigation", async ({
     await expect(
       page.getByRole("navigation", { name: "Mobile" }),
     ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Receive" })).toHaveCount(0);
   }
+  await expect(
+    page.getByRole("button", { name: "Create request" }),
+  ).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("validates the mobile receive sheet and restores trigger focus", async ({
+test("validates the receive drawer and restores trigger focus", async ({
   page,
-}, testInfo) => {
-  test.skip(testInfo.project.name === "desktop", "desktop uses the fixed rail");
-
+}) => {
   await page.goto("/overview");
-  const trigger = page.getByRole("button", { name: "Receive" });
+  const trigger = page.getByRole("button", { name: "Create request" });
   await trigger.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
@@ -196,6 +199,31 @@ test("validates the mobile receive sheet and restores trigger focus", async ({
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
+});
+
+test("shows one Create request action on every merchant page", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "the shell is shared across widths",
+  );
+
+  for (const path of [
+    "/overview",
+    "/transactions",
+    "/inventory",
+    "/invoices",
+    "/business-profile",
+  ]) {
+    await page.goto(path);
+    await expect(
+      page.getByRole("button", { name: "Create request" }),
+    ).toHaveCount(1);
+    await expect(
+      page.getByRole("button", { name: "Create request" }),
+    ).toBeVisible();
+  }
 });
 
 test("a completed request refreshes the dashboard without a reload", async ({
@@ -267,9 +295,22 @@ test("a completed request refreshes the dashboard without a reload", async ({
   );
 
   await page.goto("/overview");
-  await page.locator("#amount-desktop").fill("4.50");
-  await page.locator("#description-desktop").fill("Lunch order");
-  await page.getByRole("button", { name: "Create payment request" }).click();
+  const trigger = page.getByRole("button", { name: "Create request" });
+  await trigger.click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("textbox", { name: "Amount", exact: true })
+    .fill("4.50");
+  await dialog
+    .getByRole("textbox", { name: "Description" })
+    .fill("Lunch order");
+  await dialog.getByRole("button", { name: "Create payment request" }).click();
+  await expect(page.getByLabel("Payment request QR code")).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Close payment request drawer" })
+    .click();
+  await expect(dialog).toBeHidden();
+  await trigger.click();
   await expect(page.getByLabel("Payment request QR code")).toBeVisible();
   await expect(page.getByText("Payment received")).toBeVisible({
     timeout: 7_000,

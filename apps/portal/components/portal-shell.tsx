@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Dialog,
-  DialogDescription,
-  DialogTitle,
-  DialogTrigger,
-  SheetContent,
-} from "@repo/ui/dialog";
+import { cn } from "@repo/ui/cn";
 import { NavigationItem } from "@repo/ui/navigation";
 import {
   Building2,
@@ -18,7 +12,7 @@ import {
 import { usePathname } from "next/navigation";
 import { Logo } from "./logo";
 import { LogoutButton } from "./logout-button";
-import { ReceivePayment } from "./receive-payment";
+import { ReceivePaymentDrawer } from "./receive-payment";
 
 const navigation = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
@@ -52,7 +46,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           <LogoutButton />
         </div>
       </aside>
-      <div className="lg:pl-60 xl:pr-[23rem]">
+      <div className="lg:pl-60">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur lg:px-8">
           <div className="lg:hidden">
             <Logo />
@@ -62,51 +56,39 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
               Merchant workspace
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-xs text-slate-400 sm:inline">
-              Live records
-            </span>
-            <span
-              className="size-2 rounded-full bg-emerald-500"
-              aria-label="Live data connected"
-            />
+          <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-2 sm:flex">
+              <span className="text-xs text-slate-500">Live records</span>
+              <span
+                className="size-2 rounded-full bg-emerald-500"
+                aria-label="Live data connected"
+              />
+            </div>
+            <ReceivePaymentDrawer />
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-10">
           {children}
         </main>
       </div>
-      <aside className="fixed inset-y-0 right-0 hidden w-[23rem] overflow-y-auto border-l border-slate-200 bg-white px-6 py-8 xl:block">
-        <ReceivePayment />
-      </aside>
       <nav
         aria-label="Mobile"
-        className="fixed inset-x-0 bottom-0 z-40 grid h-[4.75rem] grid-cols-4 border-t border-slate-200 bg-white px-2 pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid h-[4.75rem] grid-cols-5 border-t border-slate-200 bg-white px-2 pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         {navigation.map(({ href, label, icon: Icon }) => (
           <a
             key={href}
             href={href}
             aria-current={pathname === href ? "page" : undefined}
-            className={`flex min-h-11 flex-col items-center justify-center gap-1 text-[11px] font-medium ${pathname === href ? "text-blue-700" : "text-slate-500"}`}
+            className={cn(
+              "flex min-h-11 flex-col items-center justify-center gap-1 text-[11px] font-medium",
+              pathname === href ? "text-blue-700" : "text-slate-500",
+            )}
           >
-            <Icon size={20} />
+            <Icon size={20} aria-hidden="true" />
             <span>{label === "Business profile" ? "Profile" : label}</span>
           </a>
         ))}
-        <Dialog>
-          <DialogTrigger className="flex min-h-11 flex-col items-center justify-center gap-1 text-[11px] font-medium text-blue-700">
-            <CircleDollarSign size={20} />
-            <span>Receive</span>
-          </DialogTrigger>
-          <SheetContent>
-            <DialogTitle className="sr-only">Receive payment</DialogTitle>
-            <DialogDescription className="sr-only">
-              Create a euro payment request for a customer to scan.
-            </DialogDescription>
-            <ReceivePayment compact />
-          </SheetContent>
-        </Dialog>
       </nav>
     </div>
   );
