@@ -1,11 +1,66 @@
 import { expect, test } from "@playwright/test";
 
+function summaryPayload({
+  receivedTodayMinor = "18420",
+  pendingRequestCount = 1,
+}: {
+  receivedTodayMinor?: string;
+  pendingRequestCount?: number;
+} = {}) {
+  return {
+    availableValue: {
+      minor: "421550",
+      currency: "EUR",
+      estimated: true,
+      rateTimestamp: new Date().toISOString(),
+    },
+    receivedToday: {
+      minor: receivedTodayMinor,
+      currency: "EUR",
+      estimated: false,
+      rateTimestamp: null,
+    },
+    received30Days: {
+      minor: receivedTodayMinor,
+      currency: "EUR",
+      estimated: false,
+      rateTimestamp: null,
+    },
+    paymentCount30Days: receivedTodayMinor === "0" ? 0 : 1,
+    averageSale: {
+      minor: receivedTodayMinor,
+      currency: "EUR",
+      estimated: false,
+      rateTimestamp: null,
+    },
+    dailyTrend: [
+      {
+        start: "2026-09-05",
+        amountMinor: receivedTodayMinor,
+        paymentCount: receivedTodayMinor === "0" ? 0 : 1,
+      },
+    ],
+    hourlyRhythm: Array.from({ length: 24 }, (_, hour) => ({
+      start: `${String(hour).padStart(2, "0")}:00`,
+      amountMinor: hour === 12 ? receivedTodayMinor : "0",
+      paymentCount: hour === 12 && receivedTodayMinor !== "0" ? 1 : 0,
+    })),
+    captureQualityPercent: receivedTodayMinor === "0" ? 0 : 100,
+    lastCapturedAt:
+      receivedTodayMinor === "0" ? null : new Date().toISOString(),
+    pendingRequestCount,
+    problemCount: 0,
+    problems: [],
+    lastUpdatedAt: new Date().toISOString(),
+  };
+}
+
 test.beforeEach(async ({ context, page }) => {
   await context.addCookies([
     {
       name: "mcbuse_portal_access",
       value: "test-only",
-      url: "http://127.0.0.1:3001",
+      url: "http://127.0.0.1:3101",
       httpOnly: true,
       sameSite: "Lax",
     },
@@ -14,18 +69,7 @@ test.beforeEach(async ({ context, page }) => {
     route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        availableValue: {
-          minor: "421550",
-          currency: "EUR",
-          estimated: true,
-          rateTimestamp: new Date().toISOString(),
-        },
-        receivedToday: {
-          minor: "18420",
-          currency: "EUR",
-          estimated: false,
-          rateTimestamp: null,
-        },
+        ...summaryPayload(),
         received30Days: {
           minor: "321090",
           currency: "EUR",
@@ -39,16 +83,20 @@ test.beforeEach(async ({ context, page }) => {
           estimated: false,
           rateTimestamp: null,
         },
-        dailyTrend: [
-          { start: "2026-09-05", amountMinor: "18420", paymentCount: 2 },
+        captureQualityPercent: 50,
+        lastCapturedAt: new Date().toISOString(),
+        problemCount: 1,
+        problems: [
+          {
+            id: "problem-1",
+            code: "payment_failed",
+            severity: "warning",
+            title: "Payment could not be completed",
+            action:
+              "Create a new payment request and ask the customer to try again.",
+            occurredAt: new Date().toISOString(),
+          },
         ],
-        hourlyRhythm: Array.from({ length: 24 }, (_, hour) => ({
-          start: `${String(hour).padStart(2, "0")}:00`,
-          amountMinor: hour === 12 ? "18420" : "0",
-          paymentCount: hour === 12 ? 2 : 0,
-        })),
-        pendingRequestCount: 1,
-        problemCount: 0,
         lastUpdatedAt: new Date().toISOString(),
       }),
     }),
@@ -97,6 +145,26 @@ test("overview renders money records and responsive navigation", async ({
   ).toBeVisible();
   await expect(page.getByText("€4,215.50")).toBeVisible();
   await expect(page.getByText("Lunch service")).toBeVisible();
+  await expect(page.getByText("Payment could not be completed")).toBeVisible();
+  await expect(page.getByText("50.00%")).toBeVisible();
+  await expect(
+    page.getByRole("img", {
+      name: "Daily received amount for the last 30 days",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", {
+      name: "Hourly sales rhythm for the last 30 days",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("table", {
+      name: "Daily received amount for the last 30 days",
+    }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("table", { name: "Hourly sales rhythm" }),
+  ).toHaveCount(1);
   if (testInfo.project.name === "desktop") {
     await expect(
       page.getByRole("navigation", { name: "Primary" }),
@@ -106,4 +174,218 @@ test("overview renders money records and responsive navigation", async ({
       page.getByRole("navigation", { name: "Mobile" }),
     ).toBeVisible();
   }
+});
+
+test("validates the mobile receive sheet and restores trigger focus", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === "desktop", "desktop uses the fixed rail");
+
+  await page.goto("/overview");
+  const trigger = page.getByRole("button", { name: "Receive" });
+  await trigger.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByRole("textbox", { name: "Amount", exact: true })
+    .fill("1.234");
+  await dialog.getByRole("button", { name: "Create payment request" }).click();
+  await expect(
+    page.getByText("Enter a valid euro amount with up to two decimal places."),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test("a completed request refreshes the dashboard without a reload", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one polling proof is enough");
+
+  let requestCompleted = false;
+  let summaryRequests = 0;
+  await page.unroute("**/api/merchant/me/summary**");
+  await page.route("**/api/merchant/me/summary**", (route) => {
+    summaryRequests += 1;
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(
+        summaryPayload({
+          receivedTodayMinor: requestCompleted ? "450" : "0",
+          pendingRequestCount: requestCompleted ? 0 : 1,
+        }),
+      ),
+    });
+  });
+  await page.route("**/api/merchant/me/payment-requests", (route) =>
+    route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "request-poll",
+        amount: {
+          minor: "450",
+          currency: "EUR",
+          estimated: false,
+          rateTimestamp: new Date().toISOString(),
+        },
+        description: "Lunch order",
+        status: "pending",
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        qrPayload:
+          "mcbuse://pay?nonce=00000000-0000-4000-8000-000000000001&v=1",
+        completedAt: null,
+        createdAt: new Date().toISOString(),
+      }),
+    }),
+  );
+  await page.route(
+    "**/api/merchant/me/payment-requests/request-poll",
+    (route) => {
+      requestCompleted = true;
+      return route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "request-poll",
+          amount: {
+            minor: "450",
+            currency: "EUR",
+            estimated: false,
+            rateTimestamp: new Date().toISOString(),
+          },
+          description: "Lunch order",
+          status: "completed",
+          expiresAt: new Date(Date.now() + 600_000).toISOString(),
+          qrPayload:
+            "mcbuse://pay?nonce=00000000-0000-4000-8000-000000000001&v=1",
+          completedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        }),
+      });
+    },
+  );
+
+  await page.goto("/overview");
+  await page.locator("#amount-desktop").fill("4.50");
+  await page.locator("#description-desktop").fill("Lunch order");
+  await page.getByRole("button", { name: "Create payment request" }).click();
+  await expect(page.getByLabel("Payment request QR code")).toBeVisible();
+  await expect(page.getByText("Payment received")).toBeVisible({
+    timeout: 7_000,
+  });
+  await expect.poll(() => summaryRequests).toBeGreaterThan(1);
+  await expect(
+    page.getByText("Received today").locator("..").getByText("€4.50"),
+  ).toBeVisible();
+});
+
+test("shows honest empty states for zero-filled merchant buckets", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one state proof is enough");
+
+  await page.unroute("**/api/merchant/me/summary**");
+  await page.unroute("**/api/merchant/me/transactions**");
+  await page.route("**/api/merchant/me/summary**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(
+        summaryPayload({ receivedTodayMinor: "0", pendingRequestCount: 0 }),
+      ),
+    }),
+  );
+  await page.route("**/api/merchant/me/transactions**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [],
+        page: 1,
+        pageSize: 5,
+        totalItems: 0,
+        totalPages: 1,
+      }),
+    }),
+  );
+
+  await page.goto("/overview");
+  await expect(
+    page.getByText("Your first sale will appear here"),
+  ).toBeVisible();
+  await expect(page.getByText("No payments received yet")).toBeVisible();
+  await expect(page.getByText("No data")).toBeVisible();
+});
+
+test("shows a safe error when the initial summary request fails", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one state proof is enough");
+
+  await page.unroute("**/api/merchant/me/summary**");
+  await page.route("**/api/merchant/me/summary**", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Service unavailable" }),
+    }),
+  );
+
+  await page.goto("/overview");
+  await expect(page.getByText("We could not load this")).toBeVisible();
+  await expect(page.getByText("Your payment records are safe.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+});
+
+test("keeps loaded values visible when a refresh is delayed", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one state proof is enough");
+
+  let summaryRequests = 0;
+  await page.unroute("**/api/merchant/me/summary**");
+  await page.route("**/api/merchant/me/summary**", (route) => {
+    summaryRequests += 1;
+    if (summaryRequests === 1) {
+      return route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(summaryPayload()),
+      });
+    }
+    return route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Service unavailable" }),
+    });
+  });
+
+  await page.goto("/overview");
+  await expect(page.getByText("€4,215.50")).toBeVisible();
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event("merchant:refresh")),
+  );
+  await expect.poll(() => summaryRequests).toBeGreaterThan(1);
+  await expect(page.getByText("Live updates are delayed.")).toBeVisible();
+  await expect(page.getByText("€4,215.50")).toBeVisible();
+});
+
+test("identifies an offline refresh while retaining loaded values", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one state proof is enough");
+
+  await page.goto("/overview");
+  await expect(page.getByText("€4,215.50")).toBeVisible();
+  await page.unroute("**/api/merchant/me/summary**");
+  await page.route("**/api/merchant/me/summary**", (route) =>
+    route.abort("internetdisconnected"),
+  );
+  await page.evaluate(() => {
+    Object.defineProperty(window.navigator, "onLine", {
+      configurable: true,
+      get: () => false,
+    });
+    window.dispatchEvent(new Event("merchant:refresh"));
+  });
+  await expect(page.getByText("You appear to be offline.")).toBeVisible();
+  await expect(page.getByText("€4,215.50")).toBeVisible();
 });

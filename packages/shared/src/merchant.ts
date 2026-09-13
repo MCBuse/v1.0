@@ -13,6 +13,20 @@ export type MerchantSummaryBucket = {
   paymentCount: number;
 };
 
+export type MerchantProblem = {
+  id: string;
+  code:
+    | "payment_failed"
+    | "payment_delayed"
+    | "capture_malformed"
+    | "capture_missed"
+    | "payment_issue";
+  severity: "info" | "warning" | "critical";
+  title: string;
+  action: string;
+  occurredAt: string;
+};
+
 export type MerchantSummary = {
   availableValue: MoneyValue;
   receivedToday: MoneyValue;
@@ -21,8 +35,11 @@ export type MerchantSummary = {
   averageSale: MoneyValue;
   dailyTrend: MerchantSummaryBucket[];
   hourlyRhythm: MerchantSummaryBucket[];
+  captureQualityPercent: number;
+  lastCapturedAt: string | null;
   pendingRequestCount: number;
   problemCount: number;
+  problems: MerchantProblem[];
   lastUpdatedAt: string;
 };
 

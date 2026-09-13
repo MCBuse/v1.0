@@ -8,6 +8,13 @@ export const ACCESS_COOKIE = "mcbuse_portal_access";
 export const REFRESH_COOKIE = "mcbuse_portal_refresh";
 export const CSRF_COOKIE = "mcbuse_portal_csrf";
 
+export type MerchantSessionState =
+  | "anonymous"
+  | "valid"
+  | "refresh"
+  | "rejected"
+  | "unavailable";
+
 const baseCookie = {
   httpOnly: true,
   sameSite: "lax" as const,
@@ -37,6 +44,31 @@ export function clearSessionCookies(response: NextResponse) {
     httpOnly: false,
     maxAge: 0,
   });
+}
+
+export async function getMerchantSessionState(): Promise<MerchantSessionState> {
+  const jar = await cookies();
+  const accessToken = jar.get(ACCESS_COOKIE)?.value;
+  const refreshToken = jar.get(REFRESH_COOKIE)?.value;
+  if (!accessToken && !refreshToken) return "anonymous";
+  if (!accessToken) return "refresh";
+
+  try {
+    const upstream = await fetch(`${API_URL}/merchants/me`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    if (upstream.ok) return "valid";
+    if (upstream.status === 401) return refreshToken ? "refresh" : "rejected";
+    if (upstream.status === 403 || upstream.status === 404) return "rejected";
+    return "unavailable";
+  } catch {
+    return "unavailable";
+  }
 }
 
 export async function remoteRequest(path: string, init: RequestInit = {}) {

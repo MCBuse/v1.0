@@ -10,7 +10,11 @@
     "db:generate": "pnpm --filter api db:generate",
     "db:migrate": "pnpm --filter api db:migrate",
     "db:push": "pnpm --filter api db:push",
-    "deploy:api:fly": "fly deploy -c fly.toml",
+    "deploy:api": "pnpm deploy:api:cloud-run",
+    "deploy:api:cloud-run:bootstrap": "bash scripts/cloud-run/bootstrap.sh",
+    "deploy:api:cloud-run:import-secrets": "bash scripts/cloud-run/import-fly-secrets.sh",
+    "deploy:api:cloud-run": "bash scripts/cloud-run/deploy.sh",
+    "deploy:portal:cloud-run": "bash scripts/cloud-run/deploy-portal.sh",
     "dev:api": "pnpm --filter api start:dev",
     "dev:portal": "pnpm --filter portal dev",
     "test:portal": "pnpm --filter portal test && pnpm --filter portal test:e2e"
@@ -23,13 +27,5 @@
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=18"
-  },
-  "pnpm": {
-    "overrides": {
-      "react": "19.1.0",
-      "react-dom": "19.1.0",
-      "react-native": "0.81.5",
-      "react-native-svg": "15.12.1"
-    }
   }
 }

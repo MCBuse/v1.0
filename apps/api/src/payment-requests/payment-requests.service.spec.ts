@@ -196,6 +196,38 @@ describe('PaymentRequestsService', () => {
     });
   });
 
+  it('uses the active merchant business name in the mobile payment response', async () => {
+    const merchantId = '66666666-6666-4666-8666-666666666666';
+    const pr = paymentRequest({ merchantId });
+    const selects = [
+      selectChain([pr]),
+      selectChain([
+        {
+          walletId: ROUTINE_WALLET_ID,
+          solanaPubkey: 'merchant-pubkey',
+          walletType: 'routine',
+          username: 'ama_shop',
+          firstName: 'Ama',
+          lastName: 'Mensah',
+        },
+      ]),
+      selectChain([{ businessName: 'Ama Corner Shop' }]),
+    ];
+
+    const { service } = createService({
+      select: jest.fn(() => selects.shift()),
+    });
+
+    await expect(service.resolve(pr.nonce as string)).resolves.toMatchObject({
+      merchantId,
+      recipient: {
+        username: 'ama_shop',
+        displayName: 'Ama Corner Shop',
+        businessName: 'Ama Corner Shop',
+      },
+    });
+  });
+
   it('marks stale invoices expired during resolve', async () => {
     const stale = paymentRequest({
       expiresAt: new Date(NOW.getTime() - 1_000),

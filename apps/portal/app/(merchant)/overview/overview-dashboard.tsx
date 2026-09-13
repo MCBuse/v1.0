@@ -72,6 +72,9 @@ export function OverviewDashboard() {
     );
   const data = summary.data;
   const delayed = Date.now() - new Date(data.lastUpdatedAt).getTime() > 90_000;
+  const hasDailySales = data.dailyTrend.some(
+    (bucket) => bucket.paymentCount > 0,
+  );
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -107,17 +110,33 @@ export function OverviewDashboard() {
         </Alert>
       ) : null}
       {data.problemCount > 0 ? (
-        <Alert className="flex items-center gap-3 border-red-200 bg-red-50 text-red-800">
-          <AlertTriangle size={18} />
-          <span>
-            <strong>
-              {data.problemCount} payment{" "}
-              {data.problemCount === 1 ? "problem needs" : "problems need"}{" "}
-              attention.
-            </strong>{" "}
-            No unresolved payment is included in received totals.
-          </span>
-        </Alert>
+        <section className="grid gap-3" aria-labelledby="payment-problems">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="text-red-600" size={18} />
+            <h2 id="payment-problems" className="font-semibold text-slate-950">
+              Payments needing attention
+            </h2>
+          </div>
+          {data.problems.map((problem) => (
+            <Alert
+              key={problem.id}
+              className="border-red-200 bg-red-50 text-red-900"
+            >
+              <strong className="block">{problem.title}</strong>
+              <span className="mt-1 block text-sm">{problem.action}</span>
+              <span className="mt-2 block text-xs text-red-700">
+                Reported{" "}
+                {new Intl.DateTimeFormat("en-GB", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(new Date(problem.occurredAt))}
+              </span>
+            </Alert>
+          ))}
+          <p className="text-xs text-slate-500">
+            Unresolved payments are never included in received totals.
+          </p>
+        </section>
       ) : null}
       <Card className="overflow-hidden">
         <CardContent className="p-6 sm:p-8">
@@ -167,6 +186,37 @@ export function OverviewDashboard() {
           value={<Money value={data.averageSale} />}
         />
       </div>
+      <Card>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
+          <div>
+            <p className="text-sm font-medium text-slate-950">
+              Payment capture quality
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              {data.lastCapturedAt
+                ? `Last received ${new Intl.DateTimeFormat("en-GB", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(data.lastCapturedAt))}`
+                : "No finalized payment history yet"}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-mono text-2xl font-medium tabular-nums text-slate-950">
+              {data.lastCapturedAt || data.problemCount
+                ? `${data.captureQualityPercent.toFixed(2)}%`
+                : "—"}
+            </p>
+            {!data.lastCapturedAt && !data.problemCount ? (
+              <Badge tone="neutral">No data</Badge>
+            ) : (
+              <Badge tone={data.problemCount ? "danger" : "success"}>
+                {data.problemCount ? "Needs attention" : "Healthy"}
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       <div className="grid gap-6 2xl:grid-cols-[1.5fr_1fr]">
         <Card>
           <CardHeader>
@@ -178,7 +228,7 @@ export function OverviewDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            {data.dailyTrend.length ? (
+            {hasDailySales ? (
               <SalesBars
                 buckets={data.dailyTrend}
                 label="Daily received amount for the last 30 days"

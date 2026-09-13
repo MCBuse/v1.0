@@ -27,6 +27,9 @@ export async function portalApi<T>(
   const payload = (await response.json().catch(() => ({}))) as {
     message?: string;
   };
+  if (response.status === 401 && typeof window !== "undefined") {
+    window.location.assign("/sign-in");
+  }
   if (!response.ok)
     throw new PortalApiError(
       payload.message ?? "Request failed",

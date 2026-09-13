@@ -33,8 +33,7 @@
       "package": "com.f_o_nyarko.mcbuse",
       "permissions": [
         "android.permission.NFC"
-      ],
-      "usesCleartextTraffic": true
+      ]
     },
     "web": {
       "output": "static",

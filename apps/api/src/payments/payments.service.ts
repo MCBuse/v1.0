@@ -9,7 +9,7 @@ import {
   OnModuleInit,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
@@ -31,6 +31,8 @@ type MerchantPaymentData = {
   quoteRateScaled: string;
   description: string | null;
 };
+
+const RECOVERY_TIMEOUT_MS = 5 * 60 * 1000;
 
 @Injectable()
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
@@ -58,7 +60,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async execute(payerUserId: string, dto: ExecutePaymentDto) {
-    const duplicate = await this.findCompletedByIdempotency(dto.idempotencyKey);
+    const duplicate = await this.findCompletedByIdempotency(
+      dto.idempotencyKey,
+      payerUserId,
+      dto.nonce,
+    );
     if (duplicate) return duplicate;
 
     const resolved = await this.paymentRequestsService.resolveForExecution(
@@ -117,6 +123,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         resolved.id,
         payerUserId,
         dto.idempotencyKey,
+        payerWallet.id,
+        currency,
+        amount,
       );
     }
     let result: { txSignature: string | null };
@@ -193,6 +202,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     paymentRequestId: string,
     payerUserId: string,
     idempotencyKey: string,
+    payerWalletId: string,
+    currency: string,
+    amount: bigint,
   ) {
     try {
       await this.db.transaction(async (tx) => {
@@ -216,6 +228,24 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
           throw new BadRequestException(
             'Payment request is already being processed',
           );
+        }
+        const reserved = await tx
+          .update(schema.balances)
+          .set({
+            available: sql`${schema.balances.available} - ${amount}`,
+            pending: sql`${schema.balances.pending} + ${amount}`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schema.balances.walletId, payerWalletId),
+              eq(schema.balances.currency, currency),
+              gte(schema.balances.available, amount),
+            ),
+          )
+          .returning({ id: schema.balances.id });
+        if (reserved.length !== 1) {
+          throw new BadRequestException('Insufficient balance');
         }
       });
     } catch (error) {
@@ -254,7 +284,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       dynamicPaymentRequestId,
       merchantPaymentRequest,
     } = params;
-    await this.assertAvailableBalance(payerWallet.id, currency, amount);
+    if (!merchantPaymentRequest)
+      await this.assertAvailableBalance(payerWallet.id, currency, amount);
     const transferResult = await this.transferProvider.execute({
       payerWalletId: payerWallet.id,
       payerPubkey: payerWallet.solanaPubkey,
@@ -266,7 +297,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       idempotencyKey,
       onSubmitted: merchantPaymentRequest
         ? async (txSignature) => {
-            await this.db
+            const submitted = await this.db
               .update(schema.merchantPaymentAttempts)
               .set({
                 status: 'submitted',
@@ -279,7 +310,29 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                   schema.merchantPaymentAttempts.idempotencyKey,
                   idempotencyKey,
                 ),
-              );
+              )
+              .returning({ id: schema.merchantPaymentAttempts.id });
+            if (submitted.length !== 1)
+              throw new Error('Payment attempt submission was not persisted');
+          }
+        : undefined,
+      onSignaturePrepared: merchantPaymentRequest
+        ? async (txSignature) => {
+            const prepared = await this.db
+              .update(schema.merchantPaymentAttempts)
+              .set({
+                submittedSignature: txSignature,
+                updatedAt: new Date(),
+              })
+              .where(
+                eq(
+                  schema.merchantPaymentAttempts.idempotencyKey,
+                  idempotencyKey,
+                ),
+              )
+              .returning({ id: schema.merchantPaymentAttempts.id });
+            if (prepared.length !== 1)
+              throw new Error('Payment attempt signature was not persisted');
           }
         : undefined,
     });
@@ -400,7 +453,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         .where(eq(schema.merchantTransactions.paymentRequestId, request.id))
         .limit(1);
       if (existing[0]) return;
-      await this.moveBalances(
+      await this.settleMerchantReservation(
         tx,
         params.payerWallet.id,
         params.payeeWallet.id,
@@ -455,11 +508,29 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       });
       await tx
         .update(schema.merchantPaymentAttempts)
-        .set({ status: 'finalized', finalizedAt, updatedAt: finalizedAt })
+        .set({
+          status: 'finalized',
+          errorCode: null,
+          finalizedAt,
+          updatedAt: finalizedAt,
+        })
         .where(
           eq(
             schema.merchantPaymentAttempts.idempotencyKey,
             params.idempotencyKey,
+          ),
+        );
+      await tx
+        .update(schema.merchantCaptureExceptions)
+        .set({ status: 'resolved', resolvedAt: finalizedAt })
+        .where(
+          and(
+            eq(schema.merchantCaptureExceptions.paymentRequestId, request.id),
+            eq(
+              schema.merchantCaptureExceptions.reasonCode,
+              'reconciliation_delayed',
+            ),
+            eq(schema.merchantCaptureExceptions.status, 'open'),
           ),
         );
     });
@@ -502,9 +573,117 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async settleMerchantReservation(
+    tx: Parameters<Parameters<typeof this.db.transaction>[0]>[0],
+    payerWalletId: string,
+    payeeWalletId: string,
+    currency: string,
+    amount: bigint,
+  ) {
+    const settled = await tx
+      .update(schema.balances)
+      .set({
+        pending: sql`${schema.balances.pending} - ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.balances.walletId, payerWalletId),
+          eq(schema.balances.currency, currency),
+          gte(schema.balances.pending, amount),
+        ),
+      )
+      .returning({ id: schema.balances.id });
+    if (settled.length !== 1)
+      throw new Error('Reserved merchant payment balance is unavailable');
+    await this.creditBalance(tx, payeeWalletId, currency, amount);
+  }
+
+  private async releaseMerchantReservation(
+    tx: Parameters<Parameters<typeof this.db.transaction>[0]>[0],
+    payerWalletId: string,
+    currency: string,
+    amount: bigint,
+  ) {
+    const released = await tx
+      .update(schema.balances)
+      .set({
+        available: sql`${schema.balances.available} + ${amount}`,
+        pending: sql`${schema.balances.pending} - ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.balances.walletId, payerWalletId),
+          eq(schema.balances.currency, currency),
+          gte(schema.balances.pending, amount),
+        ),
+      )
+      .returning({ id: schema.balances.id });
+    if (released.length !== 1)
+      throw new Error('Reserved merchant payment balance is unavailable');
+  }
+
+  private async creditBalance(
+    tx: Parameters<Parameters<typeof this.db.transaction>[0]>[0],
+    walletId: string,
+    currency: string,
+    amount: bigint,
+  ) {
+    const credited = await tx
+      .update(schema.balances)
+      .set({
+        available: sql`${schema.balances.available} + ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.balances.walletId, walletId),
+          eq(schema.balances.currency, currency),
+        ),
+      )
+      .returning({ id: schema.balances.id });
+    if (credited.length !== 1) {
+      throw new BadRequestException(
+        `Payee balance record not found for currency ${currency}`,
+      );
+    }
+  }
+
   private async markMerchantPaymentFailed(paymentRequestId: string) {
     await this.db.transaction(async (tx) => {
-      await tx
+      const paymentRows = await tx
+        .select({
+          payerWalletId: schema.wallets.id,
+          amount: schema.paymentRequests.amount,
+          currency: schema.paymentRequests.currency,
+          merchantId: schema.paymentRequests.merchantId,
+        })
+        .from(schema.merchantPaymentAttempts)
+        .innerJoin(
+          schema.paymentRequests,
+          eq(
+            schema.paymentRequests.id,
+            schema.merchantPaymentAttempts.paymentRequestId,
+          ),
+        )
+        .innerJoin(
+          schema.wallets,
+          and(
+            eq(
+              schema.wallets.userId,
+              schema.merchantPaymentAttempts.payerUserId,
+            ),
+            eq(schema.wallets.type, 'routine'),
+          ),
+        )
+        .where(eq(schema.paymentRequests.id, paymentRequestId))
+        .limit(1);
+      const payment = paymentRows[0];
+      if (!payment?.amount || !payment.currency) {
+        throw new Error('Merchant payment reservation data is incomplete');
+      }
+      const failed = await tx
         .update(schema.merchantPaymentAttempts)
         .set({
           status: 'failed',
@@ -512,20 +691,48 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
           updatedAt: new Date(),
         })
         .where(
-          eq(schema.merchantPaymentAttempts.paymentRequestId, paymentRequestId),
-        );
+          and(
+            eq(
+              schema.merchantPaymentAttempts.paymentRequestId,
+              paymentRequestId,
+            ),
+            inArray(schema.merchantPaymentAttempts.status, [
+              'processing',
+              'submitted',
+            ]),
+          ),
+        )
+        .returning({ id: schema.merchantPaymentAttempts.id });
+      if (failed.length !== 1) return;
+      await this.releaseMerchantReservation(
+        tx,
+        payment.payerWalletId,
+        payment.currency,
+        payment.amount,
+      );
       await tx
         .update(schema.paymentRequests)
         .set({ status: 'failed' })
         .where(eq(schema.paymentRequests.id, paymentRequestId));
-      const requestRows = await tx
-        .select({ merchantId: schema.paymentRequests.merchantId })
-        .from(schema.paymentRequests)
-        .where(eq(schema.paymentRequests.id, paymentRequestId))
-        .limit(1);
-      if (requestRows[0]?.merchantId) {
+      if (payment.merchantId) {
+        await tx
+          .update(schema.merchantCaptureExceptions)
+          .set({ status: 'resolved', resolvedAt: new Date() })
+          .where(
+            and(
+              eq(
+                schema.merchantCaptureExceptions.paymentRequestId,
+                paymentRequestId,
+              ),
+              eq(
+                schema.merchantCaptureExceptions.reasonCode,
+                'reconciliation_delayed',
+              ),
+              eq(schema.merchantCaptureExceptions.status, 'open'),
+            ),
+          );
         await tx.insert(schema.merchantCaptureExceptions).values({
-          merchantId: requestRows[0].merchantId,
+          merchantId: payment.merchantId,
           paymentRequestId,
           reasonCode: 'transfer_failed',
           severity: 'warning',
@@ -535,15 +742,52 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  private async markMerchantPaymentDelayed(
+    paymentRequestId: string,
+    merchantId: string | null,
+  ) {
+    if (!merchantId) return;
+    await this.db.transaction(async (tx) => {
+      const marked = await tx
+        .update(schema.merchantPaymentAttempts)
+        .set({ errorCode: 'reconciliation_delayed', updatedAt: new Date() })
+        .where(
+          and(
+            eq(
+              schema.merchantPaymentAttempts.paymentRequestId,
+              paymentRequestId,
+            ),
+            inArray(schema.merchantPaymentAttempts.status, [
+              'processing',
+              'submitted',
+            ]),
+            isNull(schema.merchantPaymentAttempts.errorCode),
+          ),
+        )
+        .returning({ id: schema.merchantPaymentAttempts.id });
+      if (marked.length !== 1) return;
+      await tx.insert(schema.merchantCaptureExceptions).values({
+        merchantId,
+        paymentRequestId,
+        reasonCode: 'reconciliation_delayed',
+        severity: 'warning',
+        status: 'open',
+      });
+    });
+  }
+
   private async failUnsubmittedMerchantPayment(paymentRequestId: string) {
     const rows = await this.db
-      .select({ status: schema.merchantPaymentAttempts.status })
+      .select({
+        status: schema.merchantPaymentAttempts.status,
+        submittedSignature: schema.merchantPaymentAttempts.submittedSignature,
+      })
       .from(schema.merchantPaymentAttempts)
       .where(
         eq(schema.merchantPaymentAttempts.paymentRequestId, paymentRequestId),
       )
       .limit(1);
-    if (rows[0]?.status === 'processing')
+    if (rows[0]?.status === 'processing' && !rows[0].submittedSignature)
       await this.markMerchantPaymentFailed(paymentRequestId);
   }
 
@@ -562,14 +806,34 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             schema.merchantPaymentAttempts.paymentRequestId,
           ),
         )
-        .where(eq(schema.merchantPaymentAttempts.status, 'submitted'))
+        .where(
+          inArray(schema.merchantPaymentAttempts.status, [
+            'processing',
+            'submitted',
+          ]),
+        )
         .limit(25);
       for (const row of rows) {
-        if (!row.attempt.submittedSignature) continue;
+        const recoveryStartedAt =
+          row.attempt.submittedAt ?? row.attempt.claimedAt;
+        const recoveryExpired =
+          recoveryStartedAt.getTime() < Date.now() - RECOVERY_TIMEOUT_MS;
+        if (!row.attempt.submittedSignature) {
+          if (recoveryExpired)
+            await this.markMerchantPaymentFailed(row.request.id);
+          continue;
+        }
         const status = await this.transferProvider.getStatus(
           row.attempt.submittedSignature,
         );
-        if (status === 'pending') continue;
+        if (status === 'pending') {
+          if (recoveryExpired)
+            await this.markMerchantPaymentDelayed(
+              row.request.id,
+              row.request.merchantId,
+            );
+          continue;
+        }
         if (status === 'failed') {
           await this.markMerchantPaymentFailed(row.request.id);
           continue;
@@ -622,20 +886,57 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async findCompletedByIdempotency(idempotencyKey: string) {
+  private async findCompletedByIdempotency(
+    idempotencyKey: string,
+    payerUserId: string,
+    nonce: string,
+  ) {
     const rows = await this.db
-      .select()
+      .select({
+        txSignature: schema.ledgerEntries.solanaTxSignature,
+        amount: schema.ledgerEntries.amount,
+        currency: schema.ledgerEntries.currency,
+        payerWalletId: schema.ledgerEntries.debitWalletId,
+        payeeWalletId: schema.ledgerEntries.creditWalletId,
+        paymentRequestId: schema.ledgerEntries.paymentRequestId,
+        metadata: schema.ledgerEntries.metadata,
+      })
       .from(schema.ledgerEntries)
-      .where(eq(schema.ledgerEntries.idempotencyKey, idempotencyKey))
+      .innerJoin(
+        schema.wallets,
+        eq(schema.wallets.id, schema.ledgerEntries.debitWalletId),
+      )
+      .where(
+        and(
+          eq(schema.ledgerEntries.idempotencyKey, idempotencyKey),
+          eq(schema.wallets.userId, payerUserId),
+        ),
+      )
       .limit(1);
     const row = rows[0];
     if (!row) return null;
+
+    let recordedNonce: unknown;
+    try {
+      const metadata = JSON.parse(row.metadata ?? '{}') as {
+        nonce?: unknown;
+      };
+      recordedNonce = metadata.nonce;
+    } catch {
+      recordedNonce = undefined;
+    }
+    if (recordedNonce !== nonce) {
+      throw new BadRequestException(
+        'Idempotency key was already used for a different payment',
+      );
+    }
+
     return {
-      txSignature: row.solanaTxSignature,
+      txSignature: row.txSignature,
       amount: row.amount.toString(),
       currency: row.currency,
-      payerWalletId: row.debitWalletId,
-      payeeWalletId: row.creditWalletId,
+      payerWalletId: row.payerWalletId,
+      payeeWalletId: row.payeeWalletId,
       idempotencyKey,
       paymentRequestId: row.paymentRequestId ?? undefined,
     };

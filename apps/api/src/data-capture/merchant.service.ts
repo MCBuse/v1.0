@@ -27,6 +27,13 @@ import {
   euroMinorToUsdcBaseUnits,
   usdcBaseUnitsToEuroMinor,
 } from './merchant-money';
+import { toMerchantProblem } from './merchant-problem';
+import {
+  buildMerchantActivitySummary,
+  calculateCaptureQualityPercent,
+  merchantCalendarDaySpan,
+  merchantLocalDateKey,
+} from './merchant-summary';
 
 const CONSENT_PURPOSE = 'evidence_assessment';
 const CONSENT_VERSION = '2026-09-merchant-v1';
@@ -125,56 +132,94 @@ export class MerchantService {
       throw new BadRequestException('Only period=30d is supported');
     const merchant = await this.requireMerchant(userId);
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const thirtyOneDaysAgo = new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000);
 
-    const [transactions, balanceRows, pendingRows, problemRows] =
-      await Promise.all([
-        this.db
-          .select()
-          .from(schema.merchantTransactions)
-          .where(
-            and(
-              eq(schema.merchantTransactions.merchantId, merchant.merchantId),
-              eq(schema.merchantTransactions.status, 'finalized'),
-              gte(schema.merchantTransactions.occurredAt, thirtyDaysAgo),
-            ),
-          )
-          .orderBy(schema.merchantTransactions.occurredAt),
-        this.db
-          .select({ available: schema.balances.available })
-          .from(schema.balances)
-          .where(
-            and(
-              eq(schema.balances.walletId, merchant.receivingWalletId),
-              eq(schema.balances.currency, 'USDC'),
-            ),
-          )
-          .limit(1),
-        this.db
-          .select({ value: count() })
-          .from(schema.paymentRequests)
-          .where(
-            and(
-              eq(schema.paymentRequests.merchantId, merchant.merchantId),
-              or(
-                eq(schema.paymentRequests.status, 'pending'),
-                eq(schema.paymentRequests.status, 'processing'),
-              ),
+    const [
+      transactions,
+      balanceRows,
+      pendingRows,
+      captureExceptionRows,
+      openProblemRows,
+      latestTransactionRows,
+    ] = await Promise.all([
+      this.db
+        .select()
+        .from(schema.merchantTransactions)
+        .where(
+          and(
+            eq(schema.merchantTransactions.merchantId, merchant.merchantId),
+            eq(schema.merchantTransactions.status, 'finalized'),
+            gte(schema.merchantTransactions.occurredAt, thirtyOneDaysAgo),
+          ),
+        )
+        .orderBy(schema.merchantTransactions.occurredAt),
+      this.db
+        .select({ available: schema.balances.available })
+        .from(schema.balances)
+        .where(
+          and(
+            eq(schema.balances.walletId, merchant.receivingWalletId),
+            eq(schema.balances.currency, 'USDC'),
+          ),
+        )
+        .limit(1),
+      this.db
+        .select({ value: count() })
+        .from(schema.paymentRequests)
+        .where(
+          and(
+            eq(schema.paymentRequests.merchantId, merchant.merchantId),
+            or(
+              eq(schema.paymentRequests.status, 'pending'),
+              eq(schema.paymentRequests.status, 'processing'),
             ),
           ),
-        this.db
-          .select({ value: count() })
-          .from(schema.merchantCaptureExceptions)
-          .where(
-            and(
-              eq(
-                schema.merchantCaptureExceptions.merchantId,
-                merchant.merchantId,
-              ),
-              eq(schema.merchantCaptureExceptions.status, 'open'),
+        ),
+      this.db
+        .select({
+          reasonCode: schema.merchantCaptureExceptions.reasonCode,
+          createdAt: schema.merchantCaptureExceptions.createdAt,
+        })
+        .from(schema.merchantCaptureExceptions)
+        .where(
+          and(
+            eq(
+              schema.merchantCaptureExceptions.merchantId,
+              merchant.merchantId,
             ),
+            gte(schema.merchantCaptureExceptions.createdAt, thirtyOneDaysAgo),
           ),
-      ]);
+        ),
+      this.db
+        .select({
+          id: schema.merchantCaptureExceptions.id,
+          reasonCode: schema.merchantCaptureExceptions.reasonCode,
+          severity: schema.merchantCaptureExceptions.severity,
+          createdAt: schema.merchantCaptureExceptions.createdAt,
+        })
+        .from(schema.merchantCaptureExceptions)
+        .where(
+          and(
+            eq(
+              schema.merchantCaptureExceptions.merchantId,
+              merchant.merchantId,
+            ),
+            eq(schema.merchantCaptureExceptions.status, 'open'),
+          ),
+        )
+        .orderBy(desc(schema.merchantCaptureExceptions.createdAt)),
+      this.db
+        .select({ occurredAt: schema.merchantTransactions.occurredAt })
+        .from(schema.merchantTransactions)
+        .where(
+          and(
+            eq(schema.merchantTransactions.merchantId, merchant.merchantId),
+            eq(schema.merchantTransactions.status, 'finalized'),
+          ),
+        )
+        .orderBy(desc(schema.merchantTransactions.occurredAt))
+        .limit(1),
+    ]);
 
     const currentRate = this.rates.getAll().USD_TO_EUR;
     const rateScaled = decimalRateToScaled(currentRate.rate);
@@ -182,33 +227,12 @@ export class MerchantService {
       balanceRows[0]?.available ?? 0n,
       rateScaled,
     );
-    const todayKey = this.localDateKey(now, merchant.timezone);
-    let receivedToday = 0n;
-    let received30Days = 0n;
-    const daily = new Map<string, { amount: bigint; count: number }>();
-    const hourly = new Map<number, { amount: bigint; count: number }>();
-
-    for (const transaction of transactions) {
-      received30Days += transaction.displayAmountMinor;
-      const dayKey = this.localDateKey(
-        transaction.occurredAt,
-        merchant.timezone,
-      );
-      if (dayKey === todayKey) receivedToday += transaction.displayAmountMinor;
-      const day = daily.get(dayKey) ?? { amount: 0n, count: 0 };
-      day.amount += transaction.displayAmountMinor;
-      day.count += 1;
-      daily.set(dayKey, day);
-      const hourKey = this.localHour(transaction.occurredAt, merchant.timezone);
-      const hour = hourly.get(hourKey) ?? { amount: 0n, count: 0 };
-      hour.amount += transaction.displayAmountMinor;
-      hour.count += 1;
-      hourly.set(hourKey, hour);
-    }
-
-    const average = transactions.length
-      ? received30Days / BigInt(transactions.length)
-      : 0n;
+    const activity = buildMerchantActivitySummary({
+      now,
+      timeZone: merchant.timezone,
+      transactions,
+      exceptions: captureExceptionRows,
+    });
     const money = (
       minor: bigint,
       estimated = false,
@@ -222,25 +246,18 @@ export class MerchantService {
 
     return {
       availableValue: money(availableMinor, true, currentRate.updatedAt),
-      receivedToday: money(receivedToday),
-      received30Days: money(received30Days),
-      paymentCount30Days: transactions.length,
-      averageSale: money(average),
-      dailyTrend: [...daily.entries()].map(([start, bucket]) => ({
-        start,
-        amountMinor: bucket.amount.toString(),
-        paymentCount: bucket.count,
-      })),
-      hourlyRhythm: Array.from({ length: 24 }, (_, hour) => {
-        const bucket = hourly.get(hour) ?? { amount: 0n, count: 0 };
-        return {
-          start: `${String(hour).padStart(2, '0')}:00`,
-          amountMinor: bucket.amount.toString(),
-          paymentCount: bucket.count,
-        };
-      }),
+      receivedToday: money(activity.receivedTodayMinor),
+      received30Days: money(activity.received30DaysMinor),
+      paymentCount30Days: activity.paymentCount30Days,
+      averageSale: money(activity.averageSaleMinor),
+      dailyTrend: activity.dailyTrend,
+      hourlyRhythm: activity.hourlyRhythm,
+      captureQualityPercent: activity.captureQualityPercent,
+      lastCapturedAt:
+        latestTransactionRows[0]?.occurredAt.toISOString() ?? null,
       pendingRequestCount: pendingRows[0]?.value ?? 0,
-      problemCount: problemRows[0]?.value ?? 0,
+      problemCount: openProblemRows.length,
+      problems: openProblemRows.slice(0, 3).map(toMerchantProblem),
       lastUpdatedAt: now.toISOString(),
     };
   }
@@ -362,51 +379,48 @@ export class MerchantService {
         )
         .where(eq(schema.paymentRequests.merchantId, merchant.merchantId)),
       this.db
-        .select({ severity: schema.merchantCaptureExceptions.severity })
+        .select({
+          reasonCode: schema.merchantCaptureExceptions.reasonCode,
+          severity: schema.merchantCaptureExceptions.severity,
+          status: schema.merchantCaptureExceptions.status,
+        })
         .from(schema.merchantCaptureExceptions)
         .where(
-          and(
-            eq(
-              schema.merchantCaptureExceptions.merchantId,
-              merchant.merchantId,
-            ),
-            eq(schema.merchantCaptureExceptions.status, 'open'),
-          ),
+          eq(schema.merchantCaptureExceptions.merchantId, merchant.merchantId),
         ),
       this.latestConsent(merchant.merchantId),
     ]);
 
     const activeDays = new Set(
       transactions.map((transaction) =>
-        this.localDateKey(transaction.occurredAt, merchant.timezone),
+        merchantLocalDateKey(transaction.occurredAt, merchant.timezone),
       ),
     ).size;
     const observedDays = transactions[0]
-      ? Math.max(
-          1,
-          Math.floor(
-            (Date.now() - transactions[0].occurredAt.getTime()) / 86_400_000,
-          ) + 1,
+      ? merchantCalendarDaySpan(
+          transactions[0].occurredAt,
+          new Date(),
+          merchant.timezone,
         )
       : 0;
     const finalizedAttempts = attempts.filter(
       (attempt) => attempt.status === 'finalized',
     ).length;
-    const captureDenominator = transactions.length + exceptions.length;
-
     return calculateMerchantReadiness({
       observedDays,
       activeDays,
       finalizedPayments: transactions.length,
-      captureQualityPercent: captureDenominator
-        ? Math.round((transactions.length / captureDenominator) * 10_000) / 100
-        : 0,
+      captureQualityPercent: calculateCaptureQualityPercent(
+        transactions.length,
+        exceptions.map((exception) => exception.reasonCode),
+      ),
       finalityPercent: attempts.length
         ? Math.round((finalizedAttempts / attempts.length) * 10_000) / 100
         : 0,
       activeConsent: consent?.action === 'granted',
       unresolvedCriticalException: exceptions.some(
-        (exception) => exception.severity === 'critical',
+        (exception) =>
+          exception.severity === 'critical' && exception.status === 'open',
       ),
     });
   }
@@ -494,24 +508,6 @@ export class MerchantService {
       completedAt: row.completedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
     };
-  }
-
-  private localDateKey(date: Date, timeZone: string) {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
-  }
-
-  private localHour(date: Date, timeZone: string) {
-    const value = new Intl.DateTimeFormat('en-GB', {
-      timeZone,
-      hour: '2-digit',
-      hourCycle: 'h23',
-    }).format(date);
-    return Number(value);
   }
 
   static receiptNumber() {

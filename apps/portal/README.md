@@ -5,10 +5,28 @@ Runs locally on `http://localhost:3001` and connects to the deployed API through
 Required configuration:
 
 ```text
-MCBUSE_API_URL=https://mcbuse-api.fly.dev/api/v1
+MCBUSE_API_URL=https://mcbuse-api-332810840225.europe-west1.run.app/api/v1
 PORTAL_ORIGIN=http://localhost:3001
 NEXT_PUBLIC_AUTH_BACKGROUND_URL=
 SESSION_COOKIE_SECURE=false
 ```
 
 `MCBUSE_API_URL` is server-only. Access and refresh tokens are stored in HTTP-only cookies and are never exposed to browser JavaScript.
+
+The deployed hackathon portal is a separate Cloud Run service:
+
+```text
+https://mcbuse-portal-332810840225.europe-west1.run.app
+```
+
+Deploy it from the repository root with:
+
+```text
+MCBUSE_GCP_PROJECT_ID=mcbuse-hackathon-2026-fno pnpm deploy:portal:cloud-run
+```
+
+The portal runtime receives no database, JWT, Stripe, or wallet secret. Its only runtime configuration is the server-only API URL, canonical portal origin, secure-cookie enforcement, and the optional public authentication background URL.
+
+The configured service is the dedicated MCBuse Cloud Run deployment in the
+`mcbuse-hackathon-2026-fno` Google Cloud project. Do not point the portal at an
+unrelated Google Cloud project.

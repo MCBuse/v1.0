@@ -21,14 +21,14 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://mcbuse-api.fly.dev/api/v1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://mcbuse-api-332810840225.europe-west1.run.app/api/v1",
         "EXPO_PUBLIC_ONRAMP_REDIRECT_URL": "mcbuse://onramp/complete"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://mcbuse-api.fly.dev/api/v1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://mcbuse-api-332810840225.europe-west1.run.app/api/v1",
         "EXPO_PUBLIC_ONRAMP_REDIRECT_URL": "mcbuse://onramp/complete"
       }
     }

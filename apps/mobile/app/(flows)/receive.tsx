@@ -1,4 +1,5 @@
 import { useTheme } from '@shopify/restyle';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { CloseCircle, Copy } from 'iconsax-react-native';
 import React, { useEffect, useState } from 'react';
@@ -32,10 +33,16 @@ export default function ReceiveScreen() {
 
   const handleCopyAddress = async () => {
     if (!routineAddress) return;
-    // expo-clipboard is not guaranteed to be installed; use Share as fallback
-    await Share.share({ message: routineAddress, title: 'My MCBuse address' });
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await Clipboard.setStringAsync(routineAddress);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      await Share.share({
+        message: routineAddress,
+        title: 'My MCBuse address',
+      });
+    }
   };
 
   const handleShare = async () => {
@@ -159,11 +166,15 @@ export default function ReceiveScreen() {
             {/* Address row */}
             <Pressable
               onPress={handleCopyAddress}
+              accessibilityRole="button"
+              accessibilityLabel={
+                copied ? 'Routine address copied' : 'Copy routine address'
+              }
               style={[styles.addressRow, { backgroundColor: colors.bgSecondary }]}
             >
               <Box flex={1}>
                 <Text variant="caption" color="textTertiary" style={{ marginBottom: 2 }}>
-                  Routine address
+                  {copied ? 'Address copied' : 'Routine address'}
                 </Text>
                 <Text variant="captionMedium" numberOfLines={1}>
                   {truncateAddress(routineAddress, 12)}

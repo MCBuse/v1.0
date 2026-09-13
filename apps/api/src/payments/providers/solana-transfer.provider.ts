@@ -9,6 +9,7 @@ import {
   createTransferCheckedInstruction,
   getMint,
 } from '@solana/spl-token';
+import bs58 from 'bs58';
 import { SolanaService } from '../../solana/solana.service';
 import type {
   TransferProvider,
@@ -61,7 +62,8 @@ export class SolanaTransferProvider implements TransferProvider {
         `${params.payerPubkey.slice(0, 8)}… → ${params.payeePubkey.slice(0, 8)}…`,
     );
 
-    let submittedSignature: string | null = null;
+    let preparedSignature: string | null = null;
+    let broadcastAttempted = false;
     try {
       // Get or create ATAs for both wallets (payer pays for ATA creation)
       const [payerAta, payeeAta] = await Promise.all([
@@ -90,14 +92,29 @@ export class SolanaTransferProvider implements TransferProvider {
         mintInfo.decimals,
       );
 
-      const tx = new Transaction().add(ix);
-      const txSignature = await connection.sendTransaction(tx, [payerKeypair], {
+      const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+      const tx = new Transaction({
+        feePayer: payerPubkey,
+        recentBlockhash: latestBlockhash.blockhash,
+      }).add(ix);
+      tx.sign(payerKeypair);
+      const signatureBytes = tx.signature;
+      if (!signatureBytes)
+        throw new Error('Signed transaction did not contain a signature');
+      const signature = bs58.encode(signatureBytes);
+      preparedSignature = signature;
+      await params.onSignaturePrepared?.(signature);
+
+      broadcastAttempted = true;
+      const txSignature = await connection.sendRawTransaction(tx.serialize(), {
         preflightCommitment: 'confirmed',
       });
-      submittedSignature = txSignature;
+      if (txSignature !== preparedSignature) {
+        throw new Error('RPC returned an unexpected transaction signature');
+      }
       await params.onSubmitted?.(txSignature);
       const confirmation = await connection.confirmTransaction(
-        txSignature,
+        { signature: txSignature, ...latestBlockhash },
         'finalized',
       );
       if (confirmation.value.err)
@@ -110,12 +127,12 @@ export class SolanaTransferProvider implements TransferProvider {
         '[SolanaTransfer] Failed',
         err instanceof Error ? err.stack : err,
       );
-      if (submittedSignature) {
-        const status = await this.getStatus(submittedSignature).catch(
+      if (broadcastAttempted && preparedSignature) {
+        const status = await this.getStatus(preparedSignature).catch(
           () => 'pending' as const,
         );
         if (status !== 'failed')
-          return { txSignature: submittedSignature, status: 'pending' };
+          return { txSignature: preparedSignature, status: 'pending' };
       }
       return { txSignature: null, status: 'failed' };
     }

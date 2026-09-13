@@ -7,6 +7,7 @@ export interface TransferParams {
   amount: bigint;
   currency: string;
   idempotencyKey: string;
+  onSignaturePrepared?: (txSignature: string) => Promise<void>;
   onSubmitted?: (txSignature: string) => Promise<void>;
 }
 

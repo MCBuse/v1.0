@@ -69,6 +69,7 @@ export function TransactionsView() {
               />
               <Input
                 name="query"
+                aria-label="Search receipts"
                 defaultValue={query}
                 placeholder="Search receipt or description"
                 className="pl-9"
@@ -105,39 +106,41 @@ export function TransactionsView() {
             />
           ) : resource.data?.items.length ? (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Receipt</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Received</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {resource.data.items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono text-xs">
-                        {item.receiptNumber}
-                      </TableCell>
-                      <TableCell>{item.description ?? "Payment"}</TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {new Intl.DateTimeFormat("en-GB", {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        }).format(new Date(item.receivedAt))}
-                      </TableCell>
-                      <TableCell>
-                        <Badge tone="success">Received</Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-slate-950">
-                        <Money value={item.amount} />
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Receipt</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Received</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {resource.data.items.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-mono text-xs">
+                          {item.receiptNumber}
+                        </TableCell>
+                        <TableCell>{item.description ?? "Payment"}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {new Intl.DateTimeFormat("en-GB", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          }).format(new Date(item.receivedAt))}
+                        </TableCell>
+                        <TableCell>
+                          <Badge tone="success">Received</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-slate-950">
+                          <Money value={item.amount} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
               <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
                 <p className="text-xs text-slate-500">
                   Page {resource.data.page} of {resource.data.totalPages} ·{" "}

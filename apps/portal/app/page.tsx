@@ -6,7 +6,7 @@ export default async function Home() {
   const jar = await cookies();
   redirect(
     jar.has(ACCESS_COOKIE) || jar.has(REFRESH_COOKIE)
-      ? "/overview"
+      ? "/api/auth/session?next=/overview"
       : "/sign-in",
   );
 }

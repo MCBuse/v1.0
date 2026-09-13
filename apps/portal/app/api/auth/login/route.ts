@@ -50,12 +50,56 @@ export async function POST(request: NextRequest) {
         },
         { status: upstream.status === 401 ? 401 : 503 },
       );
-    const tokens = (await upstream.json()) as {
-      accessToken: string;
-      refreshToken: string;
-    };
+    const tokens = (await upstream.json().catch(() => null)) as {
+      accessToken?: unknown;
+      refreshToken?: unknown;
+    } | null;
+    if (
+      !tokens ||
+      typeof tokens.accessToken !== "string" ||
+      typeof tokens.refreshToken !== "string"
+    )
+      return NextResponse.json(
+        { message: "Sign-in is unavailable right now" },
+        { status: 503 },
+      );
+
+    const membership = await fetch(`${API_URL}/merchants/me`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${tokens.accessToken}`,
+      },
+    });
+    if (!membership.ok) {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: "POST",
+        cache: "no-store",
+        signal: AbortSignal.timeout(12_000),
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${tokens.accessToken}`,
+        },
+        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+      }).catch(() => undefined);
+      if (membership.status === 403 || membership.status === 404)
+        return NextResponse.json(
+          { message: "This account does not have merchant portal access" },
+          { status: 403 },
+        );
+      return NextResponse.json(
+        { message: "Sign-in is unavailable right now" },
+        { status: 503 },
+      );
+    }
+
     const response = NextResponse.json({ ok: true });
-    setSessionCookies(response, tokens);
+    setSessionCookies(response, {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    });
     response.cookies.set(CSRF_COOKIE, randomUUID(), {
       httpOnly: false,
       sameSite: "lax",

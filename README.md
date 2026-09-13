@@ -25,7 +25,7 @@ Turborepo monorepo with pnpm workspaces.
 - **pnpm** ≥ 9 (`npm install -g pnpm`)
 - **PostgreSQL** ≥ 14 (local install or Docker)
 - **EAS CLI** for mobile builds: `npm install -g eas-cli`
-- **Fly CLI** for API deploys (optional): `brew install flyctl`
+- **Google Cloud CLI** for API deploys (optional): `brew install --cask google-cloud-sdk`
 - **Stripe CLI** for local webhook forwarding (optional): `brew install stripe/stripe-cli/stripe`
 - Xcode (iOS) and/or Android Studio (Android) for simulators/devices
 
@@ -180,16 +180,22 @@ Tap **Swap** to convert between USDC and EURC inside the Holding Account.
 
 ## Deployment
 
-### API → Fly.io
+### API → Google Cloud Run
 
 ```bash
-cd apps/api
-fly secrets set STRIPE_SECRET_KEY=sk_live_... STRIPE_WEBHOOK_SECRET=whsec_... -a mcbuse-api
-fly deploy -a mcbuse-api
-fly logs -a mcbuse-api
+export MCBUSE_GCP_PROJECT_ID="mcbuse-hackathon-2026-fno"
+export MCBUSE_GCP_REGION="europe-west1"
+export MCBUSE_BACKUP_DIR="/absolute/path/to/verified-pre-migration-backup"
+pnpm deploy:api:cloud-run
 ```
 
-After deploying, register the prod webhook endpoint in the Stripe Dashboard at `https://mcbuse-api.fly.dev/api/v1/webhooks/stripe` and copy the generated `whsec_...` back into Fly secrets.
+The deploy command verifies the database backup, builds the API, runs migrations,
+deploys the service, and checks its health. One-time project and secret setup is
+documented in [docs/cloud-run-api-deployment.md](docs/cloud-run-api-deployment.md).
+
+After deploying, register the production webhook endpoint in the Stripe Dashboard
+at `https://mcbuse-api-332810840225.europe-west1.run.app/api/v1/webhooks/stripe`
+and store the generated signing secret in Google Secret Manager.
 
 ### Mobile → EAS
 
@@ -213,7 +219,7 @@ eas submit --platform android --latest
 ## Troubleshooting
 
 - **"Email verification required" when topping up** — currently disabled for new signups in dev. If you still hit it, your account predates the change. Flip the flag: `UPDATE users SET is_email_verified = true WHERE email = 'you@example.com';`
-- **Top-up stuck on "Waiting for payment"** — Stripe webhook isn't reaching the API. Confirm `stripe listen` is running locally, or that the prod webhook endpoint + signing secret are registered. Inspect with `fly logs -a mcbuse-api`.
+- **Top-up stuck on "Waiting for payment"** — Stripe webhook isn't reaching the API. Confirm `stripe listen` is running locally, or that the production webhook endpoint and signing secret are registered. Inspect the `mcbuse-api` Cloud Run logs in the dedicated MCBuse Google Cloud project.
 - **Mobile build can't reach API** — `EXPO_PUBLIC_API_BASE_URL` must be your LAN IP for physical devices, or `10.0.2.2` for Android emulator, or `localhost` only for iOS simulator. The app also auto-detects the Metro host in dev.
 - **Drizzle migrations out of sync** — `pnpm --filter api db:generate` then commit the new SQL file alongside the schema change.
 

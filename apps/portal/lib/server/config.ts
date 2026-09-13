@@ -1,7 +1,8 @@
 import "server-only";
 
 export const API_URL = (
-  process.env.MCBUSE_API_URL ?? "https://mcbuse-api.fly.dev/api/v1"
+  process.env.MCBUSE_API_URL ??
+  "https://mcbuse-api-332810840225.europe-west1.run.app/api/v1"
 ).replace(/\/$/, "");
 export const PORTAL_ORIGIN = (
   process.env.PORTAL_ORIGIN ?? "http://localhost:3001"

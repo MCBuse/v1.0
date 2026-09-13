@@ -1,0 +1,14 @@
+record_id,merchant_id,occurred_at,display_amount_minor,display_currency,settlement_amount_atomic,settlement_currency,payment_status,attempt_status,error_code,exception_reason,exception_severity,exception_status,exception_retry_count,exception_resolved_at,data_source
+txn_001,merchant_ready_001,2026-08-07T09:12:00Z,6500,EUR,71000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_002,merchant_ready_001,2026-08-10T13:45:00Z,4200,EUR,46000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_003,merchant_ready_001,2026-08-14T16:20:00Z,11800,EUR,129000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_004,merchant_ready_001,2026-08-19T11:05:00Z,7350,EUR,80000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_005,merchant_building_002,2026-08-24T08:40:00Z,5200,EUR,57000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_006,merchant_building_002,2026-08-29T14:10:00Z,8900,EUR,97000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_007,merchant_building_002,2026-09-02T17:35:00Z,6800,EUR,74000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_008,merchant_building_002,2026-09-04T10:15:00Z,0,EUR,0,USDC,not_created,failed,amount_mismatch,amount_mismatch,warning,open,1,,synthetic_demo
+txn_009,merchant_insufficient_003,2026-09-07T12:00:00Z,4800,EUR,52000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_010,merchant_insufficient_003,2026-09-10T15:25:00Z,5600,EUR,61000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_011,merchant_review_004,2026-08-25T09:30:00Z,7900,EUR,86000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_012,merchant_review_004,2026-09-01T18:05:00Z,6200,EUR,68000000,USDC,finalized,finalized,,,,,,,synthetic_demo
+txn_013,merchant_review_004,2026-09-05T11:45:00Z,0,EUR,0,USDC,not_created,failed,signature_mismatch,signature_mismatch,critical,open,2,,synthetic_demo

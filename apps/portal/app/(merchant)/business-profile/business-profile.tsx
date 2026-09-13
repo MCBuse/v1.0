@@ -56,6 +56,7 @@ export function BusinessProfile() {
   );
   const consent = usePortalResource<MerchantConsent>("me/consents");
   const [saving, setSaving] = useState(false);
+  const [consentError, setConsentError] = useState("");
   if (
     (profile.loading && !profile.data) ||
     (readiness.loading && !readiness.data)
@@ -79,6 +80,7 @@ export function BusinessProfile() {
   const stage = stageCopy[readiness.data.stage];
   async function changeConsent(active: boolean) {
     setSaving(true);
+    setConsentError("");
     try {
       await portalApi<MerchantConsent>("me/consents", {
         method: "POST",
@@ -86,6 +88,12 @@ export function BusinessProfile() {
       });
       await consent.refresh();
       await readiness.refresh();
+    } catch (reason) {
+      setConsentError(
+        reason instanceof Error
+          ? reason.message
+          : "Consent could not be updated",
+      );
     } finally {
       setSaving(false);
     }
@@ -207,6 +215,11 @@ export function BusinessProfile() {
               </div>
             </CardHeader>
             <CardContent>
+              {consentError ? (
+                <Alert className="mb-4 border-red-200 bg-red-50 text-red-800">
+                  {consentError}
+                </Alert>
+              ) : null}
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <Badge tone={consent.data?.active ? "success" : "neutral"}>

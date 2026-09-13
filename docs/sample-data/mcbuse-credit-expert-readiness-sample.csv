@@ -1,0 +1,5 @@
+merchant_id,display_currency,observed_days,active_days,finalized_payments,total_verified_sales_minor,average_sale_minor,capture_quality_percent,finality_percent,active_consent,unresolved_critical_exception,expected_stage,data_source
+merchant_ready_001,EUR,35,12,30,258400,8613,99.20,99.00,true,false,evidence_ready,synthetic_demo
+merchant_building_002,EUR,18,6,14,98200,7014,99.00,97.50,true,false,building_history,synthetic_demo
+merchant_insufficient_003,EUR,5,3,4,21600,5400,100.00,100.00,true,false,insufficient_evidence,synthetic_demo
+merchant_review_004,EUR,22,8,20,146500,7325,92.00,96.00,true,true,integrity_review,synthetic_demo

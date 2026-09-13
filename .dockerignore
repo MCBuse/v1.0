@@ -6,6 +6,13 @@ node_modules
 **/.expo
 **/.next
 **/coverage
+**/playwright-report
+**/test-results
 .env
 **/.env
+**/.env.*
 *.log
+apps/mobile
+apps/web
+docs
+out

@@ -17,6 +17,7 @@ export class MockTransferProvider implements TransferProvider {
 
   async execute(params: TransferParams): Promise<TransferResult> {
     const txSignature = `mock_${randomUUID().replace(/-/g, '')}`;
+    await params.onSignaturePrepared?.(txSignature);
     await params.onSubmitted?.(txSignature);
     this.logger.log(
       `[MockTransfer] ${params.amount} ${params.currency}: ` +

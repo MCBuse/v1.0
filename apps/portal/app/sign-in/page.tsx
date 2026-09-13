@@ -8,7 +8,8 @@ export const metadata = { title: "Sign in" };
 
 export default async function SignInPage() {
   const jar = await cookies();
-  if (jar.has(ACCESS_COOKIE) || jar.has(REFRESH_COOKIE)) redirect("/overview");
+  if (jar.has(ACCESS_COOKIE) || jar.has(REFRESH_COOKIE))
+    redirect("/api/auth/session?next=/overview");
   const image = process.env.NEXT_PUBLIC_AUTH_BACKGROUND_URL?.trim();
   return (
     <main className="min-h-dvh bg-white lg:grid lg:grid-cols-[minmax(28rem,1fr)_minmax(32rem,42rem)]">
