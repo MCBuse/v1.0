@@ -37,10 +37,15 @@ Cloud Run's free tier reduces compute cost for a low-traffic hackathon API, but 
 Deploy the portal independently with:
 
 ```bash
-MCBUSE_GCP_PROJECT_ID=mcbuse-hackathon-2026-fno pnpm deploy:portal:cloud-run
+pnpm deploy:portal:cloud-run
 ```
 
-The portal deployment supplies only the API URL, canonical portal origin, secure-cookie setting, and optional public authentication background URL. Do not copy API database, JWT, Stripe, encryption, or wallet secrets into the portal service.
+The portal deployment defaults to the dedicated
+`mcbuse-hackathon-2026-fno` project and supplies only the API URL, canonical
+portal origin, secure-cookie setting, and optional public authentication
+background URL. Use `MCBUSE_GCP_PROJECT_ID` only when an explicit project
+override is needed. Do not copy API database, JWT, Stripe, encryption, or wallet
+secrets into the portal service.
 
 ## One-time project setup
 

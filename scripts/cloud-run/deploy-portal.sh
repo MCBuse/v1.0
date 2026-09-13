@@ -2,13 +2,30 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-project_id="${MCBUSE_GCP_PROJECT_ID:?Set MCBUSE_GCP_PROJECT_ID to the dedicated GCP project.}"
+default_project_id="mcbuse-hackathon-2026-fno"
+project_id="${MCBUSE_GCP_PROJECT_ID:-$default_project_id}"
 region="${MCBUSE_GCP_REGION:-europe-west1}"
 repository="${MCBUSE_ARTIFACT_REPOSITORY:-mcbuse}"
 service="${MCBUSE_PORTAL_SERVICE:-mcbuse-portal}"
 api_service="${MCBUSE_RUN_SERVICE:-mcbuse-api}"
 service_account_name="${MCBUSE_PORTAL_SERVICE_ACCOUNT:-mcbuse-portal}"
 service_account_email="${service_account_name}@${project_id}.iam.gserviceaccount.com"
+
+if ! command -v gcloud >/dev/null 2>&1; then
+  echo "Google Cloud CLI is required. Install it, then run: gcloud auth login" >&2
+  exit 1
+fi
+
+active_account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null || true)"
+if [[ -z "$active_account" ]]; then
+  echo "No active Google Cloud account. Run: gcloud auth login" >&2
+  exit 1
+fi
+
+echo "Deploying the merchant portal to GCP project: $project_id"
+if [[ -z "${MCBUSE_GCP_PROJECT_ID:-}" ]]; then
+  echo "Using the repository default. Override with MCBUSE_GCP_PROJECT_ID if needed."
+fi
 
 project_number="$(
   gcloud projects describe "$project_id" \

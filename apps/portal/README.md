@@ -22,8 +22,12 @@ https://mcbuse-portal-332810840225.europe-west1.run.app
 Deploy it from the repository root with:
 
 ```text
-MCBUSE_GCP_PROJECT_ID=mcbuse-hackathon-2026-fno pnpm deploy:portal:cloud-run
+pnpm deploy:portal:cloud-run
 ```
+
+The deploy script defaults to the dedicated `mcbuse-hackathon-2026-fno`
+project. Run `gcloud auth login` once if the Google Cloud CLI has no active
+account. `MCBUSE_GCP_PROJECT_ID` remains available as an explicit override.
 
 The portal runtime receives no database, JWT, Stripe, or wallet secret. Its only runtime configuration is the server-only API URL, canonical portal origin, secure-cookie enforcement, and the optional public authentication background URL.
 
