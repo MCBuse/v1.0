@@ -21,8 +21,14 @@ function safeDestination(value: string | null) {
 
 export async function GET(request: NextRequest) {
   const destination = safeDestination(request.nextUrl.searchParams.get("next"));
-  const responseOrigin = isConfiguredPortalOrigin(request.nextUrl.origin)
-    ? request.nextUrl.origin
+  const forwardedProtocol = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",", 1)[0];
+  const requestOrigin = request.headers.get("host")
+    ? `${forwardedProtocol ?? request.nextUrl.protocol.replace(":", "")}://${request.headers.get("host")}`
+    : request.nextUrl.origin;
+  const responseOrigin = isConfiguredPortalOrigin(requestOrigin)
+    ? requestOrigin
     : PORTAL_ORIGIN;
   try {
     const { upstream, rotatedTokens } = await remoteRequest("/merchants/me");
