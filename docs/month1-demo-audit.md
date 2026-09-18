@@ -7,7 +7,7 @@
 ## Executive summary
 
 MCBuse already has a usable NestJS/Drizzle foundation for authentication, logging,
-Stripe client access, signed webhook handling, migrations, and Fly deployment. Those
+Stripe client access, signed webhook handling, migrations, and Cloud Run deployment. Those
 pieces are worth retaining. The existing business model is a **custodial stablecoin
 wallet**: users receive a savings/routine wallet pair, top up, transfer, swap, pay,
 and cash out. It is not yet a merchant payment-capture system.
@@ -35,7 +35,7 @@ balance-transaction ingestion, payout matching, or sandbox evidence trail.
 | Default test command | `pnpm --filter api test -- --runInBand` fails before Jest runs because sandboxed Watchman cannot write its LaunchAgent file. Use `--watchman=false` in local/CI test commands. |
 | Database migrations | Drizzle migrations `0000` through `0007` are present. |
 | Automation | No repository CI workflow was found. |
-| Deployment | API-only Fly configuration and Dockerfile are present; no portal/web deployment configuration is present. |
+| Deployment | The API and merchant portal have independent Cloud Run deployment paths. |
 
 ## Current architecture map
 
@@ -51,7 +51,7 @@ flowchart LR
   Stripe -->|signed callback| ExistingWebhook[Generic provider webhook controller]
   ExistingWebhook --> OnOff
   API --> DB[(PostgreSQL via Drizzle)]
-  API --> Fly[Fly API deployment]
+  API --> CloudRun[Cloud Run API deployment]
 
   subgraph Required merchant MVP addition
     Portal[apps/portal\nmerchant + admin PWA] --> CaptureAPI[data-capture module]
@@ -78,7 +78,7 @@ flowchart LR
 | Public web | `apps/web` is a Next.js public marketing site, with a single landing-page route and landing components. | **Keep unchanged** | It is not a dashboard shell. Create `apps/portal` rather than mixing merchant/admin authentication into marketing routes. |
 | Mobile | Expo Router contains consumer wallet flows: top up, cash out, transfer, swap, QR scan/receive, invoice, and NFC dependency. | **Park** | Useful demonstration context but not part of the QR-based merchant pilot. Do not delete or extend for MVP. |
 | Tests | API has 11 unit suites covering providers, payment requests, transactions, rates, and users. There is an e2e file but no merchant capture coverage. | **Keep and extend** | Add deterministic Stripe fixtures plus ingestion, matching, RBAC, and portal tests. Disable Watchman for this environment. |
-| Deployment | Fly config deploys the API only. Production config currently uses `DATABASE_SSL=no-verify`, mock OTP, and zero minimum running machines. Dockerfile builds/copies only API. | **Keep as a starting point; harden** | M8 needs portal deployment, environment separation, backup/restore, TLS-validated database config, non-mock production OTP decision, and operational monitoring. |
+| Deployment | Cloud Run deploys the API and portal independently. The API currently uses `DATABASE_SSL=no-verify`, mock OTP, and zero minimum instances. | **Keep as a starting point; harden** | M8 needs environment separation, backup/restore, TLS-validated database config, non-mock production OTP decision, and operational monitoring. |
 
 ## Current data-model fit
 
@@ -122,8 +122,7 @@ or on-ramp session completion to represent merchant activity.
 | Legacy Stripe provider selection maps `stripe` to mock for core on/off-ramp providers. | A configuration name can imply a real integration when the API uses mock behavior. | W02 records the decision; W04 isolates the merchant adapter from legacy selection. |
 | Auth has no role/membership model and signup creates wallets automatically. | Merchant/admin portal cannot safely use the existing identity model as-is. | W11 defines RBAC; W13/W22 implement roles and merchant ownership without wallet side effects. |
 | No CI workflow and default Jest invocation is Watchman-dependent. | Regressions and environment-specific failures may go undetected. | W02 risk register; W24 establishes reproducible verification; M8 adds deployment checks. |
-| Fly production configuration uses `DATABASE_SSL=no-verify`, mock OTP, and auto-stop. | Not suitable as a pilot security/availability baseline. | W22 security checklist and W29 production hardening. |
-| Current API only deploys through the Dockerfile; web has no portal deployment path. | `apps/portal` would not be deployable by default. | W09 scaffold; W29 deployment/environment work. |
+| Cloud Run API configuration uses `DATABASE_SSL=no-verify`, mock OTP, and zero minimum instances. | Not suitable as a pilot security/availability baseline. | W22 security checklist and W29 production hardening. |
 | Existing mobile has parallel root and grouped receive routes and legacy consumer flows. | UI reuse could create scope creep and route confusion. | Park mobile; treat any mobile reuse as post-pilot work. |
 
 ## Draft conclusion

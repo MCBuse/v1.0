@@ -70,9 +70,7 @@ pnpm deploy:api:cloud-run:bootstrap
 The bootstrap command enables Cloud Run, Cloud Build, Artifact Registry, Secret
 Manager, and IAM, then creates the `mcbuse` Docker repository and `mcbuse-api`
 runtime service account. Create required secret versions directly in Secret
-Manager. The retained `deploy:api:cloud-run:import-secrets` command is only a
-legacy one-time cutover helper for an operator migrating an existing Fly service;
-it preserves existing GCP versions by default and is not used for normal deploys.
+Manager.
 
 Before deploying the merchant workspace, provision its separate private evidence
 bucket. This bucket is distinct from public product images and grants access only
@@ -99,13 +97,12 @@ The command verifies the backup checksum, verifies every required Secret Manager
 
 1. Confirm the Cloud Run health response and database status.
 2. Run existing API and mobile regression checks against the Cloud Run URL.
-3. In Stripe test mode, [update the existing MCBuse webhook](https://docs.stripe.com/api/webhook_endpoints/update) to the Cloud Run `/api/v1/onramp/webhooks/stripe` URL. Preserve its signing secret, confirm `checkout.session.completed` is enabled, and disable stale Fly or tunnel endpoints so completion is delivered exactly once to the active API.
+3. In Stripe test mode, [update the existing MCBuse webhook](https://docs.stripe.com/api/webhook_endpoints/update) to the Cloud Run `/api/v1/onramp/webhooks/stripe` URL. Preserve its signing secret, confirm `checkout.session.completed` is enabled, and disable any stale endpoint so completion is delivered exactly once to the active API.
 4. Run `merchant:hosted-infra-readiness` with the dedicated project and Cloud Run API base URL; require every check to pass.
 5. Point the local portal server-side API URL and the development mobile app at Cloud Run.
 6. Provision or confirm the merchant membership.
 7. Enable `MERCHANT_PORTAL_ENABLED=true` only after the protected merchant smoke test passes.
 8. Keep `TRANSFER_PROVIDER=mock` until the devnet payer has SOL and official devnet USDC and the signing key is verified.
 9. Execute the three-payment finalized acceptance flow.
-10. Retire any remaining legacy Fly configuration only after the acceptance evidence is complete; do not use it for new deployments.
 
 Do not place database dumps, service-account keys, or exported secret values in Git.

@@ -32,7 +32,7 @@ capture. The approved build boundary is a new `apps/portal` PWA plus a new API
 | Existing generic Stripe webhook route | **Replace for merchant capture** | Add a dedicated data-capture webhook adapter/route. | Existing route handles on/off-ramp event families only. |
 | Merchant/admin portal | **Rebuild** | Implement a new `apps/portal` PWA. | No existing web dashboard or role-gated shell exists. |
 | Merchant, consent, provider event, canonical transaction, payout, exception, KPI models | **Rebuild** | Create new tables under `data-capture`. | None exist in the current wallet schemas. |
-| CI and portal deployment | **Rebuild** | Add after the product path is stable; define pilot delivery path in M8. | The repository has no CI workflow and only API Fly deployment. |
+| CI and portal deployment | **Rebuild** | Add after the product path is stable; define pilot delivery path in M8. | The repository has no CI workflow; Cloud Run deploys the API and portal independently. |
 
 ## Architecture decisions
 
@@ -103,7 +103,7 @@ or matching from becoming incorrect.
 | R5 | No merchant/admin roles or membership model exists; signup automatically creates wallets. | High | High | Portal access would be based only on user identity. | Define RBAC in W11 and add server authorization/membership in W13/W22. Owner: Frederick. | W11–W22 |
 | R6 | Merchant data and raw provider payloads may retain more personal data than required. | Medium | High | Raw JSON is exposed or retained indefinitely. | Minimize/partition raw payload visibility, create retention policy, restrict admin views, and audit sensitive reads. Owner: Frederick. | W11/W22 |
 | R7 | No CI workflow and the default Jest command is Watchman-dependent. | High | Medium | Local test command fails before test execution; regressions lack automated checks. | Use `jest --watchman=false` in automation and add build/typecheck/test checks before pilot. Owner: Frederick. | W24/M8 |
-| R8 | API-only Fly deployment cannot deploy portal, and production defaults are not pilot-ready (`DATABASE_SSL=no-verify`, mock OTP, auto-stop). | Medium | High | Portal cannot be staged or service is unavailable/unsafe. | Define environment separation, verified DB TLS, operational auth decision, uptime/alerting, and backup/restore evidence. Owner: Frederick. | W22/W29–W31 |
+| R8 | Cloud Run production defaults are not pilot-ready (`DATABASE_SSL=no-verify`, mock OTP, zero minimum instances). | Medium | High | Service can be unavailable or unsafe for pilot use. | Define environment separation, verified DB TLS, operational auth decision, uptime/alerting, and backup/restore evidence. Owner: Frederick. | W22/W29–W31 |
 | R9 | At four hours/week, integration surprises consume the delivery buffer. | High | High | W04/W15/W18 exceed their timeboxes. | Protect W4-of-month buffer; create follow-up tickets rather than silently expanding scope; keep P0 path limited to capture/matching/RBAC. Owner: Frederick. | Continuous |
 | R10 | Adding merchant features to wallet tables creates irreversible coupling and unsafe migrations. | Medium | High | New columns/joins use wallet entities for merchant sales. | Enforce ADR-02/04; add standalone schemas and test migrations against a clean database. Owner: Frederick. | W05–W06 |
 | R11 | Missing CI/CD and no production data recovery test. | Medium | High | A deployment fails or data cannot be restored during pilot. | Add CI, backups, restore rehearsal, monitoring, and runbook. Owner: Frederick. | W24/W29–W32 |

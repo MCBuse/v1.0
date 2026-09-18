@@ -12,7 +12,6 @@
     "db:push": "pnpm --filter api db:push",
     "deploy:api": "pnpm deploy:api:cloud-run",
     "deploy:api:cloud-run:bootstrap": "bash scripts/cloud-run/bootstrap.sh",
-    "deploy:api:cloud-run:import-secrets": "bash scripts/cloud-run/import-fly-secrets.sh",
     "deploy:api:cloud-run": "bash scripts/cloud-run/deploy.sh",
     "deploy:portal:cloud-run": "bash scripts/cloud-run/deploy-portal.sh",
     "dev:api": "pnpm --filter api start:dev",

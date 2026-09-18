@@ -33,9 +33,8 @@ pnpm deploy:api:cloud-run
 
 The Cloud Run migration job applies `0008_merchant_portal.sql` before deploying the service. With the flag false, merchant endpoints return not found. The Cloud Run deployment is the active API target.
 
-The repository retains `deploy:api:cloud-run:import-secrets` only as a legacy
-one-time cutover helper for operators who still have a Fly deployment. It is not
-part of normal MCBuse deployment or secret rotation.
+Cloud Run is the sole MCBuse deployment target. Manage runtime secret versions
+directly in Secret Manager.
 
 ## 3. Provision an existing account
 
@@ -100,7 +99,7 @@ Prepare the payer without editing the database:
 
 The faucet funds the on-chain wallet, while **Top Up** and **Move** establish the API's internal routine balance. Both are required; the internal transfer is ledger-only and does not replace on-chain funding.
 
-For the current GCP deployment, the Stripe key was verified as test mode without printing it, the stored signing secret is present, and exactly one enabled checkout-completion webhook targets the Cloud Run on-ramp endpoint. The former Fly webhook was migrated in place so its signing secret stayed valid, and the stale ngrok endpoint was disabled. Recheck these conditions after any API-host or Stripe-account change; never use a live-mode card charge to prepare a hackathon payer.
+For the current GCP deployment, the Stripe key was verified as test mode without printing it, the stored signing secret is present, and exactly one enabled checkout-completion webhook targets the Cloud Run on-ramp endpoint. The existing endpoint was updated in place so its signing secret stayed valid, and the stale ngrok endpoint was disabled. Recheck these conditions after any API-host or Stripe-account change; never use a live-mode card charge to prepare a hackathon payer.
 
 The API reserves the payer's internal routine balance atomically with the merchant request claim, preventing a concurrent spend from invalidating database settlement after USDC has moved. Before broadcasting, it signs the transaction and durably stores its deterministic signature. A persistence failure prevents broadcast and releases the reservation; a failure after broadcast keeps the reservation and leaves the signature available to the reconciliation worker, which finalizes the ledger, request, balances, and merchant transaction exactly once. Delayed confirmation is shown as an actionable pending problem rather than being falsely marked failed.
 
