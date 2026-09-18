@@ -96,8 +96,8 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
 - API image digest `sha256:316a9671561618c08a65022b2cc2e5b0aa8a5b3a01c92fdbbe7fa15cfa997c97`
   is live as `mcbuse-api-00038-5mr` with 100% traffic. Its health endpoint and
   database report `ok`; unauthenticated `/merchants/me/activity` returns 401.
-- Portal image digest `sha256:b7c9b40c44177d14e756d404289bf99193bbcc9b90e2d6ef1d2c217b582ec35c`
-  is live as `mcbuse-portal-00022-qs8` with 100% traffic. `/sign-in` returns
+- Portal image digest `sha256:ee6ebbc4ac9dfb7ce855bac0db87f6c4a4cfc8abb44337cf5f0665f21f765b0a`
+  is live as `mcbuse-portal-00023-nsq` with 100% traffic. `/sign-in` returns
   200, while Overview, Payment, Analytics, Credit Assessment, and Finance
   Match redirect anonymous visitors to `/sign-in`.
 - `merchant:hosted-infra-readiness` passed against the deployed API: database
@@ -182,6 +182,11 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
   `89ddfca3d49b49e706b6322d2b02f42cbb2a8df2ad75d1127d9b0d13f6abf18c`,
   with the expected content type and attachment disposition. A separately
   provisioned merchant received 404 for that same attachment.
+- Product-edit hotfix `616e526` now excludes the create-only `quantity` field
+  from `PATCH /merchants/me/products/:id` and sends stock deltas only to the
+  dedicated stock-adjustment route. This resolves API validation errors such as
+  `property quantity should not exist` when an image is saved from the edit
+  drawer.
 
 ## Synthetic fixture
 
