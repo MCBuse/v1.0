@@ -234,6 +234,13 @@ export type MerchantAnalytics = {
     digitalQuantity: number;
     cashQuantity: number;
   }>;
+  unassignedItems: Array<{
+    name: string;
+    quantitySold: number;
+    totalSales: MoneyValue;
+    digitalQuantity: number;
+    cashQuantity: number;
+  }>;
 };
 
 export type MerchantCashSaleLine = {

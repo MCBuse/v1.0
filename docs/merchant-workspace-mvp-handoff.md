@@ -10,6 +10,7 @@
 - Cash-sale recording, historical sale time, stock-already-accounted-for option, audited void, and one private support document.
 - CSV/XLSX inventory and settlement imports with preview, repeat-import protection, an explicit stock-snapshot choice, source mapping, and payout allocations.
 - Product stock movements captured from the workspace upgrade onward, with 7/30-day product performance, source-aware digital/cash totals, and current stock.
+- Custom sale-line snapshots appear under Analytics as **Unassigned items**; they remain separate from catalogue products and are never attributed to a guessed SKU.
 - Transactions expose evidence source, verification status, and environment separately so merchant-entered, imported, live, test, synthetic, and unknown records are not conflated.
 - Transactions and Analytics can filter the combined activity by evidence source and environment. The selected filters apply to totals, comparisons, trends, and product metrics.
 - Overview's recent-activity panel uses that same combined activity feed, including merchant-recorded cash sales.
@@ -73,6 +74,11 @@ The package-script form `pnpm --filter api test -- --runInBand` is not valid in 
 
 Portal lint still reports three existing warnings in unrelated test scripts: `tests/capture-week2-mobile.mjs` and `tests/render-week2-cards.mjs`.
 
+The requested targeted, non-fixing API ESLint check also reports a pre-existing
+formatting baseline in `merchant-activity.service.ts` (114 Prettier errors and
+one complexity warning). It was already intentionally compact before this
+release; no broad `--fix` formatting rewrite was applied during the MVP work.
+
 ## Hosted release evidence — 17 September 2026
 
 - Created a non-empty PostgreSQL 17 custom-format pre-migration backup in the
@@ -83,11 +89,11 @@ Portal lint still reports three existing warnings in unrelated test scripts: `te
   runtime identity has application object-admin access.
 - Cloud Run migration execution `mcbuse-api-migrate-tnptf` completed
   successfully before traffic changed.
-- API image digest `sha256:76b446c0adc9dfda94023bc247234ea941d47d2afa074706c11c9f25156f20c1`
-  is live as `mcbuse-api-00033-5xq` with 100% traffic. Its health endpoint and
+- API image digest `sha256:fada012040c683c06f4df7c783e5a014ae3c87dc6b928b6d9db2d0b5f2f54765`
+  is live as `mcbuse-api-00034-542` with 100% traffic. Its health endpoint and
   database report `ok`; unauthenticated `/merchants/me/activity` returns 401.
-- Portal image digest `sha256:e0332220360c7521be8fc0e13662c80ba3e06bb838110459b094355f2aed8319`
-  is live as `mcbuse-portal-00015-2dx` with 100% traffic. `/sign-in` returns
+- Portal image digest `sha256:1975aead733f5aa1b2afe5fbfaaed6acc1aab4402f19c3033f4cac0cf4ad19ef`
+  is live as `mcbuse-portal-00017-vj4` with 100% traffic. `/sign-in` returns
   200, while Overview, Payment, Analytics, Credit Assessment, and Finance
   Match redirect anonymous visitors to `/sign-in`.
 - `merchant:hosted-infra-readiness` passed against the deployed API: database
