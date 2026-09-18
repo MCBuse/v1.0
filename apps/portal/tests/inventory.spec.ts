@@ -134,7 +134,14 @@ async function mockInventory(page: Page, initial: Product[] = []) {
         unitPriceMinor: string;
         lowStockThreshold: number;
         status: Product["status"];
-      }>;
+      }> & { quantity?: unknown };
+      if ("quantity" in body) {
+        return route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ message: ["property quantity should not exist"] }),
+        });
+      }
       Object.assign(product, {
         name: body.name ?? product.name,
         sku: body.sku ?? product.sku,

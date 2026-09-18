@@ -172,14 +172,15 @@ export function InventoryView() {
       let product: MerchantProduct;
 
       if (editing) {
+        const { quantity, ...productUpdate } = payload;
         product = await portalApi<MerchantProduct>(
           `me/products/${editing.id}`,
           {
             method: "PATCH",
-            body: JSON.stringify({ ...payload, status: editing.status }),
+            body: JSON.stringify({ ...productUpdate, status: editing.status }),
           },
         );
-        const change = payload.quantity - editing.onHandQuantity;
+        const change = quantity - editing.onHandQuantity;
         if (change) {
           product = await portalApi<MerchantProduct>(
             `me/products/${editing.id}/stock-adjustments`,
