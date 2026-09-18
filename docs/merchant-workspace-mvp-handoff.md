@@ -166,7 +166,8 @@ These checks cannot be established from local code or fixtures:
    arrived with readable attachments. SMTP message acceptance is now verified,
    but it does not establish inbox delivery.
 4. Separate merchant and payer test accounts plus devnet payment prerequisites for the mobile receipt flow.
-5. Hosted verification using an authenticated merchant session for binary downloads and private attachment access.
+5. George's complete assessment model: formulas, input definitions, missing-data handling, thresholds, version, and example expected outputs. `readiness-rules-v1` remains the agreed demonstration fallback until then.
+6. Hosted verification using an authenticated merchant session for binary downloads and private attachment access.
 
 ## Current limits before release sign-off
 
