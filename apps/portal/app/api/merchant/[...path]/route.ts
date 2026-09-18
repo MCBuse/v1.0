@@ -20,6 +20,7 @@ const allowed = [
   /^me\/activity$/,
   /^me\/analytics$/,
   /^me\/cash-sales(?:\/[0-9a-f-]{36}\/(?:void|attachment))?$/i,
+  /^me\/imports\/preview$/,
   /^me\/imports\/(?:inventory|settlement)\/preview$/,
   /^me\/imports$/,
   /^me\/imports\/[0-9a-f-]{36}\/mapping$/i,

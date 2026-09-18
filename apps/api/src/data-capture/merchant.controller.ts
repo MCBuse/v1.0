@@ -316,6 +316,27 @@ export class MerchantController {
     return this.imports.preview(user.id, kind, sourceName, file, applyStockSnapshot === 'true');
   }
 
+  @Post('imports/preview')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @ApiOperation({ summary: 'Preview an inventory or settlement CSV/XLSX import' })
+  previewImportByKind(
+    @CurrentUser() user: { id: string },
+    @Body('kind') kind: string,
+    @Body('sourceName') sourceName: string,
+    @Body('applyStockSnapshot') applyStockSnapshot: string | undefined,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (kind !== 'inventory' && kind !== 'settlement')
+      throw new BadRequestException('Unsupported import type');
+    return this.imports.preview(
+      user.id,
+      kind,
+      sourceName,
+      file,
+      applyStockSnapshot === 'true',
+    );
+  }
+
   @Post('imports/:id/mapping')
   @ApiOperation({ summary: 'Map uploaded import columns before validation and commit' })
   updateImportMapping(@CurrentUser() user: { id: string }, @Param('id', ParseUUIDPipe) id: string, @Body('fieldMap') fieldMap: Record<string, string>) {

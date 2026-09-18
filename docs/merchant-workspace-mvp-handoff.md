@@ -92,11 +92,11 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
   runtime identity has application object-admin access.
 - Cloud Run migration execution `mcbuse-api-migrate-tnptf` completed
   successfully before traffic changed.
-- API image digest `sha256:0d3447db97f0b1dd1ef3b8ac1f1e1cecf07b173917b86b82137c47d999a450ea`
-  is live as `mcbuse-api-00036-f4m` with 100% traffic. Its health endpoint and
+- API image digest `sha256:1050a4fc968e55d64c2980a264c845e739dfb2ef8cbe8c24b502c8d9bcfbcefc`
+  is live as `mcbuse-api-00037-4pq` with 100% traffic. Its health endpoint and
   database report `ok`; unauthenticated `/merchants/me/activity` returns 401.
-- Portal image digest `sha256:caad164370f2af62f7479e866188c35e2e15a3e5216fe60b47c758b89fbca414`
-  is live as `mcbuse-portal-00018-jrq` with 100% traffic. `/sign-in` returns
+- Portal image digest `sha256:66a898879bb3fd4913c34a0b7b1e21ac1be15bcb40aa016acee10d800aa42aee`
+  is live as `mcbuse-portal-00019-sv5` with 100% traffic. `/sign-in` returns
   200, while Overview, Payment, Analytics, Credit Assessment, and Finance
   Match redirect anonymous visitors to `/sign-in`.
 - `merchant:hosted-infra-readiness` passed against the deployed API: database

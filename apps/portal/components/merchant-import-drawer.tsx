@@ -20,7 +20,7 @@ export function MerchantImportDrawer({ kind, label, onCommitted }: { kind: "inve
     event.preventDefault(); const form = new FormData(event.currentTarget); const file = form.get("file");
     if (!(file instanceof File) || !file.size) { setError("Choose a CSV or XLSX file."); return; }
     setBusy(true); setError("");
-    try { const body = new FormData(); body.set("file", file); body.set("sourceName", String(form.get("sourceName") || "").trim()); if (kind === "inventory") body.set("applyStockSnapshot", form.get("applyStockSnapshot") === "on" ? "true" : "false"); const next = await portalApi<Preview>(`me/imports/${kind}/preview`, { method: "POST", body }); setPreview(next); setFieldMap(next.fieldMap); }
+    try { const body = new FormData(); body.set("file", file); body.set("kind", kind); body.set("sourceName", String(form.get("sourceName") || "").trim()); if (kind === "inventory") body.set("applyStockSnapshot", form.get("applyStockSnapshot") === "on" ? "true" : "false"); const next = await portalApi<Preview>("me/imports/preview", { method: "POST", body }); setPreview(next); setFieldMap(next.fieldMap); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Import preview could not be created."); }
     finally { setBusy(false); }
   }
