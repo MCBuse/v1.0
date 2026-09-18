@@ -22,6 +22,23 @@ describe("isTrustedPortalOrigin", () => {
     ).toBe(false);
   });
 
+  it("accepts each configured production portal origin", () => {
+    const origins = [
+      "https://merchant.mcbuse.com",
+      "https://mcbuse-portal-332810840225.europe-west1.run.app",
+    ];
+    expect(
+      isTrustedPortalOrigin("https://merchant.mcbuse.com", origins, "production"),
+    ).toBe(true);
+    expect(
+      isTrustedPortalOrigin(
+        "https://mcbuse-portal-332810840225.europe-west1.run.app",
+        origins,
+        "production",
+      ),
+    ).toBe(true);
+  });
+
   it("rejects different ports and non-loopback origins", () => {
     expect(
       isTrustedPortalOrigin(

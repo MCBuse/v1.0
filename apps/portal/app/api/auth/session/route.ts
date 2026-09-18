@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PORTAL_ORIGIN } from "@/lib/server/config";
+import {
+  isConfiguredPortalOrigin,
+  PORTAL_ORIGIN,
+} from "@/lib/server/config";
 import {
   clearSessionCookies,
   remoteRequest,
@@ -18,11 +21,14 @@ function safeDestination(value: string | null) {
 
 export async function GET(request: NextRequest) {
   const destination = safeDestination(request.nextUrl.searchParams.get("next"));
+  const responseOrigin = isConfiguredPortalOrigin(request.nextUrl.origin)
+    ? request.nextUrl.origin
+    : PORTAL_ORIGIN;
   try {
     const { upstream, rotatedTokens } = await remoteRequest("/merchants/me");
     if (upstream.ok) {
       const response = NextResponse.redirect(
-        new URL(destination, PORTAL_ORIGIN),
+        new URL(destination, responseOrigin),
       );
       if (rotatedTokens) setSessionCookies(response, rotatedTokens);
       return response;
@@ -31,7 +37,7 @@ export async function GET(request: NextRequest) {
     // A session that cannot be verified must not grant access to merchant pages.
   }
 
-  const response = NextResponse.redirect(new URL("/sign-in", PORTAL_ORIGIN));
+  const response = NextResponse.redirect(new URL("/sign-in", responseOrigin));
   clearSessionCookies(response);
   return response;
 }

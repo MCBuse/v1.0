@@ -7,6 +7,7 @@ Required configuration:
 ```text
 MCBUSE_API_URL=https://mcbuse-api-332810840225.europe-west1.run.app/api/v1
 PORTAL_ORIGIN=http://localhost:3001
+PORTAL_ORIGINS=
 NEXT_PUBLIC_AUTH_BACKGROUND_URL=
 SESSION_COOKIE_SECURE=false
 ```
@@ -18,6 +19,12 @@ The deployed hackathon portal is a separate Cloud Run service:
 ```text
 https://mcbuse-portal-332810840225.europe-west1.run.app
 ```
+
+The canonical merchant URL is `https://merchant.mcbuse.com`, while the Cloud
+Run URL remains an allowed origin for direct access. In production, set
+`PORTAL_ORIGIN` to the canonical URL and use the comma-separated
+`PORTAL_ORIGINS` allowlist for both HTTPS origins. The portal API may use
+`https://api.mcbuse.com/api/v1`; the Cloud Run API URL remains available.
 
 Deploy it from the repository root with:
 

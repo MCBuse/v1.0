@@ -3,7 +3,7 @@ import "server-only";
 import { timingSafeEqual } from "crypto";
 import { NextRequest } from "next/server";
 import { CSRF_COOKIE } from "./session";
-import { PORTAL_ORIGIN } from "./config";
+import { PORTAL_ORIGINS } from "./config";
 import { isTrustedPortalOrigin } from "./trusted-origin";
 
 function equal(left: string, right: string) {
@@ -15,7 +15,7 @@ function equal(left: string, right: string) {
 export function hasTrustedOrigin(request: NextRequest) {
   return isTrustedPortalOrigin(
     request.headers.get("origin"),
-    PORTAL_ORIGIN,
+    PORTAL_ORIGINS,
     process.env.NODE_ENV,
   );
 }

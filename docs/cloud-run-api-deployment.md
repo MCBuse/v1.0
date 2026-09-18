@@ -20,6 +20,7 @@ Cloud Run's free tier reduces compute cost for a low-traffic hackathon API, but 
 - Image: `europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/api:20260918T0930Z-import-idempotency`
 - Image digest: `sha256:316a9671561618c08a65022b2cc2e5b0aa8a5b3a01c92fdbbe7fa15cfa997c97`
 - API base URL: `https://mcbuse-api-332810840225.europe-west1.run.app/api/v1`
+- API custom URL: `https://api.mcbuse.com/api/v1` (the Cloud Run URL remains supported)
 - Runtime identity: `mcbuse-api@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com`
 - Merchant routes: enabled after merchant provisioning
 - Transfer provider: `mock` pending the real devnet gate
@@ -31,6 +32,7 @@ Cloud Run's free tier reduces compute cost for a low-traffic hackathon API, but 
 - Image: `europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/portal:20260918T0930Z-import-idempotency`
 - Image digest: `sha256:570280b2e9a532ce11b83a2feb1188fde51f26be58d74ee638fb6d67ac6595c6`
 - Public URL: `https://mcbuse-portal-332810840225.europe-west1.run.app`
+- Canonical custom URL: `https://merchant.mcbuse.com` (the Cloud Run URL remains an allowed portal origin)
 - Runtime identity: `mcbuse-portal@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com`
 - Traffic: 100% to the ready revision
 - Sensitive runtime secrets: none; authentication credentials and tokens are exchanged server-side with the API and session tokens remain in HTTP-only secure cookies
