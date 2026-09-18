@@ -68,7 +68,7 @@ bash scripts/cloud-run/provision-merchant-evidence.sh
 - `pnpm --filter api build`
 - `pnpm --filter portal check-types`
 - `pnpm --filter portal build`
-- `pnpm --filter portal test` — 5 tests passed.
+- `pnpm --filter portal test` — 6 tests passed.
 - `pnpm --filter api exec jest --runInBand --watchman=false` — 21 suites / 77 tests passed. Watchman is disabled for this command because the local watcher socket is intermittently inaccessible in this environment.
 - `pnpm --filter portal test:e2e` — 72 local mock-API checks across mobile, tablet, and desktop passed after the combined Overview summary change.
 - `pnpm --filter mobile exec tsc --noEmit`
@@ -166,6 +166,22 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
   accepts the custom API hostname and both official Cloud Run service aliases;
   the single enabled Stripe test webhook remains on the retained regional
   Cloud Run hostname.
+- A no-email, authenticated custom-domain package run created immutable package
+  `7367eb3b-d141-409b-9b1b-05f6052ce34d`. Its one-page A4 PDF (2,245 bytes;
+  SHA-256 `5bcaa3b3ed4f36fcb81795ff3dbbce2fc642bcc70f79379159215a5e36615ebc`)
+  and ZIP (4,196 bytes; SHA-256
+  `7ba31da32e55927f8455cb2683b0daea82ebbb5475648c8ff53e11b88d668a32`)
+  were downloaded through `api.mcbuse.com`, extracted, rendered, and inspected.
+  The PDF has one readable A4 page, explicit incomplete/demonstration labels,
+  and an intact page footer; the ZIP contains the PDF plus eight expected CSV
+  tables. Cash-sale and finance-package idempotency replay/conflict checks
+  also passed. No email was sent.
+- Private attachment acceptance run `e73407417dd94714` uploaded and downloaded
+  a labelled 70-byte PNG through `api.mcbuse.com` for cash sale
+  `01063fd9-4626-4d2b-9e1b-cb4aae571a89`. The returned bytes matched SHA-256
+  `89ddfca3d49b49e706b6322d2b02f42cbb2a8df2ad75d1127d9b0d13f6abf18c`,
+  with the expected content type and attachment disposition. A separately
+  provisioned merchant received 404 for that same attachment.
 
 ## Synthetic fixture
 
@@ -186,7 +202,6 @@ These checks cannot be established from local code or fixtures:
    but it does not establish inbox delivery.
 4. Separate merchant and payer test accounts plus devnet payment prerequisites for the mobile receipt flow.
 5. George's complete assessment model: formulas, input definitions, missing-data handling, thresholds, version, and example expected outputs. `readiness-rules-v1` remains the agreed demonstration fallback until then.
-6. Hosted verification using an authenticated merchant session for binary downloads and private attachment access.
 
 ## Current limits before release sign-off
 
