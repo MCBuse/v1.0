@@ -118,6 +118,22 @@ export const executePaymentResponse = z.object({
 });
 export type ExecutePaymentResponse = z.infer<typeof executePaymentResponse>;
 
+export const merchantReceipt = z.object({
+  receiptNumber: z.string(),
+  merchantName: z.string(),
+  invoiceNumber: z.string().nullable(),
+  description: z.string().nullable(),
+  displayAmountMinor: z.string(),
+  displayCurrency: z.literal('EUR'),
+  paymentMethod: z.string(),
+  status: z.literal('completed'),
+  saleAt: z.string(),
+  completedAt: z.string(),
+  evidence: z.object({ source: z.literal('mcbuse_payment'), verification: z.literal('internally_confirmed'), environment: z.string() }),
+  lines: z.array(z.object({ name: z.string(), quantity: z.number().int(), unitPriceMinor: z.string(), lineTotalMinor: z.string() })),
+});
+export type MerchantReceipt = z.infer<typeof merchantReceipt>;
+
 export const onRampResponse = z.object({
   externalId: z.string(),
   status: z.enum(["completed", "pending"]),

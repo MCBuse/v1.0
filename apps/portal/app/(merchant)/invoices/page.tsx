@@ -1,5 +1,5 @@
-import { InvoicesView } from "./invoices-view";
+import { redirect } from "next/navigation";
 
 export default function InvoicesPage() {
-  return <InvoicesView />;
+  redirect("/payment/invoices");
 }

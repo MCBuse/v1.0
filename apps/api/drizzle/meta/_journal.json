@@ -71,6 +71,76 @@
       "when": 1789319972000,
       "tag": "0009_merchant_inventory_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789732800000,
+      "tag": "0010_merchant_workspace_mvp",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789736400000,
+      "tag": "0011_merchant_finance_packages",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789740000000,
+      "tag": "0012_merchant_receipt_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789743600000,
+      "tag": "0013_merchant_stock_movements",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789747200000,
+      "tag": "0014_merchant_cash_sale_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1789750800000,
+      "tag": "0015_merchant_finance_package_artifacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789761600000,
+      "tag": "0016_cash_sale_idempotency_fingerprint",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789765200000,
+      "tag": "0017_finance_package_idempotency",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789768800000,
+      "tag": "0018_finance_email_idempotency",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1799700600000,
+      "tag": "0019_merchant_transaction_evidence_environment",
+      "breakpoints": true
     }
   ]
 }

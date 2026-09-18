@@ -1,5 +1,2 @@
-import { InventoryView } from "./inventory-view";
-
-export default function InventoryPage() {
-  return <InventoryView />;
-}
+import { redirect } from "next/navigation";
+export default function InventoryPage() { redirect("/analytics/inventory"); }

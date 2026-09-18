@@ -12,10 +12,21 @@ const allowed = [
   /^me\/transactions$/,
   /^me\/payment-requests$/,
   /^me\/payment-requests\/[0-9a-f-]{36}$/i,
-  /^me\/products(?:\/[0-9a-f-]{36}(?:\/(?:image|stock-adjustments))?)?$/i,
+  /^me\/products(?:\/[0-9a-f-]{36}(?:\/(?:image|stock-adjustments|analytics))?)?$/i,
   /^me\/invoices(?:\/[0-9a-f-]{36}(?:\/cancel)?)?$/i,
   /^me\/consents$/,
   /^me\/evidence-readiness$/,
+  /^me\/credit-assessment$/,
+  /^me\/activity$/,
+  /^me\/analytics$/,
+  /^me\/cash-sales(?:\/[0-9a-f-]{36}\/(?:void|attachment))?$/i,
+  /^me\/imports\/(?:inventory|settlement)\/preview$/,
+  /^me\/imports$/,
+  /^me\/imports\/[0-9a-f-]{36}\/mapping$/i,
+  /^me\/imports\/[0-9a-f-]{36}\/commit$/i,
+  /^me\/reconciliation$/,
+  /^me\/finance-packages$/,
+  /^me\/finance-packages\/[0-9a-f-]{36}(?:\/(?:pdf|data|email))?$/i,
 ];
 
 async function forward(
@@ -40,22 +51,31 @@ async function forward(
         ? await request.arrayBuffer()
         : await request.text();
   try {
+    const idempotencyKey = request.headers.get("idempotency-key");
     const { upstream, rotatedTokens } = await remoteRequest(
       `/merchants/${relative}${search}`,
       {
         method: request.method,
         body,
-        headers: contentType ? { "Content-Type": contentType } : undefined,
+        headers: {
+          ...(contentType ? { "Content-Type": contentType } : {}),
+          ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+        },
       },
     );
-    const payload = await upstream.text();
+    const contentTypeOut = upstream.headers.get("content-type") ?? "application/json";
+    const payload = contentTypeOut.includes("application/json")
+      ? await upstream.text()
+      : await upstream.arrayBuffer();
     const response = new NextResponse(payload || null, {
       status: upstream.status,
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": contentTypeOut,
         "Cache-Control": "no-store, private",
       },
     });
+    const disposition = upstream.headers.get("content-disposition");
+    if (disposition) response.headers.set("Content-Disposition", disposition);
     if (rotatedTokens) setSessionCookies(response, rotatedTokens);
     if (upstream.status === 401) clearSessionCookies(response);
     return response;

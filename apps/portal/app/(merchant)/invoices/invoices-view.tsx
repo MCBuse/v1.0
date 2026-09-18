@@ -12,6 +12,7 @@ import { Skeleton } from "@repo/ui/skeleton";
 import { CheckCircle2, CircleDollarSign, Clock3, Minus, Plus, ReceiptText, XCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { portalApi } from "@/lib/client/api";
 import { euroInputToMinor } from "@/lib/client/money-input";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
@@ -33,11 +34,12 @@ function statusLabel(status: MerchantInvoice["status"]) {
 }
 
 export function InvoicesView() {
+  const search = useSearchParams();
   const [history, setHistory] = useState(false);
   const invoices = usePortalResource<MerchantInvoicePage>(`me/invoices?status=${history ? "history" : "open"}&page=1&pageSize=50`, 10_000);
   const products = usePortalResource<MerchantProductPage>("me/products?status=active&page=1&pageSize=100", 60_000);
   const [selected, setSelected] = useState<MerchantInvoice | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(() => search.get("new") === "1");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [description, setDescription] = useState("");
   const [expiresInSeconds, setExpiresInSeconds] = useState<900 | 3600 | 86400>(3600);

@@ -16,8 +16,8 @@ Cloud Run's free tier reduces compute cost for a low-traffic hackathon API, but 
 ## Current deployment
 
 - Service: `mcbuse-api`
-- Ready revision: `mcbuse-api-00010-wmf`
-- Image digest: `sha256:796a15daf53cdd64be9c79aa49c926bc463f092aa72dadab7eb38dbe51210185`
+- Ready revision: `mcbuse-api-00030-hn5`
+- Image digest: `sha256:001287f2f6c76858b8bb9cfcc9112f52fef16d9da8a994bd7ee2304f6b571850`
 - API base URL: `https://mcbuse-api-332810840225.europe-west1.run.app/api/v1`
 - Runtime identity: `mcbuse-api@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com`
 - Merchant routes: enabled after merchant provisioning
@@ -26,9 +26,9 @@ Cloud Run's free tier reduces compute cost for a low-traffic hackathon API, but 
 ### Merchant portal
 
 - Service: `mcbuse-portal`
-- Ready revision: `mcbuse-portal-00001-4cx`
-- Image: `europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/portal:20260912T151506Z-bcb53e94`
-- Image digest: `sha256:6a9f96866430fd20f8807c54dda9bcbd1301d724dc25716fe8de1117b4f75ece`
+- Ready revision: `mcbuse-portal-00012-w2f`
+- Image: `europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/portal:20260917T2353Z-evidencefilters`
+- Image digest: `sha256:b213f4a89fe2f8370577acf16aaa8f0b87952984cad5e5138390c5681200bd25`
 - Public URL: `https://mcbuse-portal-332810840225.europe-west1.run.app`
 - Runtime identity: `mcbuse-portal@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com`
 - Traffic: 100% to the ready revision
@@ -63,6 +63,15 @@ runtime service account. Create required secret versions directly in Secret
 Manager. The retained `deploy:api:cloud-run:import-secrets` command is only a
 legacy one-time cutover helper for an operator migrating an existing Fly service;
 it preserves existing GCP versions by default and is not used for normal deploys.
+
+Before deploying the merchant workspace, provision its separate private evidence
+bucket. This bucket is distinct from public product images and grants access only
+to the API runtime identity:
+
+```bash
+export MCBUSE_GCP_PROJECT_ID="your-dedicated-project-id"
+bash scripts/cloud-run/provision-merchant-evidence.sh
+```
 
 ## Build, migrate, and deploy
 

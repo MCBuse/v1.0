@@ -12,6 +12,7 @@ import { Money } from "@repo/ui/money";
 import { Skeleton } from "@repo/ui/skeleton";
 import {
   Archive,
+  BarChart3,
   ImagePlus,
   Minus,
   PackagePlus,
@@ -33,6 +34,8 @@ import {
 import { portalApi } from "@/lib/client/api";
 import { euroInputToMinor } from "@/lib/client/money-input";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
+import { MerchantImportDrawer } from "@/components/merchant-import-drawer";
+import { ProductAnalyticsDrawer } from "@/components/product-analytics-drawer";
 
 type Draft = {
   name: string;
@@ -112,6 +115,7 @@ export function InventoryView() {
   const [pageError, setPageError] = useState("");
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [analyticsProduct, setAnalyticsProduct] = useState<MerchantProduct | null>(null);
 
   const products = (resource.data?.items ?? []).filter((product) => {
     const term = query.trim().toLowerCase();
@@ -282,10 +286,7 @@ export function InventoryView() {
             Stock is reserved while an invoice is waiting for payment.
           </p>
         </div>
-        <Button onClick={(event) => beginCreate(event.currentTarget)}>
-          <PackagePlus data-icon="inline-start" aria-hidden="true" />
-          Add product
-        </Button>
+        <div className="flex gap-3"><MerchantImportDrawer kind="inventory" label="Import inventory" onCommitted={() => void resource.refresh()} /><Button onClick={(event) => beginCreate(event.currentTarget)}><PackagePlus data-icon="inline-start" aria-hidden="true" />Add product</Button></div>
       </div>
 
       {pageError ? (
@@ -372,6 +373,14 @@ export function InventoryView() {
                   </div>
                   <div className="flex gap-2">
                     <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setAnalyticsProduct(product)}
+                    >
+                      <BarChart3 data-icon="inline-start" aria-hidden="true" />
+                      Analytics
+                    </Button>
+                    <Button
                       variant="secondary"
                       size="icon"
                       aria-label={`Decrease ${product.name} stock`}
@@ -432,6 +441,8 @@ export function InventoryView() {
           )}
         </CardContent>
       </Card>
+
+      <ProductAnalyticsDrawer product={analyticsProduct} open={Boolean(analyticsProduct)} onOpenChange={(open) => { if (!open) setAnalyticsProduct(null); }} />
 
       <Drawer
         direction="right"

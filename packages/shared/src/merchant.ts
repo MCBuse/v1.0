@@ -178,3 +178,88 @@ export type MerchantConsent = {
   version: string;
   recordedAt: string | null;
 };
+
+export type MerchantEvidenceSource = "mcbuse_payment" | "merchant_cash" | "external_import";
+export type MerchantEvidenceVerification = "internally_confirmed" | "merchant_declared" | "imported_unverified" | "unknown";
+export type MerchantEvidenceEnvironment = "live" | "test" | "synthetic" | "unknown";
+
+export type MerchantActivityItem = {
+  id: string;
+  receiptNumber: string;
+  source: MerchantEvidenceSource;
+  verification: MerchantEvidenceVerification;
+  environment: MerchantEvidenceEnvironment;
+  amount: MoneyValue;
+  description: string | null;
+  status: "recorded" | "voided";
+  occurredAt: string;
+};
+
+export type MerchantActivityPage = {
+  items: MerchantActivityItem[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
+export type MerchantAnalytics = {
+  period: { from: string; to: string; timezone: string; partialCurrentDay: boolean };
+  generatedAt: string;
+  sourceCoverage: Record<MerchantEvidenceSource, number>;
+  totalRecordedSales: MoneyValue;
+  saleCount: number;
+  averageSale: MoneyValue;
+  comparisonPercent: number | null;
+  digitalSales: MoneyValue;
+  cashSales: MoneyValue;
+  dailyTrend: MerchantSummaryBucket[];
+  hourlyRhythm: MerchantSummaryBucket[];
+  productPerformance: Array<{
+    productId: string;
+    name: string;
+    quantitySold: number;
+    totalSales: MoneyValue;
+    digitalQuantity: number;
+    cashQuantity: number;
+  }>;
+};
+
+export type MerchantCashSaleLine = {
+  type: "product" | "custom";
+  productId?: string;
+  name?: string;
+  quantity: number;
+  unitPriceMinor?: string;
+};
+
+export type MerchantPayout = {
+  id: string;
+  sourceName: string;
+  externalReference: string;
+  currency: string;
+  expectedAmountMinor: string | null;
+  actualAmountMinor: string | null;
+  expectedAt: string | null;
+  receivedAt: string | null;
+  providerStatus: string;
+  payoutStatus: "expected" | "processing" | "settled" | "delayed" | "missing";
+  reconciliationStatus: "matched" | "difference" | "unmatched";
+};
+
+export type MerchantProductAnalytics = {
+  productId: string;
+  periodDays: 7 | 30;
+  quantitySold: number;
+  revenue: MoneyValue;
+  digitalQuantity: number;
+  cashQuantity: number;
+  averageDailyQuantity: number;
+  peakSellingHour: number | null;
+  onHandQuantity: number;
+  reservedQuantity: number;
+  availableQuantity: number;
+  lowStock: boolean;
+  stockTrackingNote: string;
+  stockMovements: Array<{ kind: string; onHandChange: number; reservedChange: number; occurredAt: string }>;
+};

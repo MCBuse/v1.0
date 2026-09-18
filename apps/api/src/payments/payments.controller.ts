@@ -1,10 +1,13 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   UseGuards,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
@@ -46,5 +49,11 @@ export class PaymentsController {
     @Body() dto: ExecuteUsernamePaymentDto,
   ) {
     return this.paymentsService.executeByUsername(user.id, dto);
+  }
+
+  @Get('receipts/:paymentRequestId')
+  @ApiOperation({ summary: 'Get a completed merchant receipt for its payer or merchant' })
+  receipt(@CurrentUser() user: { id: string }, @Param('paymentRequestId', ParseUUIDPipe) paymentRequestId: string) {
+    return this.paymentsService.getReceipt(user.id, paymentRequestId);
   }
 }

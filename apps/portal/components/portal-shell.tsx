@@ -2,28 +2,41 @@
 
 import { cn } from "@repo/ui/cn";
 import { NavigationItem } from "@repo/ui/navigation";
+import type { MerchantSummary } from "@repo/shared";
 import {
   Building2,
   CircleDollarSign,
-  Package,
+  ChartNoAxesCombined,
   LayoutDashboard,
-  ReceiptText,
+  Landmark,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Logo } from "./logo";
 import { LogoutButton } from "./logout-button";
 import { ReceivePaymentDrawer } from "./receive-payment";
+import { usePortalResource } from "@/lib/client/use-portal-resource";
 
 const navigation = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: ReceiptText },
-  { href: "/inventory", label: "Inventory", icon: Package },
-  { href: "/invoices", label: "Invoices", icon: CircleDollarSign },
-  { href: "/business-profile", label: "Business profile", icon: Building2 },
+  { href: "/payment", label: "Payment", icon: CircleDollarSign },
+  { href: "/analytics", label: "Analytics", icon: ChartNoAxesCombined },
+  { href: "/credit-assessment", label: "Credit Assessment", icon: Building2 },
+  { href: "/finance-match", label: "Finance Match", icon: Landmark },
 ];
 
 export function PortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const connection = usePortalResource<MerchantSummary>("me/summary", 60_000);
+  const stale = connection.data
+    ? Date.now() - new Date(connection.data.lastUpdatedAt).getTime() > 90_000
+    : false;
+  const connectionLabel = connection.loading
+    ? "Checking records"
+    : connection.offline || connection.error
+      ? "Records unavailable"
+      : stale
+        ? "Records delayed"
+        : `Records updated ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(connection.data!.lastUpdatedAt))}`;
   return (
     <div className="min-h-dvh bg-slate-50">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-slate-200 bg-white px-4 py-6 lg:flex">
@@ -35,7 +48,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
             <NavigationItem
               key={href}
               href={href}
-              active={pathname === href}
+              active={pathname === href || pathname.startsWith(`${href}/`)}
               icon={<Icon size={19} />}
             >
               {label}
@@ -57,11 +70,11 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 sm:flex">
-              <span className="text-xs text-slate-500">Live records</span>
+            <div className="hidden items-center gap-2 sm:flex" title={connectionLabel}>
+              <span className="text-xs text-slate-500">{connectionLabel}</span>
               <span
-                className="size-2 rounded-full bg-emerald-500"
-                aria-label="Live data connected"
+                className={`size-2 rounded-full ${connection.offline || connection.error ? "bg-rose-500" : connection.loading || stale ? "bg-amber-400" : "bg-emerald-500"}`}
+                aria-label={connectionLabel}
               />
             </div>
             <ReceivePaymentDrawer />
@@ -79,14 +92,14 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           <a
             key={href}
             href={href}
-            aria-current={pathname === href ? "page" : undefined}
+            aria-current={pathname === href || pathname.startsWith(`${href}/`) ? "page" : undefined}
             className={cn(
               "flex min-h-11 flex-col items-center justify-center gap-1 text-[11px] font-medium",
-              pathname === href ? "text-blue-700" : "text-slate-500",
+              pathname === href || pathname.startsWith(`${href}/`) ? "text-blue-700" : "text-slate-500",
             )}
           >
             <Icon size={20} aria-hidden="true" />
-            <span>{label === "Business profile" ? "Profile" : label}</span>
+            <span>{label === "Credit Assessment" ? "Assessment" : label === "Finance Match" ? "Finance" : label}</span>
           </a>
         ))}
       </nav>

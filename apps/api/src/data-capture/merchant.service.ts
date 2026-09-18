@@ -21,6 +21,7 @@ import * as schema from '../database/schema';
 import { RatesService } from '../rates/rates.service';
 import { CreateMerchantPaymentRequestDto } from './dto/create-merchant-payment-request.dto';
 import { ListMerchantTransactionsDto } from './dto/list-merchant-transactions.dto';
+import { UpdateMerchantProfileDto } from './dto/update-merchant-profile.dto';
 import { calculateMerchantReadiness } from './merchant-readiness';
 import {
   decimalRateToScaled,
@@ -68,6 +69,13 @@ export class MerchantService {
       displayCurrency: 'EUR',
       role: 'owner',
     };
+  }
+
+  async updateProfile(userId: string, dto: UpdateMerchantProfileDto): Promise<MerchantProfile> {
+    const merchant = await this.requireMerchant(userId);
+    const rows = await this.db.update(schema.merchants).set({ ...(dto.businessName !== undefined ? { businessName: dto.businessName.trim() } : {}), ...(dto.timezone !== undefined ? { timezone: dto.timezone.trim() } : {}), updatedAt: new Date() }).where(eq(schema.merchants.id, merchant.merchantId)).returning();
+    const row = rows[0];
+    return { id: merchant.publicId, businessName: row.businessName, timezone: row.timezone, displayCurrency: 'EUR', role: 'owner' };
   }
 
   async createPaymentRequest(

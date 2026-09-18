@@ -38,3 +38,6 @@ yarn-error.log*
 *.pem
 
 backups/
+
+# Generated finance-package acceptance artifacts can contain merchant evidence.
+output/merchant-finance-smtp-acceptance/

@@ -9,6 +9,7 @@ import {
   OnModuleInit,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { and, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { randomUUID } from 'crypto';
@@ -47,6 +48,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     private readonly paymentRequestsService: PaymentRequestsService,
     private readonly usersService: UsersService,
     private readonly merchantInventory: MerchantInventoryService,
+    private readonly config: ConfigService,
   ) {}
 
   onModuleInit() {
@@ -198,6 +200,28 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         displayName: `${recipient.firstName} ${recipient.lastName}`.trim(),
       },
     };
+  }
+
+  async getReceipt(userId: string, paymentRequestId: string) {
+    const transaction = (await this.db
+      .select()
+      .from(schema.merchantTransactions)
+      .where(
+        and(
+          eq(schema.merchantTransactions.paymentRequestId, paymentRequestId),
+          eq(schema.merchantTransactions.status, 'finalized'),
+        ),
+      )
+      .limit(1))[0];
+    if (!transaction) throw new NotFoundException('Completed merchant receipt not found');
+    const ledger = (await this.db.select().from(schema.ledgerEntries).where(eq(schema.ledgerEntries.id, transaction.ledgerEntryId)).limit(1))[0];
+    if (!ledger) throw new NotFoundException('Receipt ledger entry not found');
+    const wallet = (await this.db.select({ id: schema.wallets.id }).from(schema.wallets).where(and(eq(schema.wallets.userId, userId), inArray(schema.wallets.id, [ledger.debitWalletId, ledger.creditWalletId]), eq(schema.wallets.isActive, true))).limit(1))[0];
+    if (!wallet) throw new NotFoundException('Completed merchant receipt not found');
+    const request = (await this.db.select().from(schema.paymentRequests).where(eq(schema.paymentRequests.id, paymentRequestId)).limit(1))[0];
+    const merchant = (await this.db.select({ businessName: schema.merchants.businessName }).from(schema.merchants).where(eq(schema.merchants.id, transaction.merchantId)).limit(1))[0];
+    const lines = await this.db.select({ name: schema.merchantInvoiceItems.name, quantity: schema.merchantInvoiceItems.quantity, unitPriceMinor: schema.merchantInvoiceItems.unitPriceMinor, lineTotalMinor: schema.merchantInvoiceItems.lineTotalMinor }).from(schema.merchantInvoiceItems).where(eq(schema.merchantInvoiceItems.paymentRequestId, paymentRequestId));
+    return { receiptNumber: transaction.receiptNumber, merchantName: transaction.merchantNameSnapshot ?? merchant?.businessName ?? 'Merchant', invoiceNumber: request?.invoiceNumber ?? null, description: transaction.description, displayAmountMinor: transaction.displayAmountMinor.toString(), displayCurrency: transaction.displayCurrency, paymentMethod: 'MCBuse payment', status: 'completed', saleAt: transaction.occurredAt.toISOString(), completedAt: transaction.finalizedAt.toISOString(), evidence: { source: 'mcbuse_payment', verification: 'internally_confirmed', environment: transaction.evidenceEnvironment as 'live' | 'test' | 'synthetic' | 'unknown' }, lines: lines.map((line) => ({ name: line.name, quantity: line.quantity, unitPriceMinor: line.unitPriceMinor.toString(), lineTotalMinor: line.lineTotalMinor.toString() })) };
   }
 
   private async claimMerchantPayment(
@@ -494,6 +518,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       if (completed.length !== 1)
         throw new BadRequestException('Payment request cannot be finalized');
       await this.merchantInventory.settleReservedInventory(tx, request.id);
+      const merchant = await tx
+        .select({ businessName: schema.merchants.businessName })
+        .from(schema.merchants)
+        .where(eq(schema.merchants.id, request.merchantId))
+        .limit(1);
       await tx.insert(schema.merchantTransactions).values({
         receiptNumber: `MCB-${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
         merchantId: request.merchantId,
@@ -505,7 +534,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         settlementCurrency: params.currency,
         quoteRateScaled: BigInt(request.quoteRateScaled),
         description: request.description,
+        merchantNameSnapshot: merchant[0]?.businessName ?? null,
         status: 'finalized',
+        evidenceEnvironment: this.merchantEvidenceEnvironment(),
         occurredAt: finalizedAt,
         finalizedAt,
       });
@@ -537,6 +568,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
           ),
         );
     });
+  }
+
+  private merchantEvidenceEnvironment(): 'live' | 'test' | 'synthetic' {
+    if (this.config.get<string>('TRANSFER_PROVIDER')?.toLowerCase() === 'mock') return 'synthetic';
+    return this.config.get<string>('SOLANA_NETWORK') === 'mainnet-beta' ? 'live' : 'test';
   }
 
   private async moveBalances(

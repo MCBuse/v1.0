@@ -1,6 +1,2 @@
-import { BusinessProfile } from "./business-profile";
-
-export const metadata = { title: "Business profile" };
-export default function BusinessProfilePage() {
-  return <BusinessProfile />;
-}
+import { redirect } from "next/navigation";
+export default function BusinessProfilePage() { redirect("/credit-assessment/business-profile"); }

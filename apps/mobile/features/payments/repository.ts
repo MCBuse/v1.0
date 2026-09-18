@@ -5,6 +5,7 @@ import {
   executePaymentResponse,
   onRampResponse,
   paymentRequest,
+  merchantReceipt,
   resolveResponse,
   type CancelPaymentRequestResponse,
   type CreatePaymentRequestInput,
@@ -15,6 +16,7 @@ import {
   type OnRampResponse,
   type PaymentRequest,
   type ResolveResponse,
+  type MerchantReceipt,
 } from './models';
 
 export const paymentRepository = {
@@ -41,6 +43,11 @@ export const paymentRepository = {
   async executePayment(input: ExecutePaymentInput): Promise<ExecutePaymentResponse> {
     const raw = await http.post<unknown>('/payments', input);
     return executePaymentResponse.parse(raw);
+  },
+
+  async getMerchantReceipt(paymentRequestId: string): Promise<MerchantReceipt> {
+    const raw = await http.get<unknown>(`/payments/receipts/${paymentRequestId}`);
+    return merchantReceipt.parse(raw);
   },
 
   async executeUsernamePayment(input: ExecuteUsernamePaymentInput): Promise<ExecutePaymentResponse> {

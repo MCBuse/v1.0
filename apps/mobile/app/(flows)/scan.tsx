@@ -62,6 +62,7 @@ export default function ScanScreen() {
   const [step, setStep] = useState<Step>("scan");
   const [resolving, setResolving] = useState(false);
   const [paymentReq, setPaymentReq] = useState<ResolveResponse | null>(null);
+  const [completedPaymentRequestId, setCompletedPaymentRequestId] = useState<string | null>(null);
   const [amount, setAmount] = useState("0");
   const [currency, setCurrency] = useState<Currency>("USDC");
 
@@ -127,7 +128,8 @@ export default function ScanScreen() {
               idempotencyKey,
             }
           : { nonce: paymentReq.nonce, idempotencyKey };
-      await execute.mutateAsync(input);
+      const result = await execute.mutateAsync(input);
+      setCompletedPaymentRequestId(result.paymentRequestId ?? null);
       setStep("success");
     } catch (err: unknown) {
       const message =
@@ -142,6 +144,7 @@ export default function ScanScreen() {
     scannedRef.current = false;
     setStep("scan");
     setPaymentReq(null);
+    setCompletedPaymentRequestId(null);
     paymentKeyRef.current = null;
     setAmount("0");
     resolve.reset();
@@ -226,6 +229,7 @@ export default function ScanScreen() {
             </Text>
           </Box>
           <Box style={{ width: "100%" }} gap="m">
+            {completedPaymentRequestId ? <Button label="View receipt" variant="secondary" onPress={() => router.push(`/(flows)/receipt/${completedPaymentRequestId}` as never)} /> : null}
             <Button label="Done" onPress={() => router.back()} />
             <Button
               label="Scan Another"

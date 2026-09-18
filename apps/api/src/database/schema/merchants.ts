@@ -155,7 +155,11 @@ export const merchantTransactions = pgTable(
     }).notNull(),
     quoteRateScaled: bigint('quote_rate_scaled', { mode: 'bigint' }).notNull(),
     description: text('description'),
+    merchantNameSnapshot: varchar('merchant_name_snapshot', { length: 160 }),
     status: varchar('status', { length: 20 }).notNull().default('finalized'),
+    evidenceEnvironment: varchar('evidence_environment', { length: 20 })
+      .notNull()
+      .default('unknown'),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
     finalizedAt: timestamp('finalized_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })

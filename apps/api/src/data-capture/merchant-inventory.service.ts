@@ -131,7 +131,8 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
   ): Promise<MerchantProduct> {
     const merchant = await this.merchants.requireMerchant(userId);
     try {
-      const rows = await this.db
+      const rows = await this.db.transaction(async (tx) => {
+        const created = await tx
         .insert(schema.merchantProducts)
         .values({
           merchantId: merchant.merchantId,
@@ -145,6 +146,9 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
           status: 'active',
         })
         .returning();
+        await this.recordStockMovement(tx, merchant.merchantId, created[0].id, 'opening_balance', dto.quantity, 0, 'product', created[0].id);
+        return created;
+      });
       return this.productResponse(rows[0]);
     } catch (error) {
       this.rethrowProductConflict(error);
@@ -228,6 +232,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
         'Stock cannot be reduced below quantities reserved for invoices',
       );
     }
+    await this.db.insert(schema.merchantStockMovements).values({ merchantId: merchant.merchantId, productId, kind: 'manual_adjustment', onHandChange: dto.change, reservedChange: 0, referenceType: 'product', referenceId: productId });
     return this.productResponse(rows[0]);
   }
 
@@ -359,6 +364,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
           throw new ConflictException(
             'A selected product no longer has enough available stock',
           );
+        await this.recordStockMovement(tx, merchant.merchantId, productId, 'invoice_reservation', 0, quantity, 'invoice', null);
       }
       const rate = this.rates.getAll().USD_TO_EUR;
       const quoteRateScaled = decimalRateToScaled(rate.rate);
@@ -561,11 +567,12 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
             gte(schema.merchantProducts.reservedQuantity, line.quantity),
           ),
         )
-        .returning({ id: schema.merchantProducts.id });
+        .returning({ id: schema.merchantProducts.id, merchantId: schema.merchantProducts.merchantId });
       if (!released[0])
         throw new InternalServerErrorException(
           'Reserved stock could not be released',
         );
+      await this.recordStockMovement(tx, released[0].merchantId, line.productId!, 'reservation_release', 0, -line.quantity, 'invoice', invoiceId);
     }
   }
 
@@ -597,11 +604,12 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
             gte(schema.merchantProducts.reservedQuantity, line.quantity),
           ),
         )
-        .returning({ id: schema.merchantProducts.id });
+        .returning({ id: schema.merchantProducts.id, merchantId: schema.merchantProducts.merchantId });
       if (!settled[0])
         throw new InternalServerErrorException(
           'Reserved stock could not be settled',
         );
+      await this.recordStockMovement(tx, settled[0].merchantId, line.productId!, 'digital_sale', -line.quantity, -line.quantity, 'invoice', invoiceId);
     }
   }
 
@@ -658,6 +666,10 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
       .limit(1);
     if (!rows[0]) throw new NotFoundException('Product not found');
     return rows[0];
+  }
+
+  private async recordStockMovement(tx: Transaction, merchantId: string, productId: string, kind: string, onHandChange: number, reservedChange: number, referenceType: string, referenceId: string | null) {
+    await tx.insert(schema.merchantStockMovements).values({ merchantId, productId, kind, onHandChange, reservedChange, referenceType, referenceId });
   }
 
   private productResponse(

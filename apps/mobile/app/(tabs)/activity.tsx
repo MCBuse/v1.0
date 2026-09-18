@@ -15,6 +15,7 @@ import {
   type ListRenderItem,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
 import { Box, Text } from '@/components/ui';
 import { useTransactions } from '@/features/transactions';
@@ -231,6 +232,7 @@ const TxRow = memo(function TxRow({
         <Text variant="caption" color="textTertiary">
           {formatRelativeTime(entry.createdAt)}
         </Text>
+        {entry.paymentRequestId && entry.type === 'p2p' && entry.status === 'completed' ? <Pressable onPress={() => router.push(`/(flows)/receipt/${entry.paymentRequestId}` as never)}><Text variant="caption" color="textSecondary">View receipt</Text></Pressable> : null}
       </Box>
 
       <Box alignItems="flex-end">
