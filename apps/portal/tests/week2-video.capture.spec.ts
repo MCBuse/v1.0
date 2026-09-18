@@ -80,12 +80,36 @@ test("capture the Week 2 product surfaces", async ({ context, page }) => {
             occurredAt: now,
           },
         ],
+        recordedToday: money("42150"),
+        recorded30Days: money("693350"),
+        recordedSaleCount30Days: 86,
+        recordedAverageSale: money("8062"),
+        recordedDailyTrend: dailyAmounts.map((amount, index) => {
+          const day = new Date("2026-08-15T00:00:00.000Z");
+          day.setUTCDate(day.getUTCDate() + index);
+          return {
+            start: day.toISOString().slice(0, 10),
+            amountMinor: String(amount),
+            paymentCount:
+              amount === 0 ? 0 : Math.max(1, Math.round(amount / 8500)),
+          };
+        }),
+        recordedHourlyRhythm: Array.from({ length: 24 }, (_, hour) => ({
+          start: `${String(hour).padStart(2, "0")}:00`,
+          amountMinor:
+            hour >= 7 && hour <= 19
+              ? String(11000 + ((hour * 4700) % 23000))
+              : "0",
+          paymentCount: hour >= 7 && hour <= 19 ? 2 + (hour % 4) : 0,
+        })),
+        lowStockProductCount: 2,
+        readinessStage: "building_history",
         lastUpdatedAt: now,
       }),
     }),
   );
 
-  await page.route("**/api/merchant/me/transactions**", (route) =>
+  await page.route("**/api/merchant/me/activity**", (route) =>
     route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
@@ -95,24 +119,33 @@ test("capture the Week 2 product surfaces", async ({ context, page }) => {
             receiptNumber: "MCB-71K4P2",
             amount: money("2850"),
             description: "Lunch service",
-            status: "received",
-            receivedAt: now,
+            source: "mcbuse_payment",
+            verification: "internally_confirmed",
+            environment: "test",
+            status: "recorded",
+            occurredAt: now,
           },
           {
             id: "receipt-2",
             receiptNumber: "MCB-53Q9H8",
             amount: money("1240"),
             description: "Counter sale",
-            status: "received",
-            receivedAt: "2026-09-13T17:42:00.000Z",
+            source: "merchant_cash",
+            verification: "merchant_declared",
+            environment: "unknown",
+            status: "recorded",
+            occurredAt: "2026-09-13T17:42:00.000Z",
           },
           {
             id: "receipt-3",
             receiptNumber: "MCB-28M6R3",
             amount: money("7600"),
             description: "Afternoon order",
-            status: "received",
-            receivedAt: "2026-09-13T16:18:00.000Z",
+            source: "mcbuse_payment",
+            verification: "internally_confirmed",
+            environment: "test",
+            status: "recorded",
+            occurredAt: "2026-09-13T16:18:00.000Z",
           },
         ],
         page: 1,
@@ -200,7 +233,7 @@ test("capture the Week 2 product surfaces", async ({ context, page }) => {
     path: path.join(outputDirectory, "payment-request.png"),
   });
 
-  await page.goto("/transactions");
+  await page.goto("/analytics/transactions");
   await expect(page.getByText("Lunch service")).toBeVisible();
   await page.screenshot({
     path: path.join(outputDirectory, "transactions.png"),

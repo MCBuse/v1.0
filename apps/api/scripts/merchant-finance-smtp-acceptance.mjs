@@ -67,11 +67,15 @@ async function main() {
   const checkCashIdempotency = process.argv.includes('--check-cash-idempotency');
   const checkPackageIdempotency = process.argv.includes('--check-package-idempotency');
   const outputRoot = resolve(argument('output-dir') ?? 'output/merchant-finance-smtp-acceptance');
+  const periodDays = Number(argument('period-days') ?? 7);
   if (!projectId || !apiBaseUrl || (!skipEmail && !recipients.length)) {
-    throw new Error('Usage: MCBUSE_GCP_PROJECT_ID=... node scripts/merchant-finance-smtp-acceptance.mjs --api-base-url https://api.example/api/v1 --recipient inbox@example.test [--recipient second@example.test] [--skip-email]');
+    throw new Error('Usage: MCBUSE_GCP_PROJECT_ID=... node scripts/merchant-finance-smtp-acceptance.mjs --api-base-url https://api.example/api/v1 --recipient inbox@example.test [--recipient second@example.test] [--period-days 7|30|90] [--skip-email]');
   }
   if (recipients.some((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
     throw new Error('Every recipient must be a valid email address');
+  }
+  if (![7, 30, 90].includes(periodDays)) {
+    throw new Error('--period-days must be one of 7, 30, or 90');
   }
 
   const runId = randomUUID().replaceAll('-', '').slice(0, 16);
@@ -181,7 +185,7 @@ async function main() {
       token: accessToken,
       method: 'POST',
       headers: { 'idempotency-key': `${runId}-package` },
-      body: { periodDays: 7, demonstrationData: true },
+      body: { periodDays, demonstrationData: true },
     });
     const pkg = await created.json();
     if (!pkg?.id || pkg?.snapshot?.demonstrationData !== true) {
@@ -191,7 +195,7 @@ async function main() {
     if (checkPackageIdempotency) {
       const replay = await request(apiBaseUrl, '/merchants/me/finance-packages', {
         token: accessToken, method: 'POST', headers: { 'idempotency-key': `${runId}-package` },
-        body: { periodDays: 7, demonstrationData: true },
+        body: { periodDays, demonstrationData: true },
       });
       if ((await replay.json()).id !== pkg.id) {
         throw new Error('Identical finance-package replay did not return the original package');
@@ -199,7 +203,7 @@ async function main() {
       try {
         await request(apiBaseUrl, '/merchants/me/finance-packages', {
           token: accessToken, method: 'POST', headers: { 'idempotency-key': `${runId}-package` },
-          body: { periodDays: 30, demonstrationData: true },
+          body: { periodDays: periodDays === 90 ? 30 : 90, demonstrationData: true },
         });
         throw new Error('Changed finance-package input unexpectedly reused an idempotency key');
       } catch (error) {

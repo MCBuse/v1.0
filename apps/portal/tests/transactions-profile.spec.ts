@@ -37,43 +37,45 @@ test.beforeEach(async ({ context }) => {
   ]);
 });
 
-test("keeps transaction filters and pagination in the URL", async ({
+test("keeps activity provenance filters and pagination in the URL", async ({
   page,
 }) => {
   const requested: string[] = [];
-  await page.route("**/api/merchant/me/transactions**", (route) => {
+  await page.route("**/api/merchant/me/activity**", (route) => {
     const url = new URL(route.request().url());
     requested.push(url.search);
-    const query = url.searchParams.get("query");
     const currentPage = Number(url.searchParams.get("page") ?? "1");
     return route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
         items: [
-          receipt(
-            `${query ? "lunch" : "sale"}-${currentPage}`,
-            query ? "Lunch order" : "Counter sale",
-            currentPage === 1 ? "450" : "900",
-          ),
+          {
+            ...receipt(`sale-${currentPage}`, "Counter sale", currentPage === 1 ? "450" : "900"),
+            source: "merchant_cash",
+            verification: "merchant_declared",
+            environment: "unknown",
+            status: "recorded",
+            occurredAt: "2026-09-17T12:00:00.000Z",
+          },
         ],
         page: currentPage,
         pageSize: 20,
-        totalItems: query ? 21 : 1,
-        totalPages: query ? 2 : 1,
+        totalItems: 21,
+        totalPages: 2,
       }),
     });
   });
 
-  await page.goto("/transactions");
+  await page.goto("/analytics/transactions");
   await expect(page.getByText("Counter sale")).toBeVisible();
-  await page.getByLabel("Search receipts").fill("Lunch");
-  await page.getByRole("button", { name: "Apply filter" }).click();
-  await expect(page).toHaveURL(/\/transactions\?query=Lunch$/);
-  await expect(page.getByText("Lunch order")).toBeVisible();
+  await page.getByLabel("Source").selectOption("merchant_cash");
+  await expect(page).toHaveURL(/source=merchant_cash/);
+  await page.getByLabel("Environment").selectOption("unknown");
+  await expect(page).toHaveURL(/environment=unknown/);
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page).toHaveURL(/query=Lunch&page=2|page=2&query=Lunch/);
-  await expect(page.getByText("Page 2 of 2 · 21 receipts")).toBeVisible();
-  expect(requested.some((search) => search.includes("query=Lunch"))).toBe(true);
+  await expect(page).toHaveURL(/page=2/);
+  await expect(page.getByText("Page 2 of 2 · 21 records")).toBeVisible();
+  expect(requested.some((search) => search.includes("source=merchant_cash") && search.includes("environment=unknown"))).toBe(true);
 });
 
 test("shows transaction empty and error states without leaking technical data", async ({
@@ -81,7 +83,7 @@ test("shows transaction empty and error states without leaking technical data", 
 }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one state proof is enough");
   let fail = false;
-  await page.route("**/api/merchant/me/transactions**", (route) =>
+  await page.route("**/api/merchant/me/activity**", (route) =>
     fail
       ? route.fulfill({
           status: 503,
@@ -100,8 +102,8 @@ test("shows transaction empty and error states without leaking technical data", 
         }),
   );
 
-  await page.goto("/transactions");
-  await expect(page.getByText("No matching receipts")).toBeVisible();
+  await page.goto("/analytics/transactions");
+  await expect(page.getByText("No recorded sales yet")).toBeVisible();
   fail = true;
   await page.reload();
   await expect(page.getByText("We could not load this")).toBeVisible();

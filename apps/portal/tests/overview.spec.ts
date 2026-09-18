@@ -51,6 +51,39 @@ function summaryPayload({
     pendingRequestCount,
     problemCount: 0,
     problems: [],
+    recordedToday: {
+      minor: receivedTodayMinor,
+      currency: "EUR",
+      estimated: false,
+      rateTimestamp: null,
+    },
+    recorded30Days: {
+      minor: receivedTodayMinor,
+      currency: "EUR",
+      estimated: false,
+      rateTimestamp: null,
+    },
+    recordedSaleCount30Days: receivedTodayMinor === "0" ? 0 : 1,
+    recordedAverageSale: {
+      minor: receivedTodayMinor,
+      currency: "EUR",
+      estimated: false,
+      rateTimestamp: null,
+    },
+    recordedDailyTrend: [
+      {
+        start: "2026-09-05",
+        amountMinor: receivedTodayMinor,
+        paymentCount: receivedTodayMinor === "0" ? 0 : 1,
+      },
+    ],
+    recordedHourlyRhythm: Array.from({ length: 24 }, (_, hour) => ({
+      start: `${String(hour).padStart(2, "0")}:00`,
+      amountMinor: hour === 12 ? receivedTodayMinor : "0",
+      paymentCount: hour === 12 && receivedTodayMinor !== "0" ? 1 : 0,
+    })),
+    lowStockProductCount: 2,
+    readinessStage: "building_history",
     lastUpdatedAt: new Date().toISOString(),
   };
 }
@@ -101,7 +134,7 @@ test.beforeEach(async ({ context, page }) => {
       }),
     }),
   );
-  await page.route("**/api/merchant/me/transactions**", (route) =>
+  await page.route("**/api/merchant/me/activity**", (route) =>
     route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
@@ -116,8 +149,11 @@ test.beforeEach(async ({ context, page }) => {
               rateTimestamp: null,
             },
             description: "Lunch service",
-            status: "received",
-            receivedAt: new Date().toISOString(),
+            source: "mcbuse_payment",
+            verification: "internally_confirmed",
+            environment: "test",
+            status: "recorded",
+            occurredAt: new Date().toISOString(),
           },
         ],
         page: 1,
@@ -141,7 +177,7 @@ test("overview renders money records and responsive navigation", async ({
   await page.waitForTimeout(500);
   if (browserErrors.length) throw new Error(browserErrors.join("\n"));
   await expect(
-    page.getByRole("heading", { name: "Your money, at a glance" }),
+    page.getByRole("heading", { name: "Your business, at a glance" }),
   ).toBeVisible();
   await expect(page.getByText("€4,215.50")).toBeVisible();
   await expect(page.getByText("Lunch service")).toBeVisible();
@@ -149,7 +185,7 @@ test("overview renders money records and responsive navigation", async ({
   await expect(page.getByText("50.00%")).toBeVisible();
   await expect(
     page.getByRole("img", {
-      name: "Daily received amount for the last 30 days",
+      name: "Daily recorded sales amount for the last 30 days",
     }),
   ).toBeVisible();
   await expect(
@@ -159,7 +195,7 @@ test("overview renders money records and responsive navigation", async ({
   ).toBeVisible();
   await expect(
     page.getByRole("table", {
-      name: "Daily received amount for the last 30 days",
+      name: "Daily recorded sales amount for the last 30 days",
     }),
   ).toHaveCount(1);
   await expect(
@@ -327,7 +363,7 @@ test("shows honest empty states for zero-filled merchant buckets", async ({
   test.skip(testInfo.project.name !== "desktop", "one state proof is enough");
 
   await page.unroute("**/api/merchant/me/summary**");
-  await page.unroute("**/api/merchant/me/transactions**");
+  await page.unroute("**/api/merchant/me/activity**");
   await page.route("**/api/merchant/me/summary**", (route) =>
     route.fulfill({
       contentType: "application/json",
@@ -336,7 +372,7 @@ test("shows honest empty states for zero-filled merchant buckets", async ({
       ),
     }),
   );
-  await page.route("**/api/merchant/me/transactions**", (route) =>
+  await page.route("**/api/merchant/me/activity**", (route) =>
     route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
@@ -353,7 +389,7 @@ test("shows honest empty states for zero-filled merchant buckets", async ({
   await expect(
     page.getByText("Your first sale will appear here"),
   ).toBeVisible();
-  await expect(page.getByText("No payments received yet")).toBeVisible();
+  await expect(page.getByText("No recorded activity yet")).toBeVisible();
   await expect(page.getByText("No data")).toBeVisible();
 });
 

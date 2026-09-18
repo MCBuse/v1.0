@@ -125,6 +125,21 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async lowStockCount(userId: string): Promise<number> {
+    const merchant = await this.merchants.requireMerchant(userId);
+    const rows = await this.db
+      .select({ value: count() })
+      .from(schema.merchantProducts)
+      .where(
+        and(
+          eq(schema.merchantProducts.merchantId, merchant.merchantId),
+          eq(schema.merchantProducts.status, 'active'),
+          sql`${schema.merchantProducts.onHandQuantity} - ${schema.merchantProducts.reservedQuantity} <= ${schema.merchantProducts.lowStockThreshold}`,
+        ),
+      );
+    return rows[0]?.value ?? 0;
+  }
+
   async createProduct(
     userId: string,
     dto: CreateMerchantProductDto,

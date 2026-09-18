@@ -12,8 +12,12 @@
 - Product stock movements captured from the workspace upgrade onward, with 7/30-day product performance, source-aware digital/cash totals, and current stock.
 - Transactions expose evidence source, verification status, and environment separately so merchant-entered, imported, live, test, synthetic, and unknown records are not conflated.
 - Transactions and Analytics can filter the combined activity by evidence source and environment. The selected filters apply to totals, comparisons, trends, and product metrics.
+- Overview's recent-activity panel uses that same combined activity feed, including merchant-recorded cash sales.
+- Overview's headline sales and trend figures also use combined recorded activity; it separately shows payment exceptions, the active low-stock-product count, and the versioned evidence-readiness stage.
+- Analytics groups 7/30-day ranges by day, 90-day ranges by week, and custom ranges over 180 days by month.
+- Finance packages use the same period-scoped product-performance calculation as Analytics; a 90-day package cannot silently substitute 30-day product metrics.
 - New MCBuse payment receipts persist the configured transfer environment: mock transfers are synthetic, devnet transfers are test, and mainnet transfers are live. Historical records remain `unknown`.
-- Versioned `readiness-rules-v1` assessment, business profile/consent, payout reconciliation, PDF/ZIP packages, and SMTP package submission.
+- Versioned `readiness-rules-v1` assessment, business profile/consent, payout reconciliation with distinct lifecycle/reconciliation states, PDF/ZIP packages, and SMTP package submission.
 - Buyer receipt retrieval after finalization, including reopening a merchant receipt from the payment flow and Activity.
 
 ## Database migration
@@ -60,7 +64,8 @@ bash scripts/cloud-run/provision-merchant-evidence.sh
 - `pnpm --filter portal check-types`
 - `pnpm --filter portal build`
 - `pnpm --filter portal test` — 5 tests passed.
-- `pnpm --filter api exec jest --runInBand` — 21 suites / 76 tests passed.
+- `pnpm --filter api exec jest --runInBand --watchman=false` — 21 suites / 77 tests passed. Watchman is disabled for this command because the local watcher socket is intermittently inaccessible in this environment.
+- `pnpm --filter portal test:e2e` — 72 local mock-API checks across mobile, tablet, and desktop passed after the combined Overview summary change.
 - `pnpm --filter mobile exec tsc --noEmit`
 - `git diff --check`
 
@@ -78,11 +83,11 @@ Portal lint still reports three existing warnings in unrelated test scripts: `te
   runtime identity has application object-admin access.
 - Cloud Run migration execution `mcbuse-api-migrate-tnptf` completed
   successfully before traffic changed.
-- API image digest `sha256:001287f2f6c76858b8bb9cfcc9112f52fef16d9da8a994bd7ee2304f6b571850`
-  is live as `mcbuse-api-00030-hn5` with 100% traffic. Its health endpoint and
+- API image digest `sha256:76b446c0adc9dfda94023bc247234ea941d47d2afa074706c11c9f25156f20c1`
+  is live as `mcbuse-api-00033-5xq` with 100% traffic. Its health endpoint and
   database report `ok`; unauthenticated `/merchants/me/activity` returns 401.
-- Portal image digest `sha256:b213f4a89fe2f8370577acf16aaa8f0b87952984cad5e5138390c5681200bd25`
-  is live as `mcbuse-portal-00012-w2f` with 100% traffic. `/sign-in` returns
+- Portal image digest `sha256:e0332220360c7521be8fc0e13662c80ba3e06bb838110459b094355f2aed8319`
+  is live as `mcbuse-portal-00015-2dx` with 100% traffic. `/sign-in` returns
   200, while Overview, Payment, Analytics, Credit Assessment, and Finance
   Match redirect anonymous visitors to `/sign-in`.
 - `merchant:hosted-infra-readiness` passed against the deployed API: database
@@ -112,6 +117,14 @@ Portal lint still reports three existing warnings in unrelated test scripts: `te
   generated package `e7d84913-1b7e-4067-9451-287e08b19941` (no email sent).
   Its one-page A4 PDF has the repeated package header and `Page 1 of 1` footer
   with no clipping or blank page.
+- A 90-day package-only check generated package
+  `9e595df1-6512-4829-8e6c-95deafa89c5f` (no email sent). Its PDF is one A4
+  page (2,249 bytes; SHA-256
+  `62ba89f9e96600ab0a1d35169b36568ad6399f61dea0574598af92d2703c0c43`), and
+  its ZIP is 3,950 bytes (SHA-256
+  `fb83ddd506c573d04a77fbf318b1e7d6c037010f8cc1d72024ed5bdc3ef65247`) with
+  the PDF plus all eight expected CSV tables. The page was rendered and
+  inspected; it is explicitly labelled as incomplete demonstration data.
 - Migration execution `mcbuse-api-migrate-ssn72` applied the cash-sale input
   fingerprint successfully. A hosted synthetic replay check then proved that
   the same idempotency key returns its original sale only for equivalent input;
@@ -151,6 +164,6 @@ These checks cannot be established from local code or fixtures:
 
 ## Current limits before release sign-off
 
-- The portal browser suite reaches its 72 tests in this environment but did not emit a terminal summary, so it is not proof of a passing browser suite.
+- The local portal Playwright suite now records a passing result with no failed tests across its 72 mobile, tablet, and desktop browser checks. This is local mock-API evidence, not authenticated hosted-browser proof.
 - The importer supports interactive mapping for supported CSV/XLSX columns. It still needs a real external-source acceptance file.
 - No real source file, recipient-inbox receipt, authenticated portal browser flow, or hosted mobile payment/receipt has been verified yet.

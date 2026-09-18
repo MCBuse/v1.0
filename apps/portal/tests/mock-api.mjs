@@ -82,6 +82,18 @@ const server = createServer(async (request, response) => {
     });
   }
 
+  if (request.method === "GET" && url.pathname === "/api/v1/merchants/me/products") {
+    if (!isMerchantAccess(bearer(request)))
+      return send(response, 401, { message: "Unauthorized" });
+    return send(response, 200, {
+      items: [],
+      page: 1,
+      pageSize: 100,
+      totalItems: 0,
+      totalPages: 1,
+    });
+  }
+
   return send(response, 404, { message: "Not found" });
 });
 

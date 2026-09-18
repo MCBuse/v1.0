@@ -67,7 +67,6 @@ export class MerchantFinanceService {
       analytics,
       readiness,
       reconciliation,
-      products,
       activityPage,
       digitalItems,
       cashItems,
@@ -75,14 +74,6 @@ export class MerchantFinanceService {
       this.activity.analytics(userId, from, to),
       this.merchants.getReadiness(userId),
       this.imports.listReconciliation(userId),
-      this.db
-        .select({
-          id: schema.merchantProducts.id,
-          name: schema.merchantProducts.name,
-        })
-        .from(schema.merchantProducts)
-        .where(eq(schema.merchantProducts.merchantId, merchant.merchantId))
-        .limit(100),
       this.activity.listActivity(userId, 1, 5000),
       this.db
         .select({
@@ -137,16 +128,11 @@ export class MerchantFinanceService {
           ),
         ),
     ]);
-    const productMetrics = await Promise.all(
-      products.map(async (product) => ({
-        name: product.name,
-        ...(await this.activity.productAnalytics(
-          userId,
-          product.id,
-          periodDays === 7 ? 7 : 30,
-        )),
-      })),
-    );
+    const productMetrics = analytics.productPerformance.map((product) => ({
+      ...product,
+      revenue: product.totalSales,
+      availableQuantity: null,
+    }));
     const evidenceIncomplete = readiness.stage !== 'evidence_ready';
     const sales = activityPage.items.filter((item) => {
       const occurredAt = new Date(item.occurredAt);

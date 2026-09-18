@@ -1,6 +1,9 @@
 "use client";
 
-import type { MerchantSummary, MerchantTransactionPage } from "@repo/shared";
+import type {
+  MerchantActivityPage,
+  MerchantWorkspaceSummary,
+} from "@repo/shared";
 import { Alert } from "@repo/ui/alert";
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
@@ -45,9 +48,11 @@ function Metric({
 }
 
 export function OverviewDashboard() {
-  const summary = usePortalResource<MerchantSummary>("me/summary?period=30d");
-  const transactions = usePortalResource<MerchantTransactionPage>(
-    "me/transactions?page=1&pageSize=5",
+  const summary = usePortalResource<MerchantWorkspaceSummary>(
+    "me/summary?period=30d",
+  );
+  const activity = usePortalResource<MerchantActivityPage>(
+    "me/activity?page=1&pageSize=5",
   );
   if (summary.loading && !summary.data)
     return (
@@ -72,7 +77,7 @@ export function OverviewDashboard() {
     );
   const data = summary.data;
   const delayed = Date.now() - new Date(data.lastUpdatedAt).getTime() > 90_000;
-  const hasDailySales = data.dailyTrend.some(
+  const hasDailySales = data.recordedDailyTrend.some(
     (bucket) => bucket.paymentCount > 0,
   );
   return (
@@ -81,10 +86,10 @@ export function OverviewDashboard() {
         <div>
           <p className="text-sm font-medium text-blue-700">Overview</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
-            Your money, at a glance
+            Your business, at a glance
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Finalized customer payments only.
+            Recorded sales include finalized MCBuse payments and merchant-recorded cash.
           </p>
         </div>
         <div className="text-right text-xs text-slate-400">
@@ -166,24 +171,29 @@ export function OverviewDashboard() {
       </Card>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
-          label="Received today"
-          value={<Money value={data.receivedToday} />}
+          label="Recorded sales today"
+          value={<Money value={data.recordedToday} />}
         />
         <Metric
-          label="Received · 30 days"
-          value={<Money value={data.received30Days} />}
+          label="Recorded sale count · 30 days"
+          value={<Money value={data.recorded30Days} />}
         />
         <Metric
-          label="Payments · 30 days"
+          label="Recorded sales · 30 days"
           value={
             <span className="font-mono tabular-nums">
-              {data.paymentCount30Days}
+              {data.recordedSaleCount30Days}
             </span>
           }
         />
         <Metric
-          label="Average sale"
-          value={<Money value={data.averageSale} />}
+          label="Low-stock products"
+          value={
+            <a className="font-mono tabular-nums text-blue-700" href="/analytics/inventory">
+              {data.lowStockProductCount}
+            </a>
+          }
+          detail="View Inventory"
         />
       </div>
       <Card>
@@ -223,15 +233,15 @@ export function OverviewDashboard() {
             <div>
               <h2 className="font-semibold text-slate-950">Daily trend</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Received over the last 30 days
+                Recorded sales over the last 30 days
               </p>
             </div>
           </CardHeader>
           <CardContent>
             {hasDailySales ? (
               <SalesBars
-                buckets={data.dailyTrend}
-                label="Daily received amount for the last 30 days"
+                buckets={data.recordedDailyTrend}
+                label="Daily recorded sales amount for the last 30 days"
               />
             ) : (
               <EmptyState
@@ -246,12 +256,12 @@ export function OverviewDashboard() {
             <div>
               <h2 className="font-semibold text-slate-950">Sales rhythm</h2>
               <p className="mt-1 text-sm text-slate-500">
-                When customers usually pay
+                When recorded sales usually occur
               </p>
             </div>
           </CardHeader>
           <CardContent>
-            <HourlyRhythm buckets={data.hourlyRhythm} />
+            <HourlyRhythm buckets={data.recordedHourlyRhythm} />
           </CardContent>
         </Card>
       </div>
@@ -259,25 +269,25 @@ export function OverviewDashboard() {
         <CardHeader>
           <div>
             <h2 className="font-semibold text-slate-950">
-              Recent transactions
+              Recent recorded activity
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Merchant receipts with no customer personal data
+              Finalized MCBuse payments and merchant-recorded cash sales.
             </p>
           </div>
           <a
-            href="/transactions"
+            href="/analytics/transactions"
             className="flex min-h-11 items-center gap-1 text-sm font-semibold text-blue-700"
           >
             View all <ArrowRight size={16} />
           </a>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          {transactions.loading && !transactions.data ? (
+          {activity.loading && !activity.data ? (
             <div className="p-5">
               <Skeleton className="h-32" />
             </div>
-          ) : transactions.data?.items.length ? (
+          ) : activity.data?.items.length ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -288,19 +298,19 @@ export function OverviewDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.data.items.map((item) => (
+                {activity.data.items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-xs text-slate-500">
                       {item.receiptNumber}
                     </TableCell>
-                    <TableCell>{item.description ?? "Payment"}</TableCell>
+                    <TableCell>{item.description ?? "Sale"}</TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1.5">
                         <Clock3 size={14} />
                         {new Intl.DateTimeFormat("en-GB", {
                           dateStyle: "medium",
                           timeStyle: "short",
-                        }).format(new Date(item.receivedAt))}
+                        }).format(new Date(item.occurredAt))}
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-medium text-slate-950">
@@ -312,10 +322,28 @@ export function OverviewDashboard() {
             </Table>
           ) : (
             <EmptyState
-              title="No payments received yet"
-              description="Finalized payments will appear here automatically."
+              title="No recorded activity yet"
+              description="Finalized payments and merchant-recorded cash sales will appear here."
             />
           )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
+          <div>
+            <p className="text-sm font-medium text-slate-950">
+              Evidence readiness
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Demonstration evidence completeness, not a credit decision.
+            </p>
+          </div>
+          <a
+            href="/credit-assessment"
+            className="text-sm font-semibold text-blue-700"
+          >
+            {data.readinessStage.replaceAll("_", " ")}
+          </a>
         </CardContent>
       </Card>
       {data.pendingRequestCount > 0 ? (

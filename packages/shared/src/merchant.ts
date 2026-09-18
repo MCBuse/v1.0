@@ -43,6 +43,17 @@ export type MerchantSummary = {
   lastUpdatedAt: string;
 };
 
+export type MerchantWorkspaceSummary = MerchantSummary & {
+  recordedToday: MoneyValue;
+  recorded30Days: MoneyValue;
+  recordedSaleCount30Days: number;
+  recordedAverageSale: MoneyValue;
+  recordedDailyTrend: MerchantSummaryBucket[];
+  recordedHourlyRhythm: MerchantSummaryBucket[];
+  lowStockProductCount: number;
+  readinessStage: MerchantReadinessStage;
+};
+
 export type MerchantTransactionStatus = "received";
 
 export type MerchantTransaction = {

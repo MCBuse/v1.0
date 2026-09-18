@@ -63,12 +63,38 @@ export class MerchantController {
   }
 
   @Get('summary')
-  @ApiOperation({ summary: 'Get merchant EUR sales and balance summary' })
-  getSummary(
+  @ApiOperation({ summary: 'Get compact merchant workspace summary' })
+  async getSummary(
     @CurrentUser() user: { id: string },
     @Query('period') period = '30d',
   ) {
-    return this.merchants.getSummary(user.id, period);
+    if (period !== '30d')
+      throw new BadRequestException('Only period=30d is supported');
+    const now = new Date();
+    const from = new Date(now.getTime() - 30 * 86_400_000);
+    const [summary, analytics, lowStockProductCount, readiness] = await Promise.all([
+      this.merchants.getSummary(user.id, period),
+      this.activity.analytics(user.id, from, now),
+      this.inventory.lowStockCount(user.id),
+      this.merchants.getReadiness(user.id),
+    ]);
+    const today = analytics.dailyTrend.at(-1);
+    return {
+      ...summary,
+      recordedToday: {
+        minor: today?.amountMinor ?? '0',
+        currency: 'EUR' as const,
+        estimated: false,
+        rateTimestamp: null,
+      },
+      recorded30Days: analytics.totalRecordedSales,
+      recordedSaleCount30Days: analytics.saleCount,
+      recordedAverageSale: analytics.averageSale,
+      recordedDailyTrend: analytics.dailyTrend,
+      recordedHourlyRhythm: analytics.hourlyRhythm,
+      lowStockProductCount,
+      readinessStage: readiness.stage,
+    };
   }
 
   @Get('transactions')
