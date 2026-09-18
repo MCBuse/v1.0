@@ -10,7 +10,7 @@ import { MerchantService } from './merchant.service';
 
 type ImportKind = 'inventory' | 'settlement';
 type ImportedRow = Record<string, string>;
-type BatchMapping = { headers: string[]; fieldMap?: Record<string, string>; applyStockSnapshot?: boolean };
+type BatchMapping = { headers: string[]; fieldMap?: Record<string, string>; applyStockSnapshot?: boolean; commitIdempotencyKey?: string };
 
 @Injectable()
 export class MerchantImportService {
@@ -46,16 +46,20 @@ export class MerchantImportService {
     return { items: rows.map((row) => ({ id: row.id, kind: row.kind, sourceName: row.sourceName, status: row.status, committedAt: row.committedAt?.toISOString() ?? null, createdAt: row.createdAt.toISOString() })) };
   }
 
-  async commit(userId: string, id: string) {
+  async commit(userId: string, id: string, idempotencyKey?: string) {
+    if (!idempotencyKey?.trim()) throw new BadRequestException('Idempotency-Key is required');
     const merchant = await this.merchants.requireMerchant(userId);
     return this.db.transaction(async (tx) => {
       const batch = (await tx.select().from(schema.merchantImportBatches).where(and(eq(schema.merchantImportBatches.id, id), eq(schema.merchantImportBatches.merchantId, merchant.merchantId))).limit(1))[0];
       if (!batch) throw new BadRequestException('Import preview not found');
-      if (batch.status === 'committed') return { id: batch.id, status: batch.status, imported: 0 };
       const mapping = batch.mapping as BatchMapping; const rows = this.mappedRows(batch.rowsJson as ImportedRow[], mapping.fieldMap ?? this.defaultFieldMap(batch.kind as ImportKind, mapping.headers)); const errors = this.validateRows(batch.kind as ImportKind, rows, Boolean(mapping.applyStockSnapshot)); if (errors.length) throw new BadRequestException(errors.join('; '));
+      if (batch.status === 'committed') {
+        if (mapping.commitIdempotencyKey && mapping.commitIdempotencyKey !== idempotencyKey) throw new ConflictException('This import was already committed with a different idempotency key');
+        return { id: batch.id, status: batch.status, imported: 0 };
+      }
       if (batch.kind === 'inventory') await this.commitInventory(tx, merchant.merchantId, batch.sourceName, rows, Boolean(mapping.applyStockSnapshot));
       else await this.commitSettlement(tx, merchant.merchantId, batch.id, batch.sourceName, rows);
-      await tx.update(schema.merchantImportBatches).set({ status: 'committed', committedAt: new Date() }).where(eq(schema.merchantImportBatches.id, id));
+      await tx.update(schema.merchantImportBatches).set({ status: 'committed', committedAt: new Date(), mapping: { ...mapping, commitIdempotencyKey: idempotencyKey } }).where(eq(schema.merchantImportBatches.id, id));
       await tx.insert(schema.auditLogs).values({ userId, action: `merchant.import.${batch.kind}.committed`, entityType: 'merchant_import_batch', entityId: id, metadata: JSON.stringify({ rows: rows.length }) });
       return { id, status: 'committed', imported: rows.length };
     });

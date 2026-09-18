@@ -10,6 +10,7 @@
 - Combined merchant activity: finalized MCBuse payments plus merchant-recorded cash sales.
 - Cash-sale recording, historical sale time, stock-already-accounted-for option, audited void, and one private support document.
 - CSV/XLSX inventory and settlement imports with preview, repeat-import protection, an explicit stock-snapshot choice, source mapping, and payout allocations.
+- Import commits require a stable `Idempotency-Key`; retries with that key return the original outcome, while a different key cannot recommit an already completed batch.
 - Product stock movements captured from the workspace upgrade onward, with 7/30-day product performance, source-aware digital/cash totals, and current stock.
 - Custom sale-line snapshots appear under Analytics as **Unassigned items**; they remain separate from catalogue products and are never attributed to a guessed SKU.
 - Transactions expose evidence source, verification status, and environment separately so merchant-entered, imported, live, test, synthetic, and unknown records are not conflated.

@@ -350,7 +350,7 @@ export class MerchantController {
 
   @Post('imports/:id/commit')
   @ApiOperation({ summary: 'Commit a validated merchant import' })
-  commitImport(@CurrentUser() user: { id: string }, @Param('id', ParseUUIDPipe) id: string) { return this.imports.commit(user.id, id); }
+  commitImport(@CurrentUser() user: { id: string }, @Param('id', ParseUUIDPipe) id: string, @Headers('idempotency-key') idempotencyKey?: string) { return this.imports.commit(user.id, id, idempotencyKey); }
 
   @Get('reconciliation')
   @ApiOperation({ summary: 'List imported payout reconciliation records' })
