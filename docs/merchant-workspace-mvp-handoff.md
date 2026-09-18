@@ -93,11 +93,11 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
   runtime identity has application object-admin access.
 - Cloud Run migration execution `mcbuse-api-migrate-tnptf` completed
   successfully before traffic changed.
-- API image digest `sha256:1050a4fc968e55d64c2980a264c845e739dfb2ef8cbe8c24b502c8d9bcfbcefc`
-  is live as `mcbuse-api-00037-4pq` with 100% traffic. Its health endpoint and
+- API image digest `sha256:316a9671561618c08a65022b2cc2e5b0aa8a5b3a01c92fdbbe7fa15cfa997c97`
+  is live as `mcbuse-api-00038-5mr` with 100% traffic. Its health endpoint and
   database report `ok`; unauthenticated `/merchants/me/activity` returns 401.
-- Portal image digest `sha256:66a898879bb3fd4913c34a0b7b1e21ac1be15bcb40aa016acee10d800aa42aee`
-  is live as `mcbuse-portal-00019-sv5` with 100% traffic. `/sign-in` returns
+- Portal image digest `sha256:570280b2e9a532ce11b83a2feb1188fde51f26be58d74ee638fb6d67ac6595c6`
+  is live as `mcbuse-portal-00020-5jc` with 100% traffic. `/sign-in` returns
   200, while Overview, Payment, Analytics, Credit Assessment, and Finance
   Match redirect anonymous visitors to `/sign-in`.
 - `merchant:hosted-infra-readiness` passed against the deployed API: database
@@ -151,6 +151,10 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
   evidence-environment labelling. It adds the classification field with
   historical records explicitly set to `unknown`; future finalised payments
   record the active mock/devnet/mainnet environment.
+- The later import-commit idempotency release (`9a841f9`) is live on the same
+  revisions. API health and database status are `ok`; the protected commit
+  route returns 401 without a merchant session and the portal sign-in route
+  returns 200.
 
 ## Synthetic fixture
 
