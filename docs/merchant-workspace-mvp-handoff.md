@@ -96,8 +96,8 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
 - API image digest `sha256:316a9671561618c08a65022b2cc2e5b0aa8a5b3a01c92fdbbe7fa15cfa997c97`
   is live as `mcbuse-api-00038-5mr` with 100% traffic. Its health endpoint and
   database report `ok`; unauthenticated `/merchants/me/activity` returns 401.
-- Portal image digest `sha256:570280b2e9a532ce11b83a2feb1188fde51f26be58d74ee638fb6d67ac6595c6`
-  is live as `mcbuse-portal-00020-5jc` with 100% traffic. `/sign-in` returns
+- Portal image digest `sha256:b7c9b40c44177d14e756d404289bf99193bbcc9b90e2d6ef1d2c217b582ec35c`
+  is live as `mcbuse-portal-00022-qs8` with 100% traffic. `/sign-in` returns
   200, while Overview, Payment, Analytics, Credit Assessment, and Finance
   Match redirect anonymous visitors to `/sign-in`.
 - `merchant:hosted-infra-readiness` passed against the deployed API: database
@@ -155,6 +155,12 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
   revisions. API health and database status are `ok`; the protected commit
   route returns 401 without a merchant session and the portal sign-in route
   returns 200.
+- Custom-domain release (`aa3ed37`, `6ffc969`) makes
+  `https://merchant.mcbuse.com` the canonical portal URL and uses
+  `https://api.mcbuse.com/api/v1` as its server-side API endpoint. Both
+  generated Cloud Run URLs remain supported: unauthenticated session redirects
+  stay on the requested allowed portal hostname, and both API health URLs
+  report database status `ok`.
 
 ## Synthetic fixture
 
