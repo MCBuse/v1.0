@@ -191,6 +191,13 @@ stock levels, thresholds, and a snapshot timestamp. It has been structurally
 checked for six unique IDs and six unique SKUs. It exercises import behaviour
 only and is not evidence of a third-party inventory integration.
 
+Hosted synthetic acceptance run `797e1ffea2184080` imported all six rows through
+`api.mcbuse.com` in batch `ce8ab570-411c-4a53-a11c-55e177e11065`. Re-uploading
+the same file was recognised as a duplicate. A subsequent merchant-recorded
+sale of two `DEMO-COF-250` units reduced on-hand stock from 36 to 34 and product
+analytics reported two cash units sold. This is demonstration-only software
+evidence, not the required external-provider acceptance evidence.
+
 ## Acceptance dependencies still required
 
 These checks cannot be established from local code or fixtures:

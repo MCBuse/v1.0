@@ -26,6 +26,7 @@
     "merchant:hosted-infra-readiness": "node scripts/merchant-hosted-infra-readiness.mjs",
     "merchant:hosted-acceptance": "node scripts/merchant-hosted-acceptance.mjs",
     "merchant:private-attachment-acceptance": "node scripts/merchant-private-attachment-acceptance.mjs",
+    "merchant:synthetic-inventory-acceptance": "node scripts/merchant-synthetic-inventory-acceptance.mjs",
     "merchant:week2-smoke": "node scripts/merchant-week2-smoke.mjs",
     "merchant:week2-recovery-smoke": "WEEK2_MANAGED_API=true node scripts/merchant-week2-smoke.mjs"
   },
