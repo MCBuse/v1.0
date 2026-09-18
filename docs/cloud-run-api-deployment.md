@@ -16,9 +16,9 @@ Cloud Run's free tier reduces compute cost for a low-traffic hackathon API, but 
 ## Current deployment
 
 - Service: `mcbuse-api`
-- Ready revision: `mcbuse-api-00035-2g7`
-- Image: `europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/api:20260918T0123Z-payment-request-list`
-- Image digest: `sha256:8c8787745c4f8a6ad1bed3f36128dafef70bbd99cc6c3c4c7c3b15a586a4228d`
+- Ready revision: `mcbuse-api-00036-f4m`
+- Image: `europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/api:20260918T0912Z-transaction-receipt`
+- Image digest: `sha256:0d3447db97f0b1dd1ef3b8ac1f1e1cecf07b173917b86b82137c47d999a450ea`
 - API base URL: `https://mcbuse-api-332810840225.europe-west1.run.app/api/v1`
 - Runtime identity: `mcbuse-api@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com`
 - Merchant routes: enabled after merchant provisioning

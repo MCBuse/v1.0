@@ -224,6 +224,22 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return { receiptNumber: transaction.receiptNumber, merchantName: transaction.merchantNameSnapshot ?? merchant?.businessName ?? 'Merchant', invoiceNumber: request?.invoiceNumber ?? null, description: transaction.description, displayAmountMinor: transaction.displayAmountMinor.toString(), displayCurrency: transaction.displayCurrency, paymentMethod: 'MCBuse payment', status: 'completed', saleAt: transaction.occurredAt.toISOString(), completedAt: transaction.finalizedAt.toISOString(), evidence: { source: 'mcbuse_payment', verification: 'internally_confirmed', environment: transaction.evidenceEnvironment as 'live' | 'test' | 'synthetic' | 'unknown' }, lines: lines.map((line) => ({ name: line.name, quantity: line.quantity, unitPriceMinor: line.unitPriceMinor.toString(), lineTotalMinor: line.lineTotalMinor.toString() })) };
   }
 
+  async getReceiptByTransactionId(userId: string, transactionId: string) {
+    const transaction = (await this.db
+      .select({ paymentRequestId: schema.merchantTransactions.paymentRequestId })
+      .from(schema.merchantTransactions)
+      .where(
+        and(
+          eq(schema.merchantTransactions.id, transactionId),
+          eq(schema.merchantTransactions.status, 'finalized'),
+        ),
+      )
+      .limit(1))[0];
+    if (!transaction)
+      throw new NotFoundException('Completed merchant receipt not found');
+    return this.getReceipt(userId, transaction.paymentRequestId);
+  }
+
   private async claimMerchantPayment(
     paymentRequestId: string,
     payerUserId: string,

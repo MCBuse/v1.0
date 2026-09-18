@@ -40,5 +40,6 @@ import { DataCaptureModule } from '../data-capture/data-capture.module';
     VerifiedEmailGuard,
   ],
   controllers: [PaymentsController],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}

@@ -22,6 +22,7 @@
 - New MCBuse payment receipts persist the configured transfer environment: mock transfers are synthetic, devnet transfers are test, and mainnet transfers are live. Historical records remain `unknown`.
 - Versioned `readiness-rules-v1` assessment, business profile/consent, payout reconciliation with distinct lifecycle/reconciliation states, PDF/ZIP packages, and SMTP package submission.
 - Buyer receipt retrieval after finalization, including reopening a merchant receipt from the payment flow and Activity.
+- The buyer receipt contract is available by both payment request and the documented `GET /transactions/:id/receipt` transaction URL; both require payer/payee wallet ownership.
 
 ## Database migration
 
@@ -91,8 +92,8 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
   runtime identity has application object-admin access.
 - Cloud Run migration execution `mcbuse-api-migrate-tnptf` completed
   successfully before traffic changed.
-- API image digest `sha256:8c8787745c4f8a6ad1bed3f36128dafef70bbd99cc6c3c4c7c3b15a586a4228d`
-  is live as `mcbuse-api-00035-2g7` with 100% traffic. Its health endpoint and
+- API image digest `sha256:0d3447db97f0b1dd1ef3b8ac1f1e1cecf07b173917b86b82137c47d999a450ea`
+  is live as `mcbuse-api-00036-f4m` with 100% traffic. Its health endpoint and
   database report `ok`; unauthenticated `/merchants/me/activity` returns 401.
 - Portal image digest `sha256:caad164370f2af62f7479e866188c35e2e15a3e5216fe60b47c758b89fbca414`
   is live as `mcbuse-portal-00018-jrq` with 100% traffic. `/sign-in` returns
