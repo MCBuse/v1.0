@@ -37,6 +37,59 @@ test.beforeEach(async ({ context }) => {
   ]);
 });
 
+test("preserves old-bookmark query parameters when moving to a pillar route", async ({
+  page,
+}) => {
+  const redirects: Array<[string, string]> = [
+    ["/transactions?source=merchant_cash&page=2", "/analytics/transactions?source=merchant_cash&page=2"],
+    ["/inventory?query=tea", "/analytics/inventory?query=tea"],
+    ["/invoices?status=history", "/payment/invoices?status=history"],
+    ["/business-profile?section=consent", "/credit-assessment/business-profile?section=consent"],
+  ];
+  for (const [legacyPath, canonicalPath] of redirects) {
+    await page.goto(legacyPath);
+    await expect(page).toHaveURL(canonicalPath);
+  }
+});
+
+test("lists fast payment requests separately from itemised invoices", async ({
+  page,
+}) => {
+  await page.route("**/api/merchant/me/payment-requests?*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [
+          {
+            id: "00000000-0000-4000-8000-000000000042",
+            amount: {
+              minor: "1850",
+              currency: "EUR",
+              estimated: false,
+              rateTimestamp: null,
+            },
+            description: "Lunch order",
+            status: "pending",
+            expiresAt: "2026-09-19T12:00:00.000Z",
+            qrPayload: "mcbuse://pay?nonce=example&v=1",
+            completedAt: null,
+            createdAt: "2026-09-18T10:00:00.000Z",
+          },
+        ],
+        page: 1,
+        pageSize: 10,
+        totalItems: 1,
+        totalPages: 1,
+      }),
+    }),
+  );
+  await page.goto("/payment");
+  await expect(page.getByRole("heading", { name: "Fast payment requests" })).toBeVisible();
+  await expect(page.getByText("Lunch order")).toBeVisible();
+  await expect(page.getByText("pending")).toBeVisible();
+  await expect(page.getByText("€18.50")).toBeVisible();
+});
+
 test("keeps activity provenance filters and pagination in the URL", async ({
   page,
 }) => {

@@ -1,2 +1,9 @@
-import { redirect } from "next/navigation";
-export default function BusinessProfilePage() { redirect("/credit-assessment/business-profile"); }
+import { redirectMerchantBookmark } from "@/lib/server/merchant-route-redirect";
+
+export default async function BusinessProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  redirectMerchantBookmark("/credit-assessment/business-profile", await searchParams);
+}

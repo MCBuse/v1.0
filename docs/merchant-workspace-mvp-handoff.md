@@ -3,6 +3,7 @@
 ## Implemented workspace capabilities
 
 - Primary navigation: Overview, Payment, Analytics, Credit Assessment, and Finance Match.
+- Payment exposes a paginated list of fast QR payment requests and their status, separately from itemised invoices.
 - The global Create request drawer supports both fast amount requests and
   itemised product/custom-line invoices, retaining the QR/status in the same
   workflow.
@@ -13,6 +14,7 @@
 - Custom sale-line snapshots appear under Analytics as **Unassigned items**; they remain separate from catalogue products and are never attributed to a guessed SKU.
 - Transactions expose evidence source, verification status, and environment separately so merchant-entered, imported, live, test, synthetic, and unknown records are not conflated.
 - Transactions and Analytics can filter the combined activity by evidence source and environment. The selected filters apply to totals, comparisons, trends, and product metrics.
+- Legacy `/transactions`, `/inventory`, `/invoices`, and `/business-profile` bookmarks now redirect to their pillar route without losing query parameters.
 - Overview's recent-activity panel uses that same combined activity feed, including merchant-recorded cash sales.
 - Overview's headline sales and trend figures also use combined recorded activity; it separately shows payment exceptions, the active low-stock-product count, and the versioned evidence-readiness stage.
 - Analytics groups 7/30-day ranges by day, 90-day ranges by week, and custom ranges over 180 days by month.
@@ -89,11 +91,11 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
   runtime identity has application object-admin access.
 - Cloud Run migration execution `mcbuse-api-migrate-tnptf` completed
   successfully before traffic changed.
-- API image digest `sha256:fada012040c683c06f4df7c783e5a014ae3c87dc6b928b6d9db2d0b5f2f54765`
-  is live as `mcbuse-api-00034-542` with 100% traffic. Its health endpoint and
+- API image digest `sha256:8c8787745c4f8a6ad1bed3f36128dafef70bbd99cc6c3c4c7c3b15a586a4228d`
+  is live as `mcbuse-api-00035-2g7` with 100% traffic. Its health endpoint and
   database report `ok`; unauthenticated `/merchants/me/activity` returns 401.
-- Portal image digest `sha256:1975aead733f5aa1b2afe5fbfaaed6acc1aab4402f19c3033f4cac0cf4ad19ef`
-  is live as `mcbuse-portal-00017-vj4` with 100% traffic. `/sign-in` returns
+- Portal image digest `sha256:caad164370f2af62f7479e866188c35e2e15a3e5216fe60b47c758b89fbca414`
+  is live as `mcbuse-portal-00018-jrq` with 100% traffic. `/sign-in` returns
   200, while Overview, Payment, Analytics, Credit Assessment, and Finance
   Match redirect anonymous visitors to `/sign-in`.
 - `merchant:hosted-infra-readiness` passed against the deployed API: database

@@ -92,6 +92,14 @@ export type MerchantPaymentRequest = {
   createdAt: string;
 };
 
+export type MerchantPaymentRequestPage = {
+  items: MerchantPaymentRequest[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
 export type MerchantProductStatus = 'active' | 'archived';
 
 export type MerchantProduct = {

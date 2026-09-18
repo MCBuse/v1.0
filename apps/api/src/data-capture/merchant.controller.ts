@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreateMerchantPaymentRequestDto } from './dto/create-merchant-payment-request.dto';
 import { ListMerchantTransactionsDto } from './dto/list-merchant-transactions.dto';
+import { ListMerchantPaymentRequestsDto } from './dto/list-merchant-payment-requests.dto';
 import { UpdateMerchantConsentDto } from './dto/update-merchant-consent.dto';
 import { MerchantService } from './merchant.service';
 import { MerchantInventoryService } from './merchant-inventory.service';
@@ -115,6 +116,15 @@ export class MerchantController {
     @Body() dto: CreateMerchantPaymentRequestDto,
   ) {
     return this.merchants.createPaymentRequest(user.id, dto);
+  }
+
+  @Get('payment-requests')
+  @ApiOperation({ summary: 'List fast merchant payment requests and their status' })
+  listPaymentRequests(
+    @CurrentUser() user: { id: string },
+    @Query() query: ListMerchantPaymentRequestsDto,
+  ) {
+    return this.merchants.listPaymentRequests(user.id, query);
   }
 
   @Get('payment-requests/:id')

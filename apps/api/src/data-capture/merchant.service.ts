@@ -9,18 +9,20 @@ import { ConfigService } from '@nestjs/config';
 import type {
   MerchantConsent,
   MerchantPaymentRequest,
+  MerchantPaymentRequestPage,
   MerchantProfile,
   MerchantSummary,
   MerchantTransactionPage,
 } from '@repo/shared';
 import { randomUUID } from 'crypto';
-import { and, count, desc, eq, gte, ilike, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, isNull, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { RatesService } from '../rates/rates.service';
 import { CreateMerchantPaymentRequestDto } from './dto/create-merchant-payment-request.dto';
 import { ListMerchantTransactionsDto } from './dto/list-merchant-transactions.dto';
+import { ListMerchantPaymentRequestsDto } from './dto/list-merchant-payment-requests.dto';
 import { UpdateMerchantProfileDto } from './dto/update-merchant-profile.dto';
 import { calculateMerchantReadiness } from './merchant-readiness';
 import {
@@ -133,6 +135,47 @@ export class MerchantService {
       .limit(1);
     if (!rows[0]) throw new NotFoundException('Payment request not found');
     return this.paymentRequestResponse(rows[0]);
+  }
+
+  async listPaymentRequests(
+    userId: string,
+    filters: ListMerchantPaymentRequestsDto,
+  ): Promise<MerchantPaymentRequestPage> {
+    const merchant = await this.requireMerchant(userId);
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 20;
+    const conditions = [
+      eq(schema.paymentRequests.merchantId, merchant.merchantId),
+      isNull(schema.paymentRequests.invoiceNumber),
+    ];
+    if (filters.status)
+      conditions.push(eq(schema.paymentRequests.status, filters.status));
+    if (filters.query?.trim()) {
+      const term = `%${filters.query.trim()}%`;
+      conditions.push(ilike(schema.paymentRequests.description, term));
+    }
+    const where = and(...conditions);
+    const [rows, totals] = await Promise.all([
+      this.db
+        .select()
+        .from(schema.paymentRequests)
+        .where(where)
+        .orderBy(desc(schema.paymentRequests.createdAt))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize),
+      this.db
+        .select({ value: count() })
+        .from(schema.paymentRequests)
+        .where(where),
+    ]);
+    const totalItems = totals[0]?.value ?? 0;
+    return {
+      items: rows.map((row) => this.paymentRequestResponse(row)),
+      page,
+      pageSize,
+      totalItems,
+      totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
+    };
   }
 
   async getSummary(userId: string, period: string): Promise<MerchantSummary> {
