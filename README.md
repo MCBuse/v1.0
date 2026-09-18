@@ -13,7 +13,7 @@ Turborepo monorepo with pnpm workspaces.
 | Path | Stack | Purpose |
 | --- | --- | --- |
 | `apps/api` | NestJS, Drizzle ORM, PostgreSQL, Solana web3.js | Backend API — auth, wallets, ledger, payments, on/off-ramp |
-| `apps/web` | Next.js | Marketing site / web companion |
+| `apps/portal` | Next.js | Merchant and administrator portal |
 | `apps/mobile` | Expo (React Native, new arch enabled) | Mobile app — primary consumer surface |
 | `packages/ui` | React | Shared UI primitives (web) |
 | `packages/shared` | TypeScript | Cross-app types/utils |
@@ -81,14 +81,14 @@ From the repo root:
 pnpm dev
 ```
 
-This starts the API on `:4000`, the web app on `:3000`, and the Expo dev server. Open the Expo URL in Expo Go, or press `i` / `a` to launch a simulator.
+This starts the API, portal, and Expo dev server. Open the Expo URL in Expo Go, or press `i` / `a` to launch a simulator.
 
 To run a single app:
 
 ```bash
 pnpm --filter api dev
 pnpm --filter mobile start
-pnpm --filter web dev
+pnpm --filter portal dev
 ```
 
 ### 5. Forward Stripe webhooks (for on-ramp + off-ramp)

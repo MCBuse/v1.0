@@ -11,7 +11,7 @@ This is a financial services platform with cryptocurrency payment capabilities, 
 The project consists of three main applications:
 
 - **API (NestJS)** (`apps/api/`) - Backend service with authentication, payment processing, Solana integration, and database management
-- **Web App (Next.js)** (`apps/web/`) - Frontend web application
+- **Portal (Next.js)** (`apps/portal/`) - Merchant and administrator application
 - **Mobile App (Expo/React Native)** (`apps/mobile/`) - Mobile application with NFC payment capabilities
 
 ## Key Technologies

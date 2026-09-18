@@ -318,7 +318,6 @@ If devnet or the wallet is unavailable during a live presentation, replay a prev
 - bank payouts or fiat settlement;
 - multi-country or multi-provider production rollout;
 - accounting integrations;
-- changes to `apps/web` beyond an optional link to the demo;
 - new work in the Expo application.
 
 ---
@@ -440,16 +439,15 @@ flowchart LR
 
 ### Architecture decisions
 
-1. `apps/web` remains the public marketing site.
-2. `apps/portal` is the authenticated merchant and admin PWA.
-3. `apps/api/src/data-capture` owns merchant identity, consent, payment adapters, raw evidence, canonical transactions, quality, evidence snapshots, and query APIs.
-4. The merchant supplies or confirms a Solana recipient address; the primary demo sends funds directly to that address.
-5. MCBuse observes and verifies payments but does not take custody in the primary hackathon flow.
-6. The existing wallet ledger is not the canonical merchant transaction store.
-7. Provider-specific events are converted into one canonical transaction contract.
-8. Monetary values use integer minor units, timestamps use UTC, and identifiers are unique within their provider/network.
-9. Sensitive activity remains off-chain; only minimal, merchant-authorized proof data is public.
-10. Stripe remains a later adapter and fixture source, not the primary hackathon payment path.
+1. `apps/portal` is the authenticated merchant and admin PWA.
+2. `apps/api/src/data-capture` owns merchant identity, consent, payment adapters, raw evidence, canonical transactions, quality, evidence snapshots, and query APIs.
+3. The merchant supplies or confirms a Solana recipient address; the primary demo sends funds directly to that address.
+4. MCBuse observes and verifies payments but does not take custody in the primary hackathon flow.
+5. The existing wallet ledger is not the canonical merchant transaction store.
+6. Provider-specific events are converted into one canonical transaction contract.
+7. Monetary values use integer minor units, timestamps use UTC, and identifiers are unique within their provider/network.
+8. Sensitive activity remains off-chain; only minimal, merchant-authorized proof data is public.
+9. Stripe remains a later adapter and fixture source, not the primary hackathon payment path.
 
 ---
 
@@ -469,7 +467,6 @@ flowchart LR
 | Audit log schema | Reuse and extend | Add an audit service and required writes for consent and evidence issuance. |
 | Existing ledger | Keep separate | It remains the wallet ledger, not the merchant activity source of truth. |
 | Stripe client and signed webhook pattern | Defer or fixture | Useful for the provider adapter, but not needed for the primary demo. |
-| `apps/web` | Preserve | Marketing only. |
 | Existing Expo mobile payment app and NFC module | Strategic asset; park new hackathon work | The app proves an existing payment surface and is the first planned source of merchant activity data. Reference it in the company story, but do not claim it already produces the new canonical merchant dataset or expand it during the hackathon. |
 
 ### 8.2 Module A — Merchant identity, recipient, and consent
@@ -880,7 +877,7 @@ The public schedule states that the fall 2026 hackathon runs from September 28 t
 ### Frederick — engineering and technical demonstration
 
 - own H04–H22 technical delivery;
-- keep `apps/web` unchanged and build the product in `apps/portal`;
+- build and maintain the product in `apps/portal`;
 - preserve the merchant/wallet domain boundary;
 - prove Solana payment and evidence verification on devnet;
 - own security, tests, deployment, architecture, and technical demo;
@@ -1002,8 +999,7 @@ W03 should approve the following changes:
 6. Replace the current “credit readiness state” language with the evidence-readiness stages in this document.
 7. Retain the explicit exclusions for credit scoring and underwriting.
 8. Park NFC and the Expo app throughout the hackathon.
-9. Do not modify `apps/web` into the portal.
-10. Do not start P1 or P2 work while any P0 end-to-end gate is failing.
+9. Do not start P1 or P2 work while any P0 end-to-end gate is failing.
 
 ### Mapping to the existing MVP work
 
@@ -1143,6 +1139,6 @@ W03 is unblocked when the team explicitly approves or amends these six statement
 1. **Primary hackathon payment:** USDC stablecoin through Solana Pay on devnet. Stablecoin is the product rail; Solana is the selected implementation network.
 2. **Primary product outcome:** verified merchant activity becomes a trusted financial-data record that powers merchant analytics and explainable, lender-verifiable credit readiness; institutional decision intelligence is the scale vision, not hackathon functionality.
 3. **Credit boundary:** no credit score, approval, pricing, limit, or lending operation.
-4. **Technical boundary:** new `apps/portal` plus `apps/api/src/data-capture`; `apps/web` remains marketing. The existing Expo payment app is a strategic data-capture asset and may appear in the story, but Expo/NFC implementation remains parked during the hackathon.
+4. **Technical boundary:** `apps/portal` plus `apps/api/src/data-capture`; the existing Expo payment app is a strategic data-capture asset and may appear in the story, but Expo/NFC implementation remains parked during the hackathon.
 5. **Delivery rule:** the P0 vertical slice and submission proof take precedence over Stripe payout matching and all P1/P2 features until November 2, 2026.
 6. **Data-trust boundary:** MCBuse does not sell unrestricted raw merchant records. Identifiable evidence is purpose-limited and merchant-authorized; broader institutional insight is appropriately aggregated or de-identified and all access is controlled and auditable.

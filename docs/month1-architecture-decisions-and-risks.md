@@ -24,7 +24,6 @@ capture. The approved build boundary is a new `apps/portal` PWA plus a new API
 | Auth credentials and refresh sessions | **Keep and extend** | Retain credential/session flows; add roles and merchant ownership/membership. | Existing JWT payload has no role and signup creates wallets automatically. |
 | Audit log table | **Keep and extend** | Add an audit service/coverage for merchant/admin mutations. | The table is a useful base but does not currently guarantee writes. |
 | Integer monetary representation | **Keep as a rule** | Store merchant amounts in provider minor units; return strings where required. | This avoids precision loss already recognized by the wallet ledger. |
-| Public `apps/web` site | **Keep unchanged** | Continue as marketing only. | The site has no authenticated product shell. |
 | Expo mobile app | **Park** | Do not delete or extend it for pilot capture. | The pilot capture path is web + static QR, and mobile is wallet-specific. |
 | Wallets, balances, and ledger | **Keep as a separate subsystem** | Do not use them as the canonical merchant transaction store. | They lack merchant scope, raw-provider provenance, and payout links. |
 | On-ramp session settlement | **Do not reuse as the merchant domain** | Reuse only Stripe SDK/config/signature techniques. | It converts fiat top-ups into USDC wallet credits and has different lifecycle semantics. |
@@ -38,8 +37,8 @@ capture. The approved build boundary is a new `apps/portal` PWA plus a new API
 
 ### ADR-01 — Product-surface separation
 
-`apps/web` remains the public site. `apps/portal` will be a separate Next.js PWA with
-authenticated merchant routes and `/admin` routes. The Expo application is explicitly
+`apps/portal` is the Next.js PWA with authenticated merchant routes and `/admin`
+routes. The Expo application is explicitly
 out of the pilot path.
 
 ### ADR-02 — Data-capture module boundary

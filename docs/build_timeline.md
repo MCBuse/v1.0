@@ -8,7 +8,7 @@ View a visual timeline here: [https://claude.ai/public/artifacts/3372218f-2d01-4
 
 - Extend the existing MCBuse pnpm/Turborepo monorepo
 - Backend: existing NestJS API, new `data-capture` module cluster
-- Frontend: one new web app (Next.js or Vite React) in the monorepo, PWA, role-gated routes serving both the merchant dashboard and the admin panel. Expo app parked, not deleted.
+- Frontend: the `apps/portal` Next.js PWA, with role-gated routes serving both the merchant dashboard and the admin panel. Expo app parked, not deleted.
 - Payment-event source: Stripe sandbox. One static QR per merchant pointing to a Stripe Payment Link. Webhooks (`payment_intent.succeeded`, `charge.succeeded`, `payout.paid`, `payout.failed`, balance transactions) drive event capture and payout matching.
 - NFC deferred to post-pilot. QR alone satisfies the capture requirement.
 
@@ -48,7 +48,7 @@ Strategy note: skip Figma-style wireframes. At this capacity, a clickable React 
 
 | Week | Hours | Work | Output |
 | --- | --- | --- | --- |
-| W9 | 4 | Scaffold the web app in the monorepo. Merchant dashboard skeleton on seed data: today's total, transaction count, expected payout, payout status. | Dashboard "wireframe" v1 (live) |
+| W9 | 4 | Scaffold the portal application in the monorepo. Merchant dashboard skeleton on seed data: today's total, transaction count, expected payout, payout status. | Dashboard "wireframe" v1 (live) |
 | W10 | 4 | Admin panel skeleton: merchant list, onboarding status, transaction counts, exception counts. Same app, `/admin` role-gated. | Admin panel structure v1 (live) |
 | W11 | 4 | Define capture quality measurement: what counts as a captured vs missed vs malformed event, and how it is computed. Implement as a metric on the raw event table. Draft secure storage requirements: encryption at rest, RBAC matrix, audit logging, GDPR data-minimization notes for the partner/legal tracker. | Capture quality logic, security requirements doc |
 | W12 | 4 | Package everything as input to Asim's scope freeze document. Set up the technical documentation structure (docs folder in repo, auto-generated where possible). Buffer. | Scope freeze technical input, docs skeleton |

@@ -14,7 +14,6 @@ and cash out. It is not yet a merchant payment-capture system.
 
 The merchant MVP should therefore be additive:
 
-- preserve `apps/web` as the public marketing site;
 - add `apps/portal` for merchant and admin use;
 - add an API `data-capture` module cluster with merchant, provider-event,
   canonical-transaction, payout, and exception records;
@@ -42,7 +41,6 @@ balance-transaction ingestion, payout matching, or sandbox evidence trail.
 ```mermaid
 flowchart LR
   Mobile[Expo mobile app\nwallet-oriented] -->|JWT API calls| API[NestJS API]
-  Marketing[apps/web\npublic marketing site] -->|static site| Visitor[Public visitor]
   API --> Auth[Auth + JWT + refresh tokens]
   API --> Wallets[Wallets + balances + ledger]
   API --> Payments[QR/P2P + payment requests]
@@ -65,7 +63,7 @@ flowchart LR
 
 | Area | Current state | Recommendation | Reason / required adaptation |
 | --- | --- | --- | --- |
-| Monorepo/tooling | pnpm workspace and Turborepo with API, web, mobile, and shared packages. | **Keep** | Suitable for an additive `apps/portal` and API module. Add portal build/deploy coverage later. |
+| Monorepo/tooling | pnpm workspace and Turborepo with API, portal, mobile, and shared packages. | **Keep** | Suitable for the portal and API module. Add portal build/deploy coverage later. |
 | API foundation | NestJS modules are registered in `apps/api/src/app.module.ts`; global validation, Helmet, Pino logging, Swagger, throttling, and raw body are enabled in `main.ts`. | **Keep** | Strong starting point. Add the data-capture module rather than folding capture logic into on/off-ramp services. |
 | Authentication | Email/password, phone OTP, JWT access tokens, refresh-token rotation, account lockout, and email-verification guard exist. JWT payload currently contains only user ID/email. Signup always creates a wallet pair. | **Keep and extend** | Reuse credential/session code. Add merchant/admin role and merchant membership/ownership separately; decouple merchant/admin creation from automatic wallet creation. |
 | Audit logging | `audit_logs` schema stores actor, action, entity, metadata, IP, and correlation ID. | **Keep and extend** | Schema is a useful base, but no cross-cutting audit service guarantees merchant/admin mutations are recorded. Add service/coverage in W22. |
@@ -75,7 +73,6 @@ flowchart LR
 | Off-ramp Stripe integration | Stripe Connect and payout-related code exists, but `OFFRAMP_PROVIDER=stripe` currently resolves to mock for the legacy API path. | **Reference only** | Payout event parsing may inform W04/W18, but merchant payout matching must model Stripe platform payment flow independently. |
 | Ledger/balances | Integer `bigint` amounts, idempotency key, wallet transfers, and user transaction summaries exist. | **Keep as wallet subsystem; do not make canonical merchant ledger** | Merchant transaction capture needs provider references, merchant scope, raw event provenance, and payout links not represented in `ledger_entries`. Integer-money policy should be reused. |
 | Database/migrations | Drizzle, PostgreSQL pool configuration, schema index, and migrations are established. Current schemas cover users, wallets, balances, payment requests, on/off-ramp transactions, ledger, refresh tokens, and audit logs. | **Keep and extend** | Add isolated data-capture tables/migrations; retain raw JSON only where justified and avoid merchant data in wallet tables. |
-| Public web | `apps/web` is a Next.js public marketing site, with a single landing-page route and landing components. | **Keep unchanged** | It is not a dashboard shell. Create `apps/portal` rather than mixing merchant/admin authentication into marketing routes. |
 | Mobile | Expo Router contains consumer wallet flows: top up, cash out, transfer, swap, QR scan/receive, invoice, and NFC dependency. | **Park** | Useful demonstration context but not part of the QR-based merchant pilot. Do not delete or extend for MVP. |
 | Tests | API has 11 unit suites covering providers, payment requests, transactions, rates, and users. There is an e2e file but no merchant capture coverage. | **Keep and extend** | Add deterministic Stripe fixtures plus ingestion, matching, RBAC, and portal tests. Disable Watchman for this environment. |
 | Deployment | Cloud Run deploys the API and portal independently. The API currently uses `DATABASE_SSL=no-verify`, mock OTP, and zero minimum instances. | **Keep as a starting point; harden** | M8 needs environment separation, backup/restore, TLS-validated database config, non-mock production OTP decision, and operational monitoring. |
