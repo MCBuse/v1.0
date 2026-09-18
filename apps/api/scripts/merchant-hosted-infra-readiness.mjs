@@ -38,6 +38,19 @@ function environment(container) {
   );
 }
 
+function publicServiceUrls(service) {
+  const raw = service?.metadata?.annotations?.['run.googleapis.com/urls'];
+  try {
+    const urls = JSON.parse(raw ?? '[]');
+    if (Array.isArray(urls) && urls.every((url) => typeof url === 'string')) {
+      return urls;
+    }
+  } catch {
+    // Fall back to the single service status URL on older Cloud Run responses.
+  }
+  return typeof service?.status?.url === 'string' ? [service.status.url] : [];
+}
+
 async function readJson(response, label) {
   if (!response.ok) {
     throw new Error(`${label} returned HTTP ${response.status}`);
@@ -106,13 +119,16 @@ async function main() {
       return false;
     }
   });
-  const expectedWebhookUrl = new URL(
-    'onramp/webhooks/stripe',
-    apiBase,
-  ).toString();
+  const cloudRunApiBases = publicServiceUrls(service).map(
+    (url) => new URL('api/v1/', `${url}/`),
+  );
+  const expectedWebhookUrls = new Set(
+    [apiBase, ...cloudRunApiBases]
+      .map((base) => new URL('onramp/webhooks/stripe', base).toString()),
+  );
   const oneExpectedStripeWebhook =
     relevantEnabled.length === 1 &&
-    relevantEnabled[0]?.url === expectedWebhookUrl &&
+    expectedWebhookUrls.has(relevantEnabled[0]?.url) &&
     relevantEnabled[0]?.livemode === false &&
     (relevantEnabled[0]?.enabled_events?.includes('*') ||
       relevantEnabled[0]?.enabled_events?.includes(
@@ -145,6 +161,13 @@ async function main() {
         service: serviceName,
         latestReadyRevision,
         expectedWebhookHost: apiBase.hostname,
+        acceptedWebhookHosts: [...expectedWebhookUrls].map(
+          (url) => new URL(url).hostname,
+        ),
+        activeStripeWebhookHost:
+          typeof relevantEnabled[0]?.url === 'string'
+            ? new URL(relevantEnabled[0].url).hostname
+            : null,
         stripeMode,
         activeRelevantStripeWebhooks: relevantEnabled.length,
         checks,

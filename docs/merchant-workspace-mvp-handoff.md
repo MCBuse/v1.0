@@ -161,6 +161,11 @@ release; no broad `--fix` formatting rewrite was applied during the MVP work.
   generated Cloud Run URLs remain supported: unauthenticated session redirects
   stay on the requested allowed portal hostname, and both API health URLs
   report database status `ok`.
+- A repeated `merchant:hosted-infra-readiness` run against
+  `https://api.mcbuse.com/api/v1` passed all nine checks. Its Stripe check
+  accepts the custom API hostname and both official Cloud Run service aliases;
+  the single enabled Stripe test webhook remains on the retained regional
+  Cloud Run hostname.
 
 ## Synthetic fixture
 
