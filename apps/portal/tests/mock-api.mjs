@@ -109,6 +109,24 @@ const server = createServer(async (request, response) => {
     });
   }
 
+  if (request.method === "POST" && url.pathname === "/api/v1/merchants/me/invoices") {
+    if (!isMerchantAccess(bearer(request)))
+      return send(response, 401, { message: "Unauthorized" });
+    const body = await readJson(request);
+    return send(response, 201, {
+      id: "00000000-0000-4000-8000-000000000002",
+      invoiceNumber: "INV-CSRF-RECOVERY",
+      description: body.description ?? null,
+      lines: body.lines,
+      amount: { currency: "EUR", minor: "1000" },
+      status: "pending",
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      qrPayload: "mcbuse://pay/test-csrf-recovery",
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   return send(response, 404, { message: "Not found" });
 });
 

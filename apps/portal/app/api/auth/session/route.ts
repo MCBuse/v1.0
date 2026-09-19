@@ -5,7 +5,9 @@ import {
 } from "@/lib/server/config";
 import {
   clearSessionCookies,
+  CSRF_COOKIE,
   remoteRequest,
+  setCsrfCookie,
   setSessionCookies,
 } from "@/lib/server/session";
 
@@ -36,7 +38,9 @@ export async function GET(request: NextRequest) {
       const response = NextResponse.redirect(
         new URL(destination, responseOrigin),
       );
-      if (rotatedTokens) setSessionCookies(response, rotatedTokens);
+      const csrfToken = request.cookies.get(CSRF_COOKIE)?.value;
+      if (rotatedTokens) setSessionCookies(response, rotatedTokens, csrfToken);
+      else if (!csrfToken) setCsrfCookie(response);
       return response;
     }
   } catch {

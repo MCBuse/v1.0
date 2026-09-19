@@ -1,9 +1,5 @@
-import { redirectMerchantBookmark } from "@/lib/server/merchant-route-redirect";
+import { InventoryView } from "./inventory-view";
 
-export default async function InventoryPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  redirectMerchantBookmark("/analytics/inventory", await searchParams);
+export default function InventoryPage() {
+  return <InventoryView />;
 }

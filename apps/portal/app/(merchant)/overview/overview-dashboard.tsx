@@ -190,7 +190,7 @@ export function OverviewDashboard() {
         <Metric
           label="Low-stock products"
           value={
-            <a className="font-mono tabular-nums text-blue-700" href="/analytics/inventory">
+            <a className="font-mono tabular-nums text-blue-700" href="/inventory">
               {data.lowStockProductCount}
             </a>
           }

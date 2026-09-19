@@ -1,8 +1,7 @@
-import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { API_URL, COOKIE_SECURE } from "@/lib/server/config";
+import { API_URL } from "@/lib/server/config";
 import { hasTrustedOrigin } from "@/lib/server/request-security";
-import { CSRF_COOKIE, setSessionCookies } from "@/lib/server/session";
+import { setSessionCookies } from "@/lib/server/session";
 
 export async function POST(request: NextRequest) {
   if (!hasTrustedOrigin(request))
@@ -99,13 +98,6 @@ export async function POST(request: NextRequest) {
     setSessionCookies(response, {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-    });
-    response.cookies.set(CSRF_COOKIE, randomUUID(), {
-      httpOnly: false,
-      sameSite: "lax",
-      secure: COOKIE_SECURE,
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60,
     });
     return response;
   } catch {

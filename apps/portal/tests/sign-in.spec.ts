@@ -107,6 +107,32 @@ test("rotates an expired session before rendering a merchant route", async ({
   expect(
     cookies.find((cookie) => cookie.name === "mcbuse_portal_refresh")?.value,
   ).toBe("refreshed-refresh");
+  expect(cookies.find((cookie) => cookie.name === "mcbuse_portal_csrf")?.value).toBeTruthy();
+});
+
+test("creates an invoice after its CSRF cookie expires while the form is open", async ({ context, page }) => {
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("merchant@example.test");
+  await page.getByLabel("Password").fill("merchant-password");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL("/overview");
+  await page.getByRole("button", { name: "Create request", exact: true }).first().click();
+  await page.getByRole("button", { name: "Itemised sale", exact: true }).click();
+  await page.getByRole("button", { name: "Custom line", exact: true }).click();
+  await page.getByLabel("Custom line name").fill("CSRF recovery test");
+  await page.getByLabel("Custom line price").fill("10");
+
+  await context.clearCookies({ name: "mcbuse_portal_csrf" });
+  const mutations: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().endsWith("/api/merchant/me/invoices"))
+      mutations.push(request.headers()["x-csrf-token"] ?? "");
+  });
+  await page.getByRole("button", { name: "Create itemised request", exact: true }).click();
+  await expect(page.getByText("INV-CSRF-RECOVERY", { exact: false })).toBeVisible();
+  expect(mutations).toHaveLength(1);
+  expect(mutations[0]).not.toBe("");
+  expect((await context.cookies()).find((cookie) => cookie.name === "mcbuse_portal_csrf")?.value).toBe(mutations[0]);
 });
 
 test("clears forged session cookies before showing a merchant route", async ({

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateMutation } from "@/lib/server/request-security";
 import {
   clearSessionCookies,
+  CSRF_COOKIE,
   remoteRequest,
+  setCsrfCookie,
   setSessionCookies,
 } from "@/lib/server/session";
 
@@ -77,7 +79,10 @@ async function forward(
     });
     const disposition = upstream.headers.get("content-disposition");
     if (disposition) response.headers.set("Content-Disposition", disposition);
-    if (rotatedTokens) setSessionCookies(response, rotatedTokens);
+    const csrfToken = request.cookies.get(CSRF_COOKIE)?.value;
+    if (rotatedTokens) setSessionCookies(response, rotatedTokens, csrfToken);
+    else if (upstream.ok && request.method === "GET" && !csrfToken)
+      setCsrfCookie(response);
     if (upstream.status === 401) clearSessionCookies(response);
     return response;
   } catch {

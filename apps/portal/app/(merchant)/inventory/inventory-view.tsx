@@ -35,6 +35,7 @@ import { portalApi } from "@/lib/client/api";
 import { euroInputToMinor } from "@/lib/client/money-input";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
 import { MerchantImportDrawer } from "@/components/merchant-import-drawer";
+import { InventoryAnalytics } from "@/components/inventory-analytics";
 import { ProductAnalyticsDrawer } from "@/components/product-analytics-drawer";
 
 type Draft = {
@@ -210,6 +211,7 @@ export function InventoryView() {
         });
       }
 
+      window.dispatchEvent(new Event("merchant:refresh"));
       await resource.refresh();
       setFormOpen(false);
       resetForm();
@@ -236,6 +238,7 @@ export function InventoryView() {
         `me/products/${product.id}/stock-adjustments`,
         { method: "POST", body: JSON.stringify({ change }) },
       );
+      window.dispatchEvent(new Event("merchant:refresh"));
       await resource.refresh();
     } catch (reason) {
       setPageError(
@@ -255,6 +258,7 @@ export function InventoryView() {
           status: product.status === "active" ? "archived" : "active",
         }),
       });
+      window.dispatchEvent(new Event("merchant:refresh"));
       await resource.refresh();
     } catch (reason) {
       setPageError(
@@ -291,7 +295,7 @@ export function InventoryView() {
             Stock is reserved while an invoice is waiting for payment.
           </p>
         </div>
-        <div className="flex gap-3"><MerchantImportDrawer kind="inventory" label="Import inventory" onCommitted={() => void resource.refresh()} /><Button onClick={(event) => beginCreate(event.currentTarget)}><PackagePlus data-icon="inline-start" aria-hidden="true" />Add product</Button></div>
+        <div className="flex gap-3"><MerchantImportDrawer kind="inventory" label="Import inventory" onCommitted={() => window.dispatchEvent(new Event("merchant:refresh"))} /><Button onClick={(event) => beginCreate(event.currentTarget)}><PackagePlus data-icon="inline-start" aria-hidden="true" />Add product</Button></div>
       </div>
 
       {pageError ? (
@@ -447,6 +451,8 @@ export function InventoryView() {
           )}
         </CardContent>
       </Card>
+
+      <InventoryAnalytics />
 
       <ProductAnalyticsDrawer product={analyticsProduct} open={Boolean(analyticsProduct)} onOpenChange={(open) => { if (!open) setAnalyticsProduct(null); }} />
 

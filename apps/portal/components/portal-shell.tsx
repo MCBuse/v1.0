@@ -9,6 +9,7 @@ import {
   ChartNoAxesCombined,
   LayoutDashboard,
   Landmark,
+  Package,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Logo } from "./logo";
@@ -19,6 +20,7 @@ import { usePortalResource } from "@/lib/client/use-portal-resource";
 const navigation = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/payment", label: "Payment", icon: CircleDollarSign },
+  { href: "/inventory", label: "Inventory", icon: Package },
   { href: "/analytics", label: "Analytics", icon: ChartNoAxesCombined },
   { href: "/credit-assessment", label: "Credit Assessment", icon: Building2 },
   { href: "/finance-match", label: "Finance Match", icon: Landmark },
@@ -70,7 +72,10 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 sm:flex" title={connectionLabel}>
+            <div
+              className="hidden items-center gap-2 sm:flex"
+              title={connectionLabel}
+            >
               <span className="text-xs text-slate-500">{connectionLabel}</span>
               <span
                 className={`size-2 rounded-full ${connection.offline || connection.error ? "bg-rose-500" : connection.loading || stale ? "bg-amber-400" : "bg-emerald-500"}`}
@@ -86,20 +91,32 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       </div>
       <nav
         aria-label="Mobile"
-        className="fixed inset-x-0 bottom-0 z-40 grid h-[4.75rem] grid-cols-5 border-t border-slate-200 bg-white px-2 pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid h-[4.75rem] grid-cols-6 border-t border-slate-200 bg-white px-2 pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         {navigation.map(({ href, label, icon: Icon }) => (
           <a
             key={href}
             href={href}
-            aria-current={pathname === href || pathname.startsWith(`${href}/`) ? "page" : undefined}
+            aria-current={
+              pathname === href || pathname.startsWith(`${href}/`)
+                ? "page"
+                : undefined
+            }
             className={cn(
-              "flex min-h-11 flex-col items-center justify-center gap-1 text-[11px] font-medium",
-              pathname === href || pathname.startsWith(`${href}/`) ? "text-blue-700" : "text-slate-500",
+              "flex min-h-11 flex-col items-center justify-center gap-1 text-[10px] sm:text-[11px] font-medium",
+              pathname === href || pathname.startsWith(`${href}/`)
+                ? "text-blue-700"
+                : "text-slate-500",
             )}
           >
             <Icon size={20} aria-hidden="true" />
-            <span>{label === "Credit Assessment" ? "Assessment" : label === "Finance Match" ? "Finance" : label}</span>
+            <span>
+              {label === "Credit Assessment"
+                ? "Assessment"
+                : label === "Finance Match"
+                  ? "Finance"
+                  : label}
+            </span>
           </a>
         ))}
       </nav>

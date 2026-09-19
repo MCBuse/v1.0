@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomUUID } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { API_URL, COOKIE_SECURE } from "./config";
@@ -25,6 +26,7 @@ const baseCookie = {
 export function setSessionCookies(
   response: NextResponse,
   tokens: { accessToken: string; refreshToken: string },
+  csrfToken?: string,
 ) {
   response.cookies.set(ACCESS_COOKIE, tokens.accessToken, {
     ...baseCookie,
@@ -32,6 +34,15 @@ export function setSessionCookies(
   });
   response.cookies.set(REFRESH_COOKIE, tokens.refreshToken, {
     ...baseCookie,
+    maxAge: 7 * 24 * 60 * 60,
+  });
+  setCsrfCookie(response, csrfToken);
+}
+
+export function setCsrfCookie(response: NextResponse, token?: string) {
+  response.cookies.set(CSRF_COOKIE, token || randomUUID(), {
+    ...baseCookie,
+    httpOnly: false,
     maxAge: 7 * 24 * 60 * 60,
   });
 }
