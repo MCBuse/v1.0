@@ -41,7 +41,7 @@ export class MerchantInsightsService {
       status: 'ready',
       calculationVersion: snapshot.calculationVersion,
       generatedAt: snapshot.generatedAt.toISOString(),
-      stale: Date.now() - snapshot.generatedAt.getTime() > 15 * 60 * 1000,
+      stale: Date.now() - snapshot.generatedAt.getTime() > this.config.get<number>('MERCHANT_INTELLIGENCE_STALE_AFTER_MINUTES', 375) * 60 * 1000,
       snapshot: { metrics: snapshotBody.metrics ?? {} },
       scope: { label: 'all_recorded_activity', periodFrom: snapshot.periodFrom.toISOString(), periodTo: snapshot.periodTo.toISOString(), mixedData, sourceCoverage },
       insights: rowsForSnapshot.map((row) => ({ id: row.id, code: row.code, kind: row.kind as 'stock_risk' | 'discrepancy' | 'anomaly' | 'performance', priority: row.priority, title: row.title, summary: row.summary, recommendation: row.recommendation, evidence: row.evidence as Array<{ id: string; label: string; value: string }>, limitations: row.limitations as string[], narrationSource: row.narrationSource as 'deterministic' | 'groq' })),

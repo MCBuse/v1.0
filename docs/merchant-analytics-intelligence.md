@@ -16,6 +16,22 @@ Business intelligence reads committed merchant records and writes derived snapsh
 
 Keep Groq credentials in Secret Manager. Do not copy them into `.env`, `api.env.yaml`, shell history, source control, or logs. Existing credentials are managed separately and are not changed by this rollout.
 
+## Worker scheduling
+
+The worker runs every six hours at 00:00, 06:00, 12:00 and 18:00 UTC (also Ghana time). This is four scheduled runs per day. Ordinary sales and inventory reports do not depend on this worker schedule.
+
+Run fresh insights on demand from the repository root, without changing the schedule:
+
+```bash
+pnpm analytics:run
+```
+
+The command waits for the Cloud Run execution to finish. It defaults to project `mcbuse-hackathon-2026-fno`, region `europe-west1`, and job `mcbuse-api-analytics`. Override these with `MCBUSE_GCP_PROJECT_ID`, `MCBUSE_GCP_REGION`, and `MCBUSE_RUN_SERVICE` as needed. Google Cloud Console's Cloud Run job page also offers **Execute**.
+
+The deployment script defaults to `MCBUSE_ANALYTICS_SCHEDULER_ENABLED=true` and cron expression `0 */6 * * *`. Set that flag to `false` to pause, or override `MCBUSE_ANALYTICS_SCHEDULE` to change the interval. The existing Scheduler resource retains its historical `every-10-minutes` name to avoid duplicate jobs.
+
+`MERCHANT_INTELLIGENCE_STALE_AFTER_MINUTES` controls when the insights API marks data delayed. Its default is 375 minutes: six hours plus a 15-minute execution grace period. Existing insights retain their actual calculation timestamp; a manual run refreshes them sooner. Keep this threshold longer than the chosen schedule.
+
 ## Calculation rules
 
 - Performance compares the last seven complete merchant-local days with the preceding seven.

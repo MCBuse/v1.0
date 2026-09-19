@@ -2,6 +2,7 @@
   "name": "v1.0",
   "private": true,
   "scripts": {
+    "analytics:run": "bash scripts/cloud-run/run-analytics-worker.sh",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",

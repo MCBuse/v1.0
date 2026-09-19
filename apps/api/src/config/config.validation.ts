@@ -1,9 +1,11 @@
 import { plainToInstance } from 'class-transformer';
 import {
   IsEnum,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  Min,
   MinLength,
   validateSync,
 } from 'class-validator';
@@ -134,6 +136,11 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   MERCHANT_INTELLIGENCE_ENABLED?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  MERCHANT_INTELLIGENCE_STALE_AFTER_MINUTES?: number;
 
   @IsOptional()
   @IsString()

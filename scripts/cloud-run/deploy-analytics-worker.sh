@@ -12,6 +12,9 @@ scheduler_service_account_name="${MCBUSE_ANALYTICS_SCHEDULER_ACCOUNT:-mcbuse-ana
 scheduler_service_account_email="${scheduler_service_account_name}@${project_id}.iam.gserviceaccount.com"
 job="${service}-analytics"
 scheduler="${service}-analytics-every-10-minutes"
+# Keep the existing Scheduler ID so deployments update it rather than duplicate it.
+analytics_schedule="${MCBUSE_ANALYTICS_SCHEDULE:-0 */6 * * *}"
+analytics_scheduler_enabled="${MCBUSE_ANALYTICS_SCHEDULER_ENABLED:-true}"
 environment_file="$repo_root/deploy/cloud-run/api.env.yaml"
 analytics_allowlist="${MCBUSE_INTELLIGENCE_ALLOWLIST:-}"
 ai_narration_enabled="${MCBUSE_AI_NARRATION_ENABLED:-false}"
@@ -25,6 +28,10 @@ if [[ ! "$analytics_allowlist" =~ ^[A-Za-z0-9,_-]*$ ]]; then
 fi
 if [[ "$ai_narration_enabled" != "true" && "$ai_narration_enabled" != "false" ]]; then
   echo "MCBUSE_AI_NARRATION_ENABLED must be true or false." >&2
+  exit 1
+fi
+if [[ "$analytics_scheduler_enabled" != "true" && "$analytics_scheduler_enabled" != "false" ]]; then
+  echo "MCBUSE_ANALYTICS_SCHEDULER_ENABLED must be true or false." >&2
   exit 1
 fi
 runtime_environment_file="$(mktemp)"
@@ -87,12 +94,22 @@ gcloud run jobs add-iam-policy-binding "$job" \
   --role=roles/run.invoker >/dev/null
 
 scheduler_uri="https://run.googleapis.com/v2/projects/${project_id}/locations/${region}/jobs/${job}:run"
-if gcloud scheduler jobs describe "$scheduler" --project="$project_id" --location="$region" >/dev/null 2>&1; then
-  gcloud scheduler jobs update http "$scheduler" --project="$project_id" --location="$region" --schedule='*/10 * * * *' --uri="$scheduler_uri" --http-method=POST --oauth-service-account-email="$scheduler_service_account_email" --oauth-token-scope=https://www.googleapis.com/auth/cloud-platform
-else
-  gcloud scheduler jobs create http "$scheduler" --project="$project_id" --location="$region" --schedule='*/10 * * * *' --uri="$scheduler_uri" --http-method=POST --oauth-service-account-email="$scheduler_service_account_email" --oauth-token-scope=https://www.googleapis.com/auth/cloud-platform
+scheduler_state="$(gcloud scheduler jobs describe "$scheduler" --project="$project_id" --location="$region" --format='value(state)' 2>/dev/null || true)"
+if [[ "$analytics_scheduler_enabled" == "true" ]]; then
+  if [[ -n "$scheduler_state" ]]; then
+    gcloud scheduler jobs update http "$scheduler" --project="$project_id" --location="$region" --schedule="$analytics_schedule" --uri="$scheduler_uri" --http-method=POST --oauth-service-account-email="$scheduler_service_account_email" --oauth-token-scope=https://www.googleapis.com/auth/cloud-platform
+    if [[ "$scheduler_state" == "PAUSED" ]]; then
+      gcloud scheduler jobs resume "$scheduler" --project="$project_id" --location="$region"
+    fi
+  else
+    gcloud scheduler jobs create http "$scheduler" --project="$project_id" --location="$region" --schedule="$analytics_schedule" --uri="$scheduler_uri" --http-method=POST --oauth-service-account-email="$scheduler_service_account_email" --oauth-token-scope=https://www.googleapis.com/auth/cloud-platform
+  fi
+elif [[ -n "$scheduler_state" && "$scheduler_state" != "PAUSED" ]]; then
+  gcloud scheduler jobs pause "$scheduler" --project="$project_id" --location="$region"
 fi
 
 echo "analytics_job=$job"
 echo "scheduler_job=$scheduler"
+echo "analytics_scheduler_enabled=$analytics_scheduler_enabled"
+echo "analytics_schedule=$analytics_schedule (used only when scheduling is enabled)"
 echo "narration remains controlled by MERCHANT_AI_NARRATION_ENABLED"
