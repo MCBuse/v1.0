@@ -47,8 +47,10 @@ async function performRefresh(): Promise<string | null> {
     const res = await axios.post<{ accessToken: string; refreshToken: string }>(
       `${env.apiBaseUrl}/auth/refresh`,
       { refreshToken: tokens.refreshToken },
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { "Content-Type": "application/json" }, timeout: 15_000 },
     );
+    // A refresh started before logout must not restore the cleared session.
+    if (authSession.get() !== tokens) return null;
     await authSession.set({
       accessToken: res.data.accessToken,
       refreshToken: res.data.refreshToken,
@@ -72,6 +74,7 @@ api.interceptors.response.use(
 
     if (status === 401 && original && !original._retried && !isRefreshCall) {
       original._retried = true;
+      const sessionBeforeRefresh = authSession.get();
 
       refreshPromise ??= performRefresh().finally(() => {
         refreshPromise = null;
@@ -83,6 +86,10 @@ api.interceptors.response.use(
           original.headers.Authorization = `Bearer ${newAccessToken}`;
         }
         return api.request(original);
+      }
+
+      if (authSession.get() !== sessionBeforeRefresh) {
+        return Promise.reject(toApiError(error));
       }
 
       // Refresh failed → force logout.

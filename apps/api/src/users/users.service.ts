@@ -193,11 +193,14 @@ export class UsersService {
 
   async updateProfile(
     userId: string,
-    data: { username?: string; primaryCurrency?: 'USDC' | 'EURC' },
+    data: { firstName?: string; lastName?: string; username?: string; primaryCurrency?: 'USDC' | 'EURC' },
   ) {
     const update: Partial<typeof schema.users.$inferInsert> = {
       updatedAt: new Date(),
     };
+
+    if (data.firstName !== undefined) update.firstName = data.firstName;
+    if (data.lastName !== undefined) update.lastName = data.lastName;
 
     if (data.username !== undefined) {
       const username = this.validateUsername(data.username);

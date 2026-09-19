@@ -26,5 +26,5 @@ export const useAppStore = create<AppStore>((set) => ({
 
   setHasSeenOnboarding: (value) => set({ hasSeenOnboarding: value }),
   setIsAuthenticated:   (value) => set({ isAuthenticated: value }),
-  signOut:              ()      => set({ isAuthenticated: false }),
+  signOut:              ()      => set({ isAuthenticated: false, hasSeenOnboarding: true }),
 }));

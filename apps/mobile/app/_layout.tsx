@@ -1,5 +1,9 @@
 import { ThemeProvider as RestyleProvider } from '@shopify/restyle';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from '@react-navigation/native';
 import {
   IBMPlexSans_400Regular,
   IBMPlexSans_500Medium,
@@ -17,9 +21,33 @@ import 'react-native-url-polyfill/auto';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ApiProvider } from '@/lib/api';
 import { theme, darkTheme } from '@/theme';
+import { useAppStore } from '@/store/app-store';
 
 // Hold the splash until fonts are ready
 SplashScreen.preventAutoHideAsync();
+
+function RootNavigator() {
+  const isAuthenticated = useAppStore((s) => s.isAuthenticated);
+
+  return (
+    <Stack>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="(guest)" options={{ headerShown: false }} />
+      <Stack.Protected guard={isAuthenticated}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="(flows)"
+          options={{ headerShown: false, presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="modal"
+          options={{ presentation: 'modal', title: 'Modal' }}
+        />
+        <Stack.Screen name="receive" options={{ headerShown: false }} />
+      </Stack.Protected>
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -43,15 +71,7 @@ export default function RootLayout() {
     <RestyleProvider theme={isDark ? darkTheme : theme}>
       <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
         <ApiProvider>
-          <Stack>
-            {/* index.tsx handles the boot redirect */}
-            <Stack.Screen name="index"   options={{ headerShown: false }} />
-            <Stack.Screen name="(guest)" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)"  options={{ headerShown: false }} />
-            {/* Transaction flows — presented as modals over the tab bar */}
-            <Stack.Screen name="(flows)" options={{ headerShown: false, presentation: 'modal' }} />
-            <Stack.Screen name="modal"   options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
+          <RootNavigator />
           <StatusBar style={isDark ? 'light' : 'dark'} />
         </ApiProvider>
       </ThemeProvider>

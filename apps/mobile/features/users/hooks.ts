@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query';
+
 import { useDataScreen, useOperation } from '@/lib/api';
 
 import {
@@ -20,9 +22,14 @@ export function useProfile() {
 }
 
 export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+
   return useOperation<UpdateProfileInput, UserProfile>({
     mutationFn:     (input) => usersRepository.updateProfile(input),
     invalidateKeys: [['profile'], ['wallets']],
+    onSuccess: (profile) => {
+      queryClient.setQueryData(['profile'], profile);
+    },
   });
 }
 

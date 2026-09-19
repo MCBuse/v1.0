@@ -28,6 +28,8 @@ export const userProfileSchema = z.object({
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
 export const updateProfileInputSchema = z.object({
+  firstName:       z.string().trim().min(1).max(100).optional(),
+  lastName:        z.string().trim().min(1).max(100).optional(),
   username:        z.string().optional(),
   primaryCurrency: stableCurrencySchema.optional(),
 });

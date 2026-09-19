@@ -1,4 +1,4 @@
-import { ApiError, authSession, http } from '@/lib/api';
+import { authSession, http } from '@/lib/api';
 
 import {
   tokenPairResponse,
@@ -37,15 +37,15 @@ export const authRepository = {
 
   async logout(): Promise<void> {
     const tokens = authSession.get();
-    if (tokens?.refreshToken) {
-      try {
+    try {
+      if (tokens?.refreshToken) {
         await http.post('/auth/logout', { refreshToken: tokens.refreshToken });
-      } catch (err) {
-        // A network / auth error during logout shouldn't block local sign-out.
-        if (!(err instanceof ApiError) || err.kind === 'server') throw err;
       }
+    } catch {
+      // Server and network failures must not prevent local sign-out.
+    } finally {
+      await authSession.clear();
     }
-    await authSession.clear();
   },
 
   async sendPhoneOtp(input: SendOtpRequest): Promise<void> {
