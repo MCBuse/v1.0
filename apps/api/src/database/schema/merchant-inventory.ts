@@ -20,6 +20,7 @@ export const merchantProducts = pgTable(
       .notNull()
       .references(() => merchants.id),
     name: varchar('name', { length: 160 }).notNull(),
+    category: varchar('category', { length: 100 }),
     sku: varchar('sku', { length: 64 }),
     description: text('description'),
     unitPriceMinor: bigint('unit_price_minor', { mode: 'bigint' }).notNull(),

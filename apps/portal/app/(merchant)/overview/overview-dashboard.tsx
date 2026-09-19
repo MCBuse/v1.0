@@ -22,6 +22,7 @@ import {
 import { AlertTriangle, ArrowRight, Clock3 } from "lucide-react";
 import { SalesBars, HourlyRhythm } from "@/components/charts";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
+import { MerchantInsightsPanel } from "@/components/merchant-insights";
 
 function Metric({
   label,
@@ -175,11 +176,11 @@ export function OverviewDashboard() {
           value={<Money value={data.recordedToday} />}
         />
         <Metric
-          label="Recorded sale count · 30 days"
+          label="Recorded sales · 30 days"
           value={<Money value={data.recorded30Days} />}
         />
         <Metric
-          label="Recorded sales · 30 days"
+          label="Recorded sale count · 30 days"
           value={
             <span className="font-mono tabular-nums">
               {data.recordedSaleCount30Days}
@@ -195,7 +196,12 @@ export function OverviewDashboard() {
           }
           detail="View Inventory"
         />
+        <Metric label="Transactions today" value={<span className="font-mono tabular-nums">{data.recordedSaleCountToday ?? 0}</span>} />
+        <Metric label="Average transaction today" value={<Money value={data.recordedAverageSaleToday ?? data.recordedAverageSale} />} />
+        <Metric label="Top product today" value={data.topProductToday?.name ?? "No product-linked sales"} detail={data.topProductToday ? `${data.topProductToday.quantitySold} units` : undefined} />
+        <Metric label="Busiest hour today" value={data.peakSellingHourToday ?? "No pattern yet"} />
       </div>
+      <MerchantInsightsPanel limit={3} />
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
           <div>

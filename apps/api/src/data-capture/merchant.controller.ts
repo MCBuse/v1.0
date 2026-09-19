@@ -6,6 +6,7 @@ import {
   Get,
   Headers,
   StreamableFile,
+  ServiceUnavailableException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -37,6 +38,8 @@ import { MerchantFinanceService } from './merchant-finance.service';
 import { CreateMerchantFinancePackageDto, EmailMerchantFinancePackageDto } from './dto/merchant-finance.dto';
 import { UpdateMerchantProfileDto } from './dto/update-merchant-profile.dto';
 import { MerchantEvidenceAttachmentService } from './merchant-evidence-attachment.service';
+import { MerchantInsightsService } from '../analytics-intelligence/merchant-insights.service';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('merchants')
 @ApiBearerAuth('access-token')
@@ -49,6 +52,8 @@ export class MerchantController {
     private readonly imports: MerchantImportService,
     private readonly finance: MerchantFinanceService,
     private readonly attachments: MerchantEvidenceAttachmentService,
+    private readonly insights: MerchantInsightsService,
+    private readonly config: ConfigService,
   ) {}
 
   @Get()
@@ -79,15 +84,13 @@ export class MerchantController {
       this.inventory.lowStockCount(user.id),
       this.merchants.getReadiness(user.id),
     ]);
-    const today = analytics.dailyTrend.at(-1);
     return {
       ...summary,
-      recordedToday: {
-        minor: today?.amountMinor ?? '0',
-        currency: 'EUR' as const,
-        estimated: false,
-        rateTimestamp: null,
-      },
+      recordedToday: analytics.today.sales,
+      recordedSaleCountToday: analytics.today.saleCount,
+      recordedAverageSaleToday: analytics.today.averageSale,
+      topProductToday: analytics.today.topProduct,
+      peakSellingHourToday: analytics.today.peakSellingHour,
       recorded30Days: analytics.totalRecordedSales,
       recordedSaleCount30Days: analytics.saleCount,
       recordedAverageSale: analytics.averageSale,
@@ -293,11 +296,18 @@ export class MerchantController {
   @Get('analytics')
   @ApiOperation({ summary: 'Get recorded merchant sales analytics' })
   getAnalytics(@CurrentUser() user: { id: string }, @Query() query: ListMerchantAnalyticsDto) {
+    if (this.config.get<string>('MERCHANT_GENERAL_ANALYTICS_ENABLED') === 'false') throw new ServiceUnavailableException('General Analytics is temporarily unavailable');
     const now = new Date(); const periodDays = query.period === '7d' ? 7 : query.period === '90d' ? 90 : 30;
     const from = query.from ? new Date(query.from) : new Date(now.getTime() - periodDays * 86_400_000);
     const to = query.to ? new Date(query.to) : now;
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to || to.getTime() - from.getTime() > 366 * 86_400_000) throw new BadRequestException('Invalid analytics period');
     return this.activity.analytics(user.id, from, to, { source: query.source, environment: query.environment });
+  }
+
+  @Get('insights')
+  @ApiOperation({ summary: 'Get the latest calculated merchant business insights' })
+  getInsights(@CurrentUser() user: { id: string }) {
+    return this.insights.getForUser(user.id);
   }
 
   @Get('credit-assessment')

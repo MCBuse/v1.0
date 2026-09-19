@@ -28,7 +28,9 @@
     "merchant:private-attachment-acceptance": "node scripts/merchant-private-attachment-acceptance.mjs",
     "merchant:synthetic-inventory-acceptance": "node scripts/merchant-synthetic-inventory-acceptance.mjs",
     "merchant:week2-smoke": "node scripts/merchant-week2-smoke.mjs",
-    "merchant:week2-recovery-smoke": "WEEK2_MANAGED_API=true node scripts/merchant-week2-smoke.mjs"
+    "merchant:week2-recovery-smoke": "WEEK2_MANAGED_API=true node scripts/merchant-week2-smoke.mjs",
+    "merchant:analytics-worker": "node dist/src/analytics-intelligence/worker.js",
+    "merchant:analytics-load": "ts-node src/analytics-intelligence/merchant-insights.load.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.1.0",

@@ -9,7 +9,7 @@ import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, Dr
 import { portalApi } from "@/lib/client/api";
 
 type Preview = { id: string; duplicate: boolean; headers: string[]; fieldMap: Record<string, string>; rowCount: number; errors: string[]; canCommit: boolean };
-const INVENTORY_FIELDS = ["name", "external_id", "sku", "unit_price_minor", "stock_on_hand", "description", "low_stock_threshold", "snapshot_at"];
+const INVENTORY_FIELDS = ["name", "external_id", "sku", "category", "unit_price_minor", "stock_on_hand", "description", "low_stock_threshold", "snapshot_at"];
 const SETTLEMENT_FIELDS = ["external_reference", "currency", "expected_amount_minor", "actual_amount_minor", "expected_at", "received_at", "provider_status", "payment_reference", "allocation_amount_minor"];
 const REQUIRED: Record<"inventory" | "settlement", Set<string>> = { inventory: new Set(["name", "unit_price_minor"]), settlement: new Set(["external_reference", "currency"]) };
 

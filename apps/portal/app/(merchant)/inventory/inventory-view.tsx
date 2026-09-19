@@ -39,6 +39,7 @@ import { ProductAnalyticsDrawer } from "@/components/product-analytics-drawer";
 
 type Draft = {
   name: string;
+  category: string;
   sku: string;
   description: string;
   price: string;
@@ -48,6 +49,7 @@ type Draft = {
 
 const emptyDraft: Draft = {
   name: "",
+  category: "",
   sku: "",
   description: "",
   price: "",
@@ -93,6 +95,7 @@ function productPayload(draft: Draft) {
 
   return {
     name: draft.name.trim(),
+    category: draft.category.trim() || undefined,
     sku: draft.sku.trim() || undefined,
     description: draft.description.trim() || undefined,
     unitPriceMinor,
@@ -145,6 +148,7 @@ export function InventoryView() {
     setEditing(product);
     setDraft({
       name: product.name,
+      category: product.category ?? "",
       sku: product.sku ?? "",
       description: product.description ?? "",
       price: (Number(product.unitPrice.minor) / 100).toFixed(2),
@@ -359,6 +363,7 @@ export function InventoryView() {
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
                       {product.sku ? `SKU ${product.sku} · ` : ""}
+                      {product.category ? `${product.category} · ` : ""}
                       <Money value={product.unitPrice} />
                     </p>
                   </div>
@@ -515,6 +520,21 @@ export function InventoryView() {
                   maxLength={64}
                   autoComplete="off"
                   spellCheck={false}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="product-category">
+                  Category{" "}
+                  <span className="font-normal text-slate-500">optional</span>
+                </FieldLabel>
+                <Input
+                  id="product-category"
+                  value={draft.category}
+                  onChange={(event) =>
+                    setDraft({ ...draft, category: event.target.value })
+                  }
+                  maxLength={100}
+                  autoComplete="off"
                 />
               </Field>
               <Field>

@@ -39,6 +39,8 @@ Apply the additive Drizzle migrations in sequence, after a verified database bac
 8. `0017_finance_package_idempotency.sql`
 9. `0018_finance_email_idempotency.sql`
 10. `0019_merchant_transaction_evidence_environment.sql`
+11. `0020_merchant_analytics_intelligence.sql`
+12. `0021_narration_attempt_budget.sql`
 
 `0013` creates a labelled opening balance for existing products at upgrade time. It does not claim to reconstruct historical stock movements.
 

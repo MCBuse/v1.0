@@ -18,6 +18,12 @@ export class UpdateMerchantProductDto {
   @MaxLength(160)
   name?: string;
 
+  @ApiPropertyOptional({ maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  category?: string | null;
+
   @ApiPropertyOptional({ maxLength: 64 })
   @IsOptional()
   @IsString()

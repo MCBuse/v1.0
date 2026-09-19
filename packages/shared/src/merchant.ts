@@ -45,6 +45,10 @@ export type MerchantSummary = {
 
 export type MerchantWorkspaceSummary = MerchantSummary & {
   recordedToday: MoneyValue;
+  recordedSaleCountToday: number;
+  recordedAverageSaleToday: MoneyValue;
+  topProductToday: { productId: string; name: string; quantitySold: number; totalSales: MoneyValue } | null;
+  peakSellingHourToday: string | null;
   recorded30Days: MoneyValue;
   recordedSaleCount30Days: number;
   recordedAverageSale: MoneyValue;
@@ -105,6 +109,7 @@ export type MerchantProductStatus = 'active' | 'archived';
 export type MerchantProduct = {
   id: string;
   name: string;
+  category: string | null;
   sku: string | null;
   description: string | null;
   unitPrice: MoneyValue;
@@ -225,11 +230,23 @@ export type MerchantActivityPage = {
 export type MerchantAnalytics = {
   period: { from: string; to: string; timezone: string; partialCurrentDay: boolean };
   generatedAt: string;
+  today: {
+    sales: MoneyValue;
+    saleCount: number;
+    averageSale: MoneyValue;
+    topProduct: { productId: string; name: string; quantitySold: number; totalSales: MoneyValue } | null;
+    peakSellingHour: string | null;
+  };
   sourceCoverage: Record<MerchantEvidenceSource, number>;
   totalRecordedSales: MoneyValue;
   saleCount: number;
   averageSale: MoneyValue;
   comparisonPercent: number | null;
+  comparisons: {
+    salesPercent: number | null;
+    transactionCountPercent: number | null;
+    averageSalePercent: number | null;
+  };
   digitalSales: MoneyValue;
   cashSales: MoneyValue;
   dailyTrend: MerchantSummaryBucket[];
@@ -237,11 +254,33 @@ export type MerchantAnalytics = {
   productPerformance: Array<{
     productId: string;
     name: string;
+    category: string;
     quantitySold: number;
     totalSales: MoneyValue;
     digitalQuantity: number;
     cashQuantity: number;
+    previousQuantitySold: number;
+    quantityChangePercent: number | null;
+    averageDailyQuantity: number;
+    stockValueAtSellingPrice: MoneyValue;
+    turnover: number | null;
+    turnoverStatus: "available" | "insufficient_stock_history";
   }>;
+  categoryPerformance: Array<{
+    category: string;
+    quantitySold: number;
+    totalSales: MoneyValue;
+    previousQuantitySold: number;
+    quantityChangePercent: number | null;
+  }>;
+  inventory: {
+    stockValueAtSellingPrices: MoneyValue;
+    availableValueAtSellingPrices: MoneyValue;
+    reservedValueAtSellingPrices: MoneyValue;
+    lowStockProductCount: number;
+    zeroStockProductCount: number;
+    valuationBasis: "current_selling_price";
+  };
   unassignedItems: Array<{
     name: string;
     quantitySold: number;
@@ -249,6 +288,42 @@ export type MerchantAnalytics = {
     digitalQuantity: number;
     cashQuantity: number;
   }>;
+};
+
+export type MerchantInsightKind =
+  | "stock_risk"
+  | "discrepancy"
+  | "anomaly"
+  | "performance";
+
+export type MerchantInsight = {
+  id: string;
+  code: string;
+  kind: MerchantInsightKind;
+  priority: number;
+  title: string;
+  summary: string;
+  recommendation: string | null;
+  evidence: Array<{ id: string; label: string; value: string }>;
+  limitations: string[];
+  narrationSource: "deterministic" | "groq";
+};
+
+export type MerchantInsightsResponse = {
+  status: "ready" | "updating" | "disabled";
+  calculationVersion: string;
+  generatedAt: string | null;
+  stale: boolean;
+  snapshot: { metrics: Record<string, unknown> } | null;
+  scope: {
+    label: "all_recorded_activity";
+    periodFrom: string | null;
+    periodTo: string | null;
+    mixedData: boolean;
+    sourceCoverage: Partial<Record<MerchantEvidenceEnvironment | MerchantEvidenceSource, number>>;
+  };
+  insights: MerchantInsight[];
+  message: string | null;
 };
 
 export type MerchantCashSaleLine = {

@@ -57,6 +57,15 @@ function summaryPayload({
       estimated: false,
       rateTimestamp: null,
     },
+    recordedSaleCountToday: receivedTodayMinor === "0" ? 0 : 1,
+    recordedAverageSaleToday: {
+      minor: receivedTodayMinor,
+      currency: "EUR",
+      estimated: false,
+      rateTimestamp: null,
+    },
+    topProductToday: null,
+    peakSellingHourToday: receivedTodayMinor === "0" ? null : "12:00",
     recorded30Days: {
       minor: receivedTodayMinor,
       currency: "EUR",
@@ -163,6 +172,27 @@ test.beforeEach(async ({ context, page }) => {
       }),
     }),
   );
+  await page.route("**/api/merchant/me/insights**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "disabled",
+        calculationVersion: "merchant-intelligence-v1",
+        generatedAt: null,
+        stale: false,
+        snapshot: null,
+        scope: {
+          label: "all_recorded_activity",
+          periodFrom: null,
+          periodTo: null,
+          mixedData: false,
+          sourceCoverage: {},
+        },
+        insights: [],
+        message: "Business intelligence is not enabled for this merchant.",
+      }),
+    }),
+  );
 });
 
 test("overview renders money records and responsive navigation", async ({
@@ -215,6 +245,45 @@ test("overview renders money records and responsive navigation", async ({
     page.getByRole("button", { name: "Create request" }),
   ).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("shows the three highest-priority insights with freshness and evidence", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one rendered insights proof is enough");
+  await page.unroute("**/api/merchant/me/insights**");
+  await page.route("**/api/merchant/me/insights**", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({
+      status: "ready",
+      calculationVersion: "merchant-intelligence-v1",
+      generatedAt: "2026-09-18T10:00:00.000Z",
+      stale: true,
+      snapshot: { metrics: { forecastEligible: true } },
+      scope: {
+        label: "all_recorded_activity",
+        periodFrom: "2026-06-20T00:00:00.000Z",
+        periodTo: "2026-09-18T10:00:00.000Z",
+        mixedData: true,
+        sourceCoverage: { live: 20, test: 1 },
+      },
+      insights: [
+        { id: "one", code: "stock.one", kind: "stock_risk", priority: 10, title: "Coffee may reach minimum stock", summary: "Recorded demand suggests stock review.", recommendation: "Review replenishment timing.", evidence: [{ id: "product:p1", label: "Coffee", value: "8 units" }], limitations: ["Incoming orders are unavailable."], narrationSource: "deterministic" },
+        { id: "two", code: "stock.two", kind: "discrepancy", priority: 20, title: "Stock movement needs review", summary: "Recorded changes differ.", recommendation: "Review source records.", evidence: [], limitations: [], narrationSource: "deterministic" },
+        { id: "three", code: "volume", kind: "anomaly", priority: 30, title: "Volume was unusual", summary: "This is a signal for review.", recommendation: null, evidence: [], limitations: ["This is not evidence of wrongdoing."], narrationSource: "groq" },
+        { id: "four", code: "performance", kind: "performance", priority: 40, title: "Fourth insight", summary: "Lower priority.", recommendation: null, evidence: [], limitations: [], narrationSource: "deterministic" },
+      ],
+      message: "Mixed recorded activity—included test or unclassified records.",
+    }),
+  }));
+  await page.goto("/overview");
+  await expect(page.getByRole("heading", { name: "Business insights" })).toBeVisible();
+  await expect(page.getByText("Update delayed")).toBeVisible();
+  await expect(page.getByText("Last updated", { exact: false })).toBeVisible();
+  await expect(page.getByText("Mixed recorded activity—included test or unclassified records.")).toBeVisible();
+  await expect(page.getByText("Coffee may reach minimum stock")).toBeVisible();
+  await expect(page.getByText("Coffee:")).toBeVisible();
+  await expect(page.getByText("Review replenishment timing.")).toBeVisible();
+  await expect(page.getByText("Incoming orders are unavailable.")).toBeVisible();
+  await expect(page.getByText("Fourth insight")).toHaveCount(0);
 });
 
 test("validates the receive drawer and restores trigger focus", async ({
@@ -353,7 +422,7 @@ test("a completed request refreshes the dashboard without a reload", async ({
   });
   await expect.poll(() => summaryRequests).toBeGreaterThan(1);
   await expect(
-    page.getByText("Received today").locator("..").getByText("€4.50"),
+    page.getByText("Recorded sales today").locator("..").getByText("€4.50"),
   ).toBeVisible();
 });
 

@@ -129,6 +129,26 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  MERCHANT_GENERAL_ANALYTICS_ENABLED?: string;
+
+  @IsOptional()
+  @IsString()
+  MERCHANT_INTELLIGENCE_ENABLED?: string;
+
+  @IsOptional()
+  @IsString()
+  MERCHANT_INTELLIGENCE_ALLOWLIST?: string;
+
+  @IsOptional()
+  @IsString()
+  MERCHANT_AI_NARRATION_ENABLED?: string;
+
+  @IsOptional()
+  @IsString()
+  GROQ_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
   PRODUCT_IMAGE_BUCKET?: string;
 
   @IsOptional()

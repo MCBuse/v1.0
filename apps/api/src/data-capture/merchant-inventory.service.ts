@@ -152,6 +152,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
         .values({
           merchantId: merchant.merchantId,
           name: dto.name.trim(),
+          category: this.normalizeOptional(dto.category),
           sku: this.normalizeOptional(dto.sku)?.toUpperCase() ?? null,
           description: this.normalizeOptional(dto.description),
           unitPriceMinor: BigInt(dto.unitPriceMinor),
@@ -180,6 +181,8 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
       updatedAt: new Date(),
     };
     if (dto.name !== undefined) update.name = dto.name.trim();
+    if (dto.category !== undefined)
+      update.category = this.normalizeOptional(dto.category ?? undefined);
     if (dto.sku !== undefined)
       update.sku =
         this.normalizeOptional(dto.sku ?? undefined)?.toUpperCase() ?? null;
@@ -694,6 +697,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
     return {
       id: row.id,
       name: row.name,
+      category: row.category,
       sku: row.sku,
       description: row.description,
       unitPrice: {
