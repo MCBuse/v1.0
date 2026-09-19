@@ -43,11 +43,23 @@ The local load command exercises 100,000 transactions and 1,000 products and fai
 
 ## Release
 
-1. Back up the database and apply migration `0020_merchant_analytics_intelligence.sql`.
+1. Back up the database and apply migrations `0020_merchant_analytics_intelligence.sql` through `0022_narration_calculation_version.sql`.
 2. Deploy API and portal with intelligence flags disabled.
-3. Add a newly rotated `GROQ_API_KEY` secret.
+3. Add a new `GROQ_API_KEY` secret version without changing separately managed existing credentials.
 4. Set a non-empty pilot merchant allowlist and run `scripts/cloud-run/deploy-analytics-worker.sh`.
 5. Validate deterministic snapshots before setting `MERCHANT_AI_NARRATION_ENABLED=true` on the worker.
 6. Monitor job duration, snapshot age, failed merchants, database load, narration cache growth, and deterministic fallback rate.
 
 Disabling the intelligence flags and restoring the prior application revision is sufficient for rollback. The additive tables may remain in place.
+
+## Hosted pilot evidence — 19 September 2026
+
+- A PostgreSQL 17 custom-format backup was created before migration. Its SHA-256 checksum and archive index were verified.
+- Migration execution `mcbuse-api-migrate-hhjhl` completed before API revision `mcbuse-api-00039-g9v` received traffic.
+- Portal revision `mcbuse-portal-00024-trb` preserves `merchant.mcbuse.com` as the canonical origin and uses `api.mcbuse.com/api/v1`.
+- The API keeps intelligence and AI narration disabled. General Analytics is enabled. The separate `mcbuse-api-analytics` job enables intelligence for two demonstration merchants and uses a database pool maximum of two.
+- Cloud Scheduler invokes the job every ten minutes. Scheduled execution `mcbuse-api-analytics-sch5r` and manually triggered Scheduler execution `mcbuse-api-analytics-k8m9r` each completed successfully.
+- Four worker runs completed with two merchants processed and zero failures. The latest snapshots use `merchant-intelligence-v1`; no production activity met the materiality thresholds for an active insight.
+- `GROQ_API_KEY` version 1 is enabled in Secret Manager. The analytics runtime has accessor permission on that secret. A minimal strict-schema request to `openai/gpt-oss-20b` returned HTTP 200 with schema-valid JSON and tools disabled. Existing Groq credentials were not revoked or changed.
+- The hosted infrastructure readiness check passed all nine payment and deployment guardrails after release. The API and database report healthy, unauthenticated insights return 401, the portal sign-in returns 200, and protected Overview redirects to the canonical sign-in URL.
+- The 100,000-transaction and 1,000-product local calculation completed in 36.026 seconds. Payment API p95 degradation under that database workload remains an expansion gate; keep the pilot allowlist in place until it is measured and is no more than 10%.
