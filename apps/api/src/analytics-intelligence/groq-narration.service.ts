@@ -23,11 +23,11 @@ export class GroqNarrationService {
     private readonly config: ConfigService,
   ) {}
 
-  async narrate(merchantId: string, fingerprint: string, insights: CalculatedInsight[]) {
+  async narrate(merchantId: string, fingerprint: string, calculationVersion: string, insights: CalculatedInsight[]) {
     if (!insights.length || this.config.get<string>('MERCHANT_AI_NARRATION_ENABLED') !== 'true') return insights;
     const apiKey = this.config.get<string>('GROQ_API_KEY');
     if (!apiKey) return insights;
-    const cached = await this.db.select().from(schema.merchantNarrationCache).where(and(eq(schema.merchantNarrationCache.merchantId, merchantId), eq(schema.merchantNarrationCache.inputFingerprint, fingerprint), eq(schema.merchantNarrationCache.model, MODEL), eq(schema.merchantNarrationCache.promptVersion, PROMPT_VERSION), eq(schema.merchantNarrationCache.status, 'success'))).limit(1);
+    const cached = await this.db.select().from(schema.merchantNarrationCache).where(and(eq(schema.merchantNarrationCache.merchantId, merchantId), eq(schema.merchantNarrationCache.inputFingerprint, fingerprint), eq(schema.merchantNarrationCache.calculationVersion, calculationVersion), eq(schema.merchantNarrationCache.model, MODEL), eq(schema.merchantNarrationCache.promptVersion, PROMPT_VERSION), eq(schema.merchantNarrationCache.status, 'success'))).limit(1);
     if (cached[0]) return this.merge(insights, cached[0].output as NarratedItem[]);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const [merchantUsage, globalUsage] = await Promise.all([
@@ -36,7 +36,7 @@ export class GroqNarrationService {
     ]);
     if ((merchantUsage[0]?.value ?? 0) >= 24 || (globalUsage[0]?.value ?? 0) >= 1000) return insights;
     const attemptFingerprint = createHash('sha256').update(`${fingerprint}:${Date.now()}:${randomUUID()}`).digest('hex');
-    await this.db.insert(schema.merchantNarrationCache).values({ merchantId, inputFingerprint: attemptFingerprint, model: MODEL, promptVersion: PROMPT_VERSION, status: 'attempt', output: {} });
+    await this.db.insert(schema.merchantNarrationCache).values({ merchantId, inputFingerprint: attemptFingerprint, calculationVersion, model: MODEL, promptVersion: PROMPT_VERSION, status: 'attempt', output: {} });
 
     const { anonymised, replacements } = this.anonymise(insights);
     try {
@@ -48,7 +48,7 @@ export class GroqNarrationService {
         summary: this.restore(item.summary, replacements),
         recommendation: item.recommendation === null ? null : this.restore(item.recommendation, replacements),
       }));
-      await this.db.insert(schema.merchantNarrationCache).values({ merchantId, inputFingerprint: fingerprint, model: MODEL, promptVersion: PROMPT_VERSION, status: 'success', output: restored }).onConflictDoNothing();
+      await this.db.insert(schema.merchantNarrationCache).values({ merchantId, inputFingerprint: fingerprint, calculationVersion, model: MODEL, promptVersion: PROMPT_VERSION, status: 'success', output: restored }).onConflictDoNothing();
       return this.merge(insights, restored);
     } catch (error) {
       this.logger.warn(`Groq narration fell back to deterministic text: ${error instanceof Error ? error.message : 'unknown error'}`);

@@ -102,12 +102,12 @@ export class MerchantInsightsService {
     if (existing[0]) {
       await this.db.update(schema.merchantAnalyticsSnapshots).set({ periodTo: calculation.periodTo, sourceCoverage: calculation.sourceCoverage, snapshot: { metrics: calculation.metrics, mixedData: calculation.mixedData }, generatedAt: now }).where(eq(schema.merchantAnalyticsSnapshots.id, existing[0].id));
       if (this.config.get<string>('MERCHANT_AI_NARRATION_ENABLED') === 'true') {
-        const narrated = await this.narration.narrate(merchant.id, fingerprint, calculation.insights);
+        const narrated = await this.narration.narrate(merchant.id, fingerprint, ANALYTICS_CALCULATION_VERSION, calculation.insights);
         for (const insight of narrated) if ((insight as { narrationSource?: string }).narrationSource === 'groq') await this.db.update(schema.merchantInsights).set({ title: insight.title, summary: insight.summary, recommendation: insight.recommendation, narrationSource: 'groq' }).where(and(eq(schema.merchantInsights.snapshotId, existing[0].id), eq(schema.merchantInsights.code, insight.code)));
       }
       return;
     }
-    const narrated = await this.narration.narrate(merchant.id, fingerprint, calculation.insights);
+    const narrated = await this.narration.narrate(merchant.id, fingerprint, ANALYTICS_CALCULATION_VERSION, calculation.insights);
     await this.db.transaction(async (tx) => {
       const snapshot = (await tx.insert(schema.merchantAnalyticsSnapshots).values({ merchantId: merchant.id, calculationVersion: ANALYTICS_CALCULATION_VERSION, inputFingerprint: fingerprint, periodFrom: calculation.periodFrom, periodTo: calculation.periodTo, sourceCoverage: calculation.sourceCoverage, snapshot: { metrics: calculation.metrics, mixedData: calculation.mixedData }, generatedAt: now }).returning())[0];
       await tx.update(schema.merchantInsights).set({ active: false, resolvedAt: now }).where(and(eq(schema.merchantInsights.merchantId, merchant.id), eq(schema.merchantInsights.active, true)));

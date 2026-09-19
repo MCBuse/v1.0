@@ -36,7 +36,7 @@ describe('GroqNarrationService safety boundary', () => {
   it('does not call Groq when AI narration is disabled', async () => {
     const config = { get: jest.fn().mockReturnValue('false') } as never;
     const service = new GroqNarrationService({} as never, config);
-    await expect(service.narrate('merchant', 'fingerprint', [insight])).resolves.toEqual([insight]);
+    await expect(service.narrate('merchant', 'fingerprint', 'calculation-v1', [insight])).resolves.toEqual([insight]);
   });
 
   it('rejects figures that were not supplied by deterministic calculations', () => {
@@ -86,7 +86,7 @@ describe('GroqNarrationService safety boundary', () => {
     const config = { get: jest.fn((key: string) => key === 'MERCHANT_AI_NARRATION_ENABLED' ? 'true' : key === 'GROQ_API_KEY' ? 'replacement-key' : undefined) } as never;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '{not-json' } }] }) }) as never;
     const service = new GroqNarrationService(db, config);
-    await expect(service.narrate('merchant', 'fingerprint', [insight])).resolves.toEqual([insight]);
+    await expect(service.narrate('merchant', 'fingerprint', 'calculation-v1', [insight])).resolves.toEqual([insight]);
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -96,7 +96,7 @@ describe('GroqNarrationService safety boundary', () => {
     const config = { get: jest.fn((key: string) => key === 'MERCHANT_AI_NARRATION_ENABLED' ? 'true' : key === 'GROQ_API_KEY' ? 'replacement-key' : undefined) } as never;
     global.fetch = jest.fn() as never;
     const service = new GroqNarrationService(db, config);
-    await expect(service.narrate('merchant', 'fingerprint', [insight])).resolves.toEqual([insight]);
+    await expect(service.narrate('merchant', 'fingerprint', 'calculation-v1', [insight])).resolves.toEqual([insight]);
     expect(global.fetch).not.toHaveBeenCalled();
   });
 

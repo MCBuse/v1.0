@@ -82,6 +82,7 @@ export const merchantNarrationCache = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     merchantId: uuid('merchant_id').notNull().references(() => merchants.id),
     inputFingerprint: varchar('input_fingerprint', { length: 64 }).notNull(),
+    calculationVersion: varchar('calculation_version', { length: 64 }).notNull(),
     model: varchar('model', { length: 80 }).notNull(),
     promptVersion: varchar('prompt_version', { length: 64 }).notNull(),
     status: varchar('status', { length: 16 }).notNull().default('success'),
@@ -92,6 +93,7 @@ export const merchantNarrationCache = pgTable(
     uniqueIndex('merchant_narration_cache_key_unique').on(
       table.merchantId,
       table.inputFingerprint,
+      table.calculationVersion,
       table.model,
       table.promptVersion,
     ),
