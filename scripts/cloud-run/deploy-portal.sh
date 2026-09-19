@@ -36,7 +36,8 @@ if [[ ! "$project_number" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-portal_origin="https://${service}-${project_number}.${region}.run.app"
+generated_portal_origin="https://${service}-${project_number}.${region}.run.app"
+portal_origin="${MCBUSE_PORTAL_ORIGIN:-$generated_portal_origin}"
 api_url="${MCBUSE_API_URL:-https://${api_service}-${project_number}.${region}.run.app/api/v1}"
 auth_background_url="${NEXT_PUBLIC_AUTH_BACKGROUND_URL:-}"
 
@@ -82,4 +83,5 @@ fi
 
 echo "MCBuse merchant portal deployed"
 echo "portal_origin=$portal_origin"
+echo "generated_portal_origin=$generated_portal_origin"
 echo "api_url=$api_url"

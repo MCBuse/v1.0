@@ -52,7 +52,7 @@ secrets into the portal service.
 
 For the custom-domain release, configure the portal with
 `MCBUSE_API_URL=https://api.mcbuse.com/api/v1`,
-`PORTAL_ORIGIN=https://merchant.mcbuse.com`, and `PORTAL_ORIGINS` containing
+`MCBUSE_PORTAL_ORIGIN=https://merchant.mcbuse.com`, and `PORTAL_ORIGINS` containing
 both that URL and the generated Cloud Run portal URL. Stripe continues to use
 its existing regional Cloud Run webhook URL; it is an official alias of the
 same API service and remains covered by the readiness check.
