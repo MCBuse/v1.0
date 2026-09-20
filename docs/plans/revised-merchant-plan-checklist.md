@@ -88,8 +88,8 @@ therefore new work, not a configuration change.
 | O.5 | Resume from last confirmed step after timeout or restart | built | L — `OperationRunnerService` dispatches on the stored status every 15s |
 | O.6 | Keep uncertain transactions pending while reconciling; never blindly resend | built | L — state machine has no `resend_chain` action; test asserts it for every kind and status |
 | O.7 | Finalize balances exactly once | built | L — `recordOnce` keyed by operation id; concurrent finalize writes one entry |
-| O.8 | Restore funds only after confirmed reversal or compensating transfer | built | L — failure after value moved is refused; compensation path tested |
-| O.9 | Record late provider failures or reversals without rewriting history | built | L — append-only event log; test asserts the full status history survives compensation |
+| O.8 | Restore funds only after confirmed reversal or compensating transfer | verified | D — payout failure holds the balance until the treasury's return confirms on chain, then releases |
+| O.9 | Record late provider failures or reversals without rewriting history | verified | D — 9-event log across the compensated withdrawal, every step intact |
 | O.10 | Top-ups, internal transfers and withdrawals are account movements, not merchant sales | built | L — these flows write ledger entries only; no merchant transaction is created |
 | O.11 | Recorded physical cash never increases digital wallet balances | built | L — cash sales write merchant records only |
 
@@ -118,17 +118,17 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| F.1 | Debit card → Holding via Stripe-hosted Checkout, then devnet treasury funds Holding | built | L + S — `AccountFundingService`; treasury delivery is a separate confirmed step. Needs a completed sandbox Checkout to verify |
+| F.1 | Debit card → Holding via Stripe-hosted Checkout, then devnet treasury funds Holding | verified | S + D — `cs_test_a1dPonXN…` paid USD 5.00; devnet `8F7Hxzba…` treasury 12.6→7.6, wallet 0→5; Holding credited 500c in 11s |
 | F.2 | Bank → Holding via USD ACH Direct Debit, pending until success, then treasury funds Holding | built | L + S — same service with `us_bank_account`; only `payment_status=paid` advances |
 | F.3 | Holding → Routine: reserve, transfer test USDC between wallets, finalize once | verified | D — devnet suite moves 0.25 USDC; ledger and chain agree; repeated finalize writes no second entry |
 | F.4 | Customer Routine → merchant Routine on devnet, with matching receipts | in-progress | Flow exists; has only ever run on the mock provider |
 | F.5 | Merchant Routine → Holding, merchant-confirmed, with day-end option | not-started | — |
-| F.6 | Holding → bank: reserve, return USDC to treasury, then Stripe sandbox payout | built | L — `AccountWithdrawalService` in that order. Needs an end-to-end sandbox run to verify |
-| F.7 | Holding → debit card: same sequence to an eligible debit-card destination | built | L — same path, instant method for card destinations |
+| F.6 | Holding → bank: reserve, return USDC to treasury, then Stripe sandbox payout | verified | D + S — chain `3JejC2yM…` returns tokens first (providerRef still null), then payout `po_1UHsax8O…` USD 0.25 |
+| F.7 | Holding → debit card: same sequence to an eligible debit-card destination | verified | S — `card_1UHr6Z8O…` routes to `withdrawal_card` with instant payout method |
 | F.8 | Treasury transfer explicit in implementation and in evidence | verified | D — `5Aex8rYv…` moved treasury 20 → 18.5 USDC; funding and withdrawal both route through the treasury explicitly |
-| F.9 | Payout destinations and capabilities retrieved from Stripe | built | L — `PayoutDestinationsService` reads account, external accounts and balance live |
+| F.9 | Payout destinations and capabilities retrieved from Stripe | verified | S — live read of `acct_1UHr638O`: 3 destinations, payoutsEnabled, balances, no outstanding requirements |
 | F.10 | Incomplete onboarding, ineligible destination, insufficient provider balance are real states | built | L — each is a named state with a reason; none is substituted with success |
-| F.11 | An unavailable provider route is never replaced by unlabeled simulated success | built | L — funding refuses up front when the treasury cannot cover it; withdrawal refuses an ineligible destination |
+| F.11 | An unavailable provider route is never replaced by unlabeled simulated success | verified | S — a USD 25 funding request was refused live: "Treasury holds 16500000 USDC base units; 25000000 are required" |
 | F.12 | Bank funding treated as asynchronous; redirect is not settlement | built | L — only `payment_status=paid` advances; `async_payment_failed` fails the operation |
 | F.13 | Sandbox conversion fixed at 1 USD per test USDC | verified | L — `operation-money.ts`; any other configured rate is refused, not silently applied |
 | F.14 | Quoted EUR conversion preserved for merchant purchases | built | L — `quoteRateScaled` snapshot on payment requests |
@@ -279,14 +279,14 @@ therefore new work, not a configuration change.
 | ID | Check | Status |
 | --- | --- | --- |
 | X.1 | Concurrent operations | not-started |
-| X.2 | Insufficient funds | in-progress |
-| X.3 | Duplicate submissions | in-progress |
+| X.2 | Insufficient funds | verified (L + D) — refused for transfer and withdrawal; concurrent reservations never overdraw |
+| X.3 | Duplicate submissions | verified (L) — idempotent replay, conflicting reuse refused, 4-way race yields one record |
 | X.4 | Unauthorized cross-merchant access | in-progress |
 | X.5 | Blockchain timeout, restart, reconciliation without duplicate transfer | in-progress |
 | X.6 | Stripe delayed success | not-started |
 | X.7 | Stripe failure | not-started |
-| X.8 | Duplicate Stripe webhooks | in-progress |
-| X.9 | Payout failure after token movement | not-started |
+| X.8 | Duplicate Stripe webhooks | built (L) — events persisted by id; redelivery recognised, differing body refused |
+| X.9 | Payout failure after token movement | verified (D) — also found a real bug: a compensating operation could be declared failed, stranding the reservation |
 | X.10 | Ledger and token reconciliation and recovery | not-started |
 | X.11 | Key-version migration and backup restoration | not-started |
 | X.12 | Secrets excluded from responses and logs | not-started |
@@ -302,7 +302,7 @@ therefore new work, not a configuration change.
 | ID | Scenario | Status |
 | --- | --- | --- |
 | M.1 | Both accounts visible and accurate | not-started |
-| M.2 | Card funding into Holding | not-started |
+| M.2 | Card funding into Holding | verified (S + D) — real hosted Checkout paid, tokens delivered, balance credited |
 | M.3 | Bank funding into Holding | not-started |
 | M.4 | Holding → Routine transfer | not-started |
 | M.5 | Product invoice created on desktop | not-started |

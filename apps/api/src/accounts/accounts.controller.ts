@@ -18,6 +18,8 @@ import { AccountSummaryService } from './account-summary.service';
 import { AccountTransferService } from './account-transfer.service';
 import { AccountWithdrawalService } from './account-withdrawal.service';
 import { PayoutDestinationsService } from './payout-destinations.service';
+import { DayEndService } from './day-end.service';
+import { ConfirmDayEndDto } from './dto/day-end.dto';
 import {
   StartFundingDto,
   StartTransferDto,
@@ -56,6 +58,7 @@ export class AccountsController {
     private readonly withdrawals: AccountWithdrawalService,
     private readonly destinations: PayoutDestinationsService,
     private readonly operations: FinancialOperationsService,
+    private readonly dayEnd: DayEndService,
   ) {}
 
   @Get()
@@ -115,6 +118,28 @@ export class AccountsController {
       destinationId: dto.destinationId,
       amountCents: parseCents(dto.amountCents),
       idempotencyKey: requireIdempotencyKey(idempotencyKey),
+    });
+  }
+
+  @Get('day-end')
+  async dayEndView(
+    @CurrentUser() user: { id: string },
+    @Query('businessDate') businessDate?: string,
+  ) {
+    return this.dayEnd.view(user.id, businessDate);
+  }
+
+  @Post('day-end')
+  async confirmDayEnd(
+    @CurrentUser() user: { id: string },
+    @Body() dto: ConfirmDayEndDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.dayEnd.confirm({
+      userId: user.id,
+      amountCents: parseCents(dto.amountCents),
+      idempotencyKey: requireIdempotencyKey(idempotencyKey),
+      businessDate: dto.businessDate,
     });
   }
 

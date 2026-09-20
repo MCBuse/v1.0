@@ -13,6 +13,7 @@ import { AccountWithdrawalService } from './account-withdrawal.service';
 import { OperationRunnerService } from './operation-runner.service';
 import { PayoutDestinationsService } from './payout-destinations.service';
 import { AccountsWebhookService } from './accounts-webhook.service';
+import { DayEndService } from './day-end.service';
 import { ProviderWebhookService } from '../financial-operations/provider-webhook.service';
 
 @Module({
@@ -29,6 +30,7 @@ import { ProviderWebhookService } from '../financial-operations/provider-webhook
     OperationRunnerService,
     ProviderWebhookService,
     AccountsWebhookService,
+    DayEndService,
   ],
   exports: [
     AccountWalletsService,
@@ -38,6 +40,7 @@ import { ProviderWebhookService } from '../financial-operations/provider-webhook
     PayoutDestinationsService,
     OperationLedgerService,
     AccountsWebhookService,
+    DayEndService,
   ],
 })
 export class AccountsModule {}
