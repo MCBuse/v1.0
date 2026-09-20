@@ -60,25 +60,25 @@ export class AccountsController {
 
   @Get()
   async accounts(
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: { id: string },
     @Query('timezone') timezone?: string,
   ) {
-    return this.summary.forUser(userId, { timezone });
+    return this.summary.forUser(user.id, { timezone });
   }
 
   @Get('payout-destinations')
-  async payoutDestinations(@CurrentUser('id') userId: string) {
-    return this.destinations.capability(userId);
+  async payoutDestinations(@CurrentUser() user: { id: string }) {
+    return this.destinations.capability(user.id);
   }
 
   @Post('funding')
   async startFunding(
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: { id: string },
     @Body() dto: StartFundingDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     return this.funding.startFunding({
-      userId,
+      userId: user.id,
       method: dto.method,
       amountCents: parseCents(dto.amountCents),
       idempotencyKey: requireIdempotencyKey(idempotencyKey),
@@ -89,12 +89,12 @@ export class AccountsController {
 
   @Post('transfers')
   async startTransfer(
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: { id: string },
     @Body() dto: StartTransferDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     return this.transfers.startTransfer({
-      userId,
+      userId: user.id,
       from: dto.from,
       to: dto.to,
       amountCents: parseCents(dto.amountCents),
@@ -106,12 +106,12 @@ export class AccountsController {
 
   @Post('withdrawals')
   async startWithdrawal(
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: { id: string },
     @Body() dto: StartWithdrawalDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     return this.withdrawals.startWithdrawal({
-      userId,
+      userId: user.id,
       destinationId: dto.destinationId,
       amountCents: parseCents(dto.amountCents),
       idempotencyKey: requireIdempotencyKey(idempotencyKey),
@@ -119,15 +119,18 @@ export class AccountsController {
   }
 
   @Get('operations')
-  async listOperations(@CurrentUser('id') userId: string) {
-    const operations = await this.operations.listForUser(userId, 50);
+  async listOperations(@CurrentUser() user: { id: string }) {
+    const operations = await this.operations.listForUser(user.id, 50);
     return { operations: operations.map((o) => this.present(o)) };
   }
 
   @Get('operations/:id')
-  async operation(@CurrentUser('id') userId: string, @Param('id') id: string) {
+  async operation(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
     const operation = await this.operations.require(id);
-    if (operation.userId !== userId) {
+    if (operation.userId !== user.id) {
       // Same shape as a missing record: a caller must not be able to probe for
       // other people's operation ids.
       throw new BadRequestException('Operation not found');

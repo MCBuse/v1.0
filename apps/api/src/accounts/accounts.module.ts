@@ -12,6 +12,8 @@ import { AccountWalletsService } from './account-wallets.service';
 import { AccountWithdrawalService } from './account-withdrawal.service';
 import { OperationRunnerService } from './operation-runner.service';
 import { PayoutDestinationsService } from './payout-destinations.service';
+import { AccountsWebhookService } from './accounts-webhook.service';
+import { ProviderWebhookService } from '../financial-operations/provider-webhook.service';
 
 @Module({
   imports: [ConfigModule, StripeModule, TreasuryModule, RatesModule],
@@ -25,6 +27,8 @@ import { PayoutDestinationsService } from './payout-destinations.service';
     AccountWithdrawalService,
     PayoutDestinationsService,
     OperationRunnerService,
+    ProviderWebhookService,
+    AccountsWebhookService,
   ],
   exports: [
     AccountWalletsService,
@@ -33,6 +37,7 @@ import { PayoutDestinationsService } from './payout-destinations.service';
     AccountWithdrawalService,
     PayoutDestinationsService,
     OperationLedgerService,
+    AccountsWebhookService,
   ],
 })
 export class AccountsModule {}

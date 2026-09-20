@@ -123,7 +123,8 @@ export class AccountWithdrawalService {
     };
   }
 
-  async reserve(operation: FinancialOperation): Promise<void> {
+  async reserve(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'created') return;
     try {
       await this.ledger.transaction(async (tx) => {
@@ -149,7 +150,8 @@ export class AccountWithdrawalService {
   }
 
   /** Returns the tokens to the treasury before any fiat is promised. */
-  async returnTokensToTreasury(operation: FinancialOperation): Promise<void> {
+  async returnTokensToTreasury(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'reserved') return;
 
     const treasuryAddress = this.treasury.address;
@@ -223,7 +225,8 @@ export class AccountWithdrawalService {
    * From here on the tokens are already gone, so any failure has to be
    * compensated rather than declared.
    */
-  async submitPayout(operation: FinancialOperation): Promise<void> {
+  async submitPayout(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'chain_confirmed') return;
 
     const amountCents = Number(
@@ -359,7 +362,8 @@ export class AccountWithdrawalService {
   }
 
   /** Records the completed withdrawal once the payout has actually settled. */
-  async finalize(operation: FinancialOperation): Promise<void> {
+  async finalize(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'payout_settled') return;
 
     const ledgerEntryId = await this.ledger.transaction(async (tx) => {
@@ -402,7 +406,8 @@ export class AccountWithdrawalService {
    * returned to the treasury. The balance is only restored after the treasury's
    * compensating transfer is confirmed on chain.
    */
-  async completeCompensation(operation: FinancialOperation): Promise<void> {
+  async completeCompensation(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'compensating') return;
 
     const walletAddress = await this.wallets.addressOf(

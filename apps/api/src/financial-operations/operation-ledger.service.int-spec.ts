@@ -58,8 +58,18 @@ describe('OperationLedgerService (integration)', () => {
     routineWalletId = wallets.find((w) => w.type === 'routine')!.id;
 
     await db.insert(schema.balances).values([
-      { walletId: holdingWalletId, currency: 'USDC', available: 0n, pending: 0n },
-      { walletId: routineWalletId, currency: 'USDC', available: 0n, pending: 0n },
+      {
+        walletId: holdingWalletId,
+        currency: 'USDC',
+        available: 0n,
+        pending: 0n,
+      },
+      {
+        walletId: routineWalletId,
+        currency: 'USDC',
+        available: 0n,
+        pending: 0n,
+      },
     ]);
   });
 
@@ -71,7 +81,9 @@ describe('OperationLedgerService (integration)', () => {
     }
     await db
       .delete(schema.balances)
-      .where(inArray(schema.balances.walletId, [holdingWalletId, routineWalletId]));
+      .where(
+        inArray(schema.balances.walletId, [holdingWalletId, routineWalletId]),
+      );
     await db
       .delete(schema.wallets)
       .where(inArray(schema.wallets.id, [holdingWalletId, routineWalletId]));
@@ -79,11 +91,7 @@ describe('OperationLedgerService (integration)', () => {
     await pool.end();
   });
 
-  async function setBalance(
-    walletId: string,
-    available: bigint,
-    pending = 0n,
-  ) {
+  async function setBalance(walletId: string, available: bigint, pending = 0n) {
     await db
       .update(schema.balances)
       .set({ available, pending })

@@ -24,6 +24,7 @@ import { FinancialOperationsService } from '../financial-operations/financial-op
 import { OperationLedgerService } from '../financial-operations/operation-ledger.service';
 import { AccountWalletsService } from './account-wallets.service';
 import { AccountTransferService } from './account-transfer.service';
+import { sweepBackToTreasury } from './testing/devnet-sweep';
 
 const TRANSFER_USD_CENTS = 25n; // 0.25 USDC — small enough to repeat cheaply
 
@@ -42,6 +43,7 @@ describe('account transfer on devnet', () => {
   let holdingAddress: string;
   let routineAddress: string;
   const operationIds: string[] = [];
+  const throwawayKeypairs: Keypair[] = [];
 
   beforeAll(async () => {
     const connection = await connectTestDatabase();
@@ -88,6 +90,7 @@ describe('account transfer on devnet', () => {
 
     const holdingKeypair = Keypair.generate();
     const routineKeypair = Keypair.generate();
+    throwawayKeypairs.push(holdingKeypair, routineKeypair);
     holdingAddress = holdingKeypair.publicKey.toBase58();
     routineAddress = routineKeypair.publicKey.toBase58();
 
@@ -140,6 +143,15 @@ describe('account transfer on devnet', () => {
   }, 180_000);
 
   afterAll(async () => {
+    const swept = await sweepBackToTreasury(
+      solana,
+      treasury,
+      throwawayKeypairs,
+    );
+    if (swept.length) {
+      console.log(`returned ${swept.length} test balance(s) to the treasury`);
+    }
+
     const walletIds = [holdingWalletId, routineWalletId];
 
     // Clean up by wallet reference, not by the ids the tests happened to

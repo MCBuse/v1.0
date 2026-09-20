@@ -100,7 +100,8 @@ export class AccountTransferService {
   }
 
   /** Holds the funds before anything is signed. */
-  async reserve(operation: FinancialOperation): Promise<void> {
+  async reserve(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'created') return;
     if (!operation.sourceWalletId) {
       throw new Error(`Transfer ${operation.id} has no source account`);
@@ -131,7 +132,8 @@ export class AccountTransferService {
   }
 
   /** Signs and broadcasts the wallet-to-wallet transfer. */
-  async submitChainTransfer(operation: FinancialOperation): Promise<void> {
+  async submitChainTransfer(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'reserved') return;
     if (!operation.sourceWalletId || !operation.destinationWalletId) {
       throw new Error(`Transfer ${operation.id} is missing an account`);
@@ -200,7 +202,8 @@ export class AccountTransferService {
   }
 
   /** Settles the reservation and credits the destination, exactly once. */
-  async finalize(operation: FinancialOperation): Promise<void> {
+  async finalize(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'chain_confirmed') return;
 
     const ledgerEntryId = await this.ledger.transaction(async (tx) => {

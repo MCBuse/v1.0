@@ -238,7 +238,10 @@ export class AccountFundingService {
    * Delivers the tokens a settled collection is owed. Safe to call repeatedly:
    * it only acts on the step the operation is actually at.
    */
-  async deliverTokens(operation: FinancialOperation): Promise<void> {
+  async deliverTokens(stale: FinancialOperation): Promise<void> {
+    // Always work from the stored status: a caller may be holding a snapshot
+    // taken before another worker moved this operation on.
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'collection_settled') return;
     if (!operation.destinationWalletId) {
       throw new Error(`Funding operation ${operation.id} has no destination`);
@@ -301,7 +304,8 @@ export class AccountFundingService {
   }
 
   /** Credits the Holding balance, exactly once, after the chain confirmed. */
-  async finalize(operation: FinancialOperation): Promise<void> {
+  async finalize(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
     if (operation.status !== 'chain_confirmed') return;
     if (!operation.destinationWalletId) {
       throw new Error(`Funding operation ${operation.id} has no destination`);
