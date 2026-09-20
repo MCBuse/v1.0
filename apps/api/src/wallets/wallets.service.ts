@@ -38,12 +38,14 @@ export class WalletsService {
             type: 'savings',
             solanaPubkey: savings.publicKey,
             encryptedKeypair: savings.encryptedKeypair,
+            encryptionKeyVersion: savings.encryptionKeyVersion,
           },
           {
             userId,
             type: 'routine',
             solanaPubkey: routine.publicKey,
             encryptedKeypair: routine.encryptedKeypair,
+            encryptionKeyVersion: routine.encryptionKeyVersion,
           },
         ])
         .returning({

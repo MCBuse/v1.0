@@ -112,6 +112,25 @@ export class EnvironmentVariables {
   @IsString()
   SOLANA_KEYPAIR_ENCRYPTION_KEY: string;
 
+  /** Additional wallet-encryption key versions, retained until rotation is verified. */
+  @IsOptional()
+  @IsString()
+  SOLANA_KEYPAIR_ENCRYPTION_KEY_V2?: string;
+
+  @IsOptional()
+  @IsString()
+  SOLANA_KEYPAIR_ENCRYPTION_KEY_V3?: string;
+
+  /** Which key version seals newly written wallet records. Defaults to the highest. */
+  @IsOptional()
+  @IsString()
+  SOLANA_KEYPAIR_ENCRYPTION_KEY_CURRENT?: string;
+
+  /** Devnet treasury signing key, held separately from the wallet-encryption keys. */
+  @IsOptional()
+  @IsString()
+  SOLANA_TREASURY_SECRET_KEY?: string;
+
   @IsString()
   ONRAMP_PROVIDER: string;
 

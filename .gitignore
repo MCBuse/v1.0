@@ -42,3 +42,6 @@ backups/
 # Generated finance-package acceptance artifacts can contain merchant evidence.
 output/merchant-finance-smtp-acceptance/
 output/merchant-finance-custom-domain-acceptance/
+
+# Local devnet treasury key material (never committed)
+.secrets/

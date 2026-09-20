@@ -30,7 +30,12 @@
     "merchant:week2-smoke": "node scripts/merchant-week2-smoke.mjs",
     "merchant:week2-recovery-smoke": "WEEK2_MANAGED_API=true node scripts/merchant-week2-smoke.mjs",
     "merchant:analytics-worker": "node dist/src/analytics-intelligence/worker.js",
-    "merchant:analytics-load": "ts-node src/analytics-intelligence/merchant-insights.load.ts"
+    "merchant:analytics-load": "ts-node src/analytics-intelligence/merchant-insights.load.ts",
+    "test:integration": "jest --config ./jest-integration.json --runInBand --watchman=false",
+    "wallets:key-status": "ts-node src/solana/rotate-wallet-keys.cli.ts status",
+    "wallets:key-rotate": "ts-node src/solana/rotate-wallet-keys.cli.ts rotate",
+    "wallets:key-verify": "ts-node src/solana/rotate-wallet-keys.cli.ts verify",
+    "treasury:status": "ts-node src/treasury/treasury-readiness.cli.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.1.0",
