@@ -1,5 +1,6 @@
 import {
   OPERATION_KINDS,
+  OPERATION_STATUSES,
   OperationKind,
   OperationStatus,
   canTransition,
@@ -155,6 +156,36 @@ describe('financial operation state machine', () => {
     it('refuses to reverse straight from compensation to finalized', () => {
       expect(
         canTransition('withdrawal_bank', 'compensating', 'finalized'),
+      ).toBe(false);
+    });
+
+    it('refuses to declare a compensating operation simply failed', () => {
+      // Value has already moved by the time compensation starts. Allowing a
+      // plain failure here would strand the reservation with nothing left to
+      // return it.
+      expect(canTransition('withdrawal_bank', 'compensating', 'failed')).toBe(
+        false,
+      );
+      expect(canTransition('withdrawal_card', 'compensating', 'failed')).toBe(
+        false,
+      );
+      expect(canTransition('funding_card', 'compensating', 'failed')).toBe(
+        false,
+      );
+    });
+
+    it('allows only a reversal out of compensation, for every kind', () => {
+      for (const kind of OPERATION_KINDS) {
+        const allowed = OPERATION_STATUSES.filter((to) =>
+          canTransition(kind, 'compensating', to),
+        );
+        expect(allowed).toEqual(['reversed']);
+      }
+    });
+
+    it('refuses to re-enter compensation from compensation', () => {
+      expect(
+        canTransition('withdrawal_bank', 'compensating', 'compensating'),
       ).toBe(false);
     });
 

@@ -308,6 +308,23 @@ describe('FinancialOperationsService (integration)', () => {
       expect(reversed.status).toBe('reversed');
     });
 
+    it('refuses to declare a compensating operation failed', async () => {
+      const { operation } = await begin({ kind: 'withdrawal_bank' });
+      await service.advance(operation.id, 'reserved');
+      await service.advance(operation.id, 'chain_submitted');
+      await service.advance(operation.id, 'chain_confirmed');
+      await service.beginCompensation(operation.id, 'payout_failed');
+
+      // Tokens have moved and the reservation is still held. Failing here
+      // would strand those funds with no compensation left to run.
+      await expect(service.fail(operation.id, 'payout_failed')).rejects.toThrow(
+        /compensat/i,
+      );
+
+      const still = await service.require(operation.id);
+      expect(still.status).toBe('compensating');
+    });
+
     it('keeps the whole history rather than rewriting the failed step', async () => {
       const { operation } = await begin({ kind: 'withdrawal_bank' });
       await service.advance(operation.id, 'reserved');

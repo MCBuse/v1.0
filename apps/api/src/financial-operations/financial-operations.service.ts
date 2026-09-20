@@ -16,7 +16,6 @@ import {
 import {
   canTransition,
   isTerminal,
-  movesValueIrreversibly,
   resumeAction,
   type OperationKind,
   type OperationStatus,
@@ -213,16 +212,19 @@ export class FinancialOperationsService {
   ): Promise<FinancialOperation> {
     const current = await this.require(operationId);
     const from = current.status as OperationStatus;
+    const kind = current.kind as OperationKind;
 
-    if (movesValueIrreversibly(from)) {
+    // The state machine is the single authority on what is legal. Repeating
+    // its rules here by hand is how `compensating` slipped through once.
+    if (!canTransition(kind, from, 'failed')) {
+      if (isTerminal(from)) {
+        throw new BadRequestException(
+          `Operation is already ${from} and cannot be failed`,
+        );
+      }
       throw new BadRequestException(
-        `A ${current.kind} operation at ${from} has already moved value; ` +
+        `A ${kind} operation at ${from} has already moved value; ` +
           'it must be compensated rather than failed',
-      );
-    }
-    if (isTerminal(from)) {
-      throw new BadRequestException(
-        `Operation is already ${from} and cannot be failed`,
       );
     }
 

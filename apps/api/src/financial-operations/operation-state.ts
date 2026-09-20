@@ -138,9 +138,13 @@ export function canTransition(
   to: OperationStatus,
 ): boolean {
   if (isTerminal(from)) return false;
+  // Compensation is checked first and on its own. By the time an operation is
+  // compensating, value has definitively moved: the only way out is a
+  // completed reversal. Letting it be declared "failed" here would leave the
+  // reservation stranded with nothing left to return it.
+  if (from === 'compensating') return to === 'reversed';
   if (to === 'failed') return !movesValueIrreversibly(from);
   if (to === 'compensating') return movesValueIrreversibly(from);
-  if (from === 'compensating') return to === 'reversed';
   if (to === 'reversed') return false;
   return nextStatus(kind, from) === to;
 }
