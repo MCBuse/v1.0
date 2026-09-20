@@ -45,9 +45,9 @@ Code presence, a passing mock, or an initiated deployment never counts.
 | S1.16 | Standard payout to bank executes | verified | S — `po_1UHr7O8OsVu9qy2oHVAoL1c8`, USD 5.00, `method: standard`, status pending |
 | S1.17 | Hosted Checkout accepts card collection | verified | S — `cs_test_a148M4G89V6XEZvYzbyj9OjI4NXm3yLAzMuOZLjBJPq1u0c6NuxAZ9AYdm` |
 | S1.18 | Hosted Checkout accepts ACH Direct Debit collection | verified | S — `cs_test_a1Llg2Kg8aXmqqWT2VEdoonbaSE9I8qpiWH2W2uUvUMjps2TH0GAPWg1te` |
-| S1.8 | Devnet treasury keypair exists and is separately protected | built | Address `82ihqmVixpNYoqJDrGPSexJ6kV2JP8Mis38pAnzzXqV4`; secret held in gitignored `.secrets/`, never committed |
-| S1.9 | Devnet treasury holds SOL for network fees | blocked | Public devnet faucet returned HTTP 429; needs an alternative source |
-| S1.10 | Devnet treasury holds test USDC | blocked | Circle faucet requires reCAPTCHA; no programmatic route |
+| S1.8 | Devnet treasury keypair exists and is separately protected | built | L — `82ihqmVixpNYoqJDrGPSexJ6kV2JP8Mis38pAnzzXqV4`, loaded from `SOLANA_TREASURY_SECRET_KEY`, secret gitignored and never committed |
+| S1.9 | Devnet treasury holds SOL for network fees | blocked | 0 lamports. RPC airdrop still HTTP 429; needs faucet.solana.com (Devnet). `pnpm --filter api treasury:status` reports this |
+| S1.10 | Devnet treasury holds test USDC | verified | D — 20.000000 USDC at token account `Ci77zxoSMX9KZh44MbngJWT6gG48kXiLEf4Mc4phJNZv` (funded by Fred) |
 | S1.11 | Hosted API reachable and healthy | verified | H — `api.mcbuse.com/api/v1/health` = ok, database ok |
 | S1.12 | Deployment credentials available | verified | H — gcloud authenticated on `mcbuse-hackathon-2026-fno` |
 | S1.13 | Hosted transfer provider currently `mock` | verified | H — Cloud Run env `TRANSFER_PROVIDER=mock`; no devnet USDC has ever moved |
@@ -65,15 +65,15 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| K.1 | Preserve existing wallet addresses and encrypted private keys | not-started | — |
-| K.2 | Signing stays server-side; clients receive only public wallet data | not-started | — |
+| K.1 | Preserve existing wallet addresses and encrypted private keys | verified | L — all 8 existing wallets decrypt and derive their stored address; migration 0023 is additive |
+| K.2 | Signing stays server-side; clients receive only public wallet data | built | L — `wallets.service.ts` never selects `encryptedKeypair` into a response |
 | K.3 | Validate owner, amount, currency, destination, operation state before signing | not-started | — |
-| K.4 | Separately protected devnet treasury key | not-started | — |
-| K.5 | Treasury-managed SOL funding so users never obtain fee tokens | not-started | — |
-| K.6 | Encryption-key version references on wallet records | not-started | — |
-| K.7 | Controlled re-encryption to a new key version | not-started | — |
-| K.8 | Old key versions retained until migration and recovery checks pass | not-started | — |
-| K.9 | Restore encrypted wallet records with the correct key version (tested) | not-started | — |
+| K.4 | Separately protected devnet treasury key | built | L — `SOLANA_TREASURY_SECRET_KEY`, distinct from the wallet-encryption keys; refuses to fall back to a user wallet |
+| K.5 | Treasury-managed SOL funding so users never obtain fee tokens | built | L — `TreasuryService.ensureFeeFunding` plus treasury-as-fee-payer in `spl-transfer.ts`. Unproven until the treasury holds SOL |
+| K.6 | Encryption-key version references on wallet records | verified | L — `wallets.encryption_key_version`, plus a version tag inside each new payload |
+| K.7 | Controlled re-encryption to a new key version | verified | L — `wallets:key-rotate` with dry-run; integration test rotates v1 to v2 preserving every address |
+| K.8 | Old key versions retained until migration and recovery checks pass | verified | L — integration test proves a restored v1 record fails recovery once v1 is dropped and passes while retained |
+| K.9 | Restore encrypted wallet records with the correct key version (tested) | verified | L — `wallets:key-verify`; 8/8 local wallets pass |
 | K.10 | Audit authorizations and signatures without logging secrets | not-started | — |
 | K.11 | Devnet credentials separated from any future production environment | not-started | — |
 
@@ -81,15 +81,15 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| O.1 | Durable operation records for reservations, chain submission/finality, Stripe transfers, payouts, recovery | not-started | Exists only for customer→merchant payments (`merchant_payment_attempts`) |
+| O.1 | Durable operation records for reservations, chain submission/finality, Stripe transfers, payouts, recovery | built | L — `financial_operations` + event log; 18 integration tests |
 | O.2 | Stable client idempotency keys accepted | in-progress | Present for merchant payments, cash sales, imports, finance packages; absent for funding/withdrawal/internal transfer |
 | O.3 | Reuse with different inputs rejected | in-progress | Same coverage as O.2 |
-| O.4 | Persist prepared blockchain signatures and provider references | in-progress | `submittedSignature` exists for merchant payments only |
+| O.4 | Persist prepared blockchain signatures and provider references | built | L — signature derived and persisted before broadcast in `spl-transfer.ts` |
 | O.5 | Resume from last confirmed step after timeout or restart | in-progress | 30s reconciler exists for merchant payments only |
-| O.6 | Keep uncertain transactions pending while reconciling; never blindly resend | in-progress | Same coverage as O.5 |
-| O.7 | Finalize balances exactly once | in-progress | Enforced for merchant payments; not for the new flows |
-| O.8 | Restore funds only after confirmed reversal or compensating transfer | not-started | — |
-| O.9 | Record late provider failures or reversals without rewriting history | not-started | — |
+| O.6 | Keep uncertain transactions pending while reconciling; never blindly resend | built | L — state machine has no `resend_chain` action; test asserts it for every kind and status |
+| O.7 | Finalize balances exactly once | built | L — `recordOnce` keyed by operation id; concurrent finalize writes one entry |
+| O.8 | Restore funds only after confirmed reversal or compensating transfer | built | L — failure after value moved is refused; compensation path tested |
+| O.9 | Record late provider failures or reversals without rewriting history | built | L — append-only event log; test asserts the full status history survives compensation |
 | O.10 | Top-ups, internal transfers and withdrawals are account movements, not merchant sales | not-started | — |
 | O.11 | Recorded physical cash never increases digital wallet balances | built | L — cash sales write merchant records only |
 
