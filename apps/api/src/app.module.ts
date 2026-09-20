@@ -28,6 +28,7 @@ import { ChainWatcherModule } from './chain-watcher/chain-watcher.module';
 import { DataCaptureModule } from './data-capture/data-capture.module';
 import { TreasuryModule } from './treasury/treasury.module';
 import { FinancialOperationsModule } from './financial-operations/financial-operations.module';
+import { AccountsModule } from './accounts/accounts.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { FinancialOperationsModule } from './financial-operations/financial-oper
     RatesModule,
     ChainWatcherModule,
     DataCaptureModule,
+    AccountsModule,
   ],
   controllers: [AppController],
   providers: [

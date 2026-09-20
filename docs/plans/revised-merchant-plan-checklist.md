@@ -46,7 +46,7 @@ Code presence, a passing mock, or an initiated deployment never counts.
 | S1.17 | Hosted Checkout accepts card collection | verified | S — `cs_test_a148M4G89V6XEZvYzbyj9OjI4NXm3yLAzMuOZLjBJPq1u0c6NuxAZ9AYdm` |
 | S1.18 | Hosted Checkout accepts ACH Direct Debit collection | verified | S — `cs_test_a1Llg2Kg8aXmqqWT2VEdoonbaSE9I8qpiWH2W2uUvUMjps2TH0GAPWg1te` |
 | S1.8 | Devnet treasury keypair exists and is separately protected | built | L — `82ihqmVixpNYoqJDrGPSexJ6kV2JP8Mis38pAnzzXqV4`, loaded from `SOLANA_TREASURY_SECRET_KEY`, secret gitignored and never committed |
-| S1.9 | Devnet treasury holds SOL for network fees | blocked | 0 lamports. RPC airdrop still HTTP 429; needs faucet.solana.com (Devnet). `pnpm --filter api treasury:status` reports this |
+| S1.9 | Devnet treasury holds SOL for network fees | verified | D — 10.000000000 SOL (funded by Fred at faucet.solana.com) |
 | S1.10 | Devnet treasury holds test USDC | verified | D — 20.000000 USDC at token account `Ci77zxoSMX9KZh44MbngJWT6gG48kXiLEf4Mc4phJNZv` (funded by Fred) |
 | S1.11 | Hosted API reachable and healthy | verified | H — `api.mcbuse.com/api/v1/health` = ok, database ok |
 | S1.12 | Deployment credentials available | verified | H — gcloud authenticated on `mcbuse-hackathon-2026-fno` |
@@ -67,9 +67,9 @@ therefore new work, not a configuration change.
 | --- | --- | --- | --- |
 | K.1 | Preserve existing wallet addresses and encrypted private keys | verified | L — all 8 existing wallets decrypt and derive their stored address; migration 0023 is additive |
 | K.2 | Signing stays server-side; clients receive only public wallet data | built | L — `wallets.service.ts` never selects `encryptedKeypair` into a response |
-| K.3 | Validate owner, amount, currency, destination, operation state before signing | not-started | — |
+| K.3 | Validate owner, amount, currency, destination, operation state before signing | built | L — owner, amount and decrypted-key/address match are all checked before signing in transfer and withdrawal |
 | K.4 | Separately protected devnet treasury key | built | L — `SOLANA_TREASURY_SECRET_KEY`, distinct from the wallet-encryption keys; refuses to fall back to a user wallet |
-| K.5 | Treasury-managed SOL funding so users never obtain fee tokens | built | L — `TreasuryService.ensureFeeFunding` plus treasury-as-fee-payer in `spl-transfer.ts`. Unproven until the treasury holds SOL |
+| K.5 | Treasury-managed SOL funding so users never obtain fee tokens | verified | D — transfer `Hf64i2ug…` succeeded with both user wallets at 0 lamports; fee payer on chain is the treasury |
 | K.6 | Encryption-key version references on wallet records | verified | L — `wallets.encryption_key_version`, plus a version tag inside each new payload |
 | K.7 | Controlled re-encryption to a new key version | verified | L — `wallets:key-rotate` with dry-run; integration test rotates v1 to v2 preserving every address |
 | K.8 | Old key versions retained until migration and recovery checks pass | verified | L — integration test proves a restored v1 record fails recovery once v1 is dropped and passes while retained |
@@ -85,12 +85,12 @@ therefore new work, not a configuration change.
 | O.2 | Stable client idempotency keys accepted | in-progress | Present for merchant payments, cash sales, imports, finance packages; absent for funding/withdrawal/internal transfer |
 | O.3 | Reuse with different inputs rejected | in-progress | Same coverage as O.2 |
 | O.4 | Persist prepared blockchain signatures and provider references | built | L — signature derived and persisted before broadcast in `spl-transfer.ts` |
-| O.5 | Resume from last confirmed step after timeout or restart | in-progress | 30s reconciler exists for merchant payments only |
+| O.5 | Resume from last confirmed step after timeout or restart | built | L — `OperationRunnerService` dispatches on the stored status every 15s |
 | O.6 | Keep uncertain transactions pending while reconciling; never blindly resend | built | L — state machine has no `resend_chain` action; test asserts it for every kind and status |
 | O.7 | Finalize balances exactly once | built | L — `recordOnce` keyed by operation id; concurrent finalize writes one entry |
 | O.8 | Restore funds only after confirmed reversal or compensating transfer | built | L — failure after value moved is refused; compensation path tested |
 | O.9 | Record late provider failures or reversals without rewriting history | built | L — append-only event log; test asserts the full status history survives compensation |
-| O.10 | Top-ups, internal transfers and withdrawals are account movements, not merchant sales | not-started | — |
+| O.10 | Top-ups, internal transfers and withdrawals are account movements, not merchant sales | built | L — these flows write ledger entries only; no merchant transaction is created |
 | O.11 | Recorded physical cash never increases digital wallet balances | built | L — cash sales write merchant records only |
 
 ---
@@ -101,38 +101,38 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| A.1 | Routine and Holding account cards on Payment | not-started | — |
-| A.2 | Available and pending balances shown per account | not-started | — |
+| A.1 | Routine and Holding account cards on Payment | in-progress | API side done (`GET /accounts`); portal UI not yet built |
+| A.2 | Available and pending balances shown per account | in-progress | In the API response; portal UI not yet built |
 | A.3 | Recent activity and relevant actions per account | not-started | — |
 | A.4 | Today's digital receipts shown separately from spendable funds | not-started | — |
-| A.5 | Converted EUR amounts labelled with conversion timestamp | not-started | — |
+| A.5 | Converted EUR amounts labelled with conversion timestamp | in-progress | `converted.rate`/`quotedAt` in the API; portal UI not yet built |
 | A.6 | Actions named Add money / Move money / Pay / Withdraw | not-started | — |
 | A.7 | No token or network selection in the demonstration journey | not-started | — |
 | A.8 | No seed phrases, no address pasting, no user-obtained SOL | not-started | — |
 | A.9 | Custody, fee and conversion information remains accessible | not-started | — |
-| A.10 | EUR display must not imply a fixed EUR entitlement over a USDC balance | not-started | — |
-| A.11 | Wallets resolved from the merchant's receiving-wallet owner | not-started | — |
-| A.12 | Money-moving actions restricted to the authorized owner | not-started | — |
+| A.10 | EUR display must not imply a fixed EUR entitlement over a USDC balance | in-progress | API carries an explicit note; portal must render it |
+| A.11 | Wallets resolved from the merchant's receiving-wallet owner | built | L — `AccountWalletsService.forMerchantOwner` |
+| A.12 | Money-moving actions restricted to the authorized owner | built | L — a membership alone cannot move money; only the receiving-wallet owner can |
 
 ### 2B — Money flows
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| F.1 | Debit card → Holding via Stripe-hosted Checkout, then devnet treasury funds Holding | not-started | Existing Checkout credits the ledger with no token movement |
-| F.2 | Bank → Holding via USD ACH Direct Debit, pending until success, then treasury funds Holding | not-started | — |
-| F.3 | Holding → Routine: reserve, transfer test USDC between wallets, finalize once | not-started | Existing "move" is a ledger-only operation |
+| F.1 | Debit card → Holding via Stripe-hosted Checkout, then devnet treasury funds Holding | built | L + S — `AccountFundingService`; treasury delivery is a separate confirmed step. Needs a completed sandbox Checkout to verify |
+| F.2 | Bank → Holding via USD ACH Direct Debit, pending until success, then treasury funds Holding | built | L + S — same service with `us_bank_account`; only `payment_status=paid` advances |
+| F.3 | Holding → Routine: reserve, transfer test USDC between wallets, finalize once | verified | D — devnet suite moves 0.25 USDC; ledger and chain agree; repeated finalize writes no second entry |
 | F.4 | Customer Routine → merchant Routine on devnet, with matching receipts | in-progress | Flow exists; has only ever run on the mock provider |
 | F.5 | Merchant Routine → Holding, merchant-confirmed, with day-end option | not-started | — |
-| F.6 | Holding → bank: reserve, return USDC to treasury, then Stripe sandbox payout | not-started | — |
-| F.7 | Holding → debit card: same sequence to an eligible debit-card destination | not-started | — |
-| F.8 | Treasury transfer explicit in implementation and in evidence | not-started | — |
-| F.9 | Payout destinations and capabilities retrieved from Stripe | not-started | — |
-| F.10 | Incomplete onboarding, ineligible destination, insufficient provider balance are real states | not-started | — |
-| F.11 | An unavailable provider route is never replaced by unlabeled simulated success | not-started | — |
-| F.12 | Bank funding treated as asynchronous; redirect is not settlement | not-started | — |
-| F.13 | Sandbox conversion fixed at 1 USD per test USDC | in-progress | `STRIPE_OFFRAMP_USD_PER_USDC=1` exists for off-ramp only |
+| F.6 | Holding → bank: reserve, return USDC to treasury, then Stripe sandbox payout | built | L — `AccountWithdrawalService` in that order. Needs an end-to-end sandbox run to verify |
+| F.7 | Holding → debit card: same sequence to an eligible debit-card destination | built | L — same path, instant method for card destinations |
+| F.8 | Treasury transfer explicit in implementation and in evidence | verified | D — `5Aex8rYv…` moved treasury 20 → 18.5 USDC; funding and withdrawal both route through the treasury explicitly |
+| F.9 | Payout destinations and capabilities retrieved from Stripe | built | L — `PayoutDestinationsService` reads account, external accounts and balance live |
+| F.10 | Incomplete onboarding, ineligible destination, insufficient provider balance are real states | built | L — each is a named state with a reason; none is substituted with success |
+| F.11 | An unavailable provider route is never replaced by unlabeled simulated success | built | L — funding refuses up front when the treasury cannot cover it; withdrawal refuses an ineligible destination |
+| F.12 | Bank funding treated as asynchronous; redirect is not settlement | built | L — only `payment_status=paid` advances; `async_payment_failed` fails the operation |
+| F.13 | Sandbox conversion fixed at 1 USD per test USDC | verified | L — `operation-money.ts`; any other configured rate is refused, not silently applied |
 | F.14 | Quoted EUR conversion preserved for merchant purchases | built | L — `quoteRateScaled` snapshot on payment requests |
-| F.15 | Integer arithmetic and explicit rounding throughout | in-progress | On-ramp settlement currently uses floating point |
+| F.15 | Integer arithmetic and explicit rounding throughout | built | L — new flows are bigint end to end and round down for payouts. The legacy widget on-ramp still uses floating point |
 
 ### 2D — Day-end transfer
 
