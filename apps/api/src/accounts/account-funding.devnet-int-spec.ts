@@ -290,4 +290,50 @@ describe('account funding settlement on devnet', () => {
     expect(failed.status).toBe('failed');
     expect(failed.failureCode).toBe('collection_failed');
   }, 60_000);
+
+  it('does not log an event for each poll that finds no change', async () => {
+    const sessionId = `cs_test_quiet_${randomUUID().slice(0, 8)}`;
+    const { operation } = await operations.begin({
+      userId,
+      kind: 'funding_card',
+      idempotencyKey: randomUUID(),
+      amountBaseUnits: 100_000n,
+      currency: 'USDC',
+      destinationWalletId: holdingWalletId,
+      provider: 'stripe',
+    });
+    await operations.advance(operation.id, 'collection_pending', {
+      providerRef: sessionId,
+    });
+
+    const countEvents = async () => {
+      const rows = await db
+        .select()
+        .from(schema.financialOperationEvents)
+        .where(eq(schema.financialOperationEvents.operationId, operation.id));
+      return rows.length;
+    };
+
+    const before = await countEvents();
+
+    // Ten polls of an unchanged unpaid session.
+    for (let i = 0; i < 10; i += 1) {
+      await funding.applyCheckoutEvent({
+        sessionId,
+        eventType: 'polled',
+        paymentStatus: 'unpaid',
+      });
+    }
+
+    // The first poll records the status; the rest add nothing.
+    expect(await countEvents()).toBe(before + 1);
+
+    // A genuine change is still recorded.
+    await funding.applyCheckoutEvent({
+      sessionId,
+      eventType: 'polled',
+      paymentStatus: 'no_payment_required',
+    });
+    expect(await countEvents()).toBe(before + 2);
+  }, 60_000);
 });

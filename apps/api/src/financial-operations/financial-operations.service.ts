@@ -338,6 +338,17 @@ export class FinancialOperationsService {
     );
   }
 
+  /** Records the provider's latest status without touching the lifecycle. */
+  async updateProviderStatus(
+    operationId: string,
+    providerStatus: string | null,
+  ): Promise<void> {
+    await this.db
+      .update(schema.financialOperations)
+      .set({ providerStatus, updatedAt: new Date() })
+      .where(eq(schema.financialOperations.id, operationId));
+  }
+
   /** Schedules the next recovery look, with a simple linear backoff. */
   async deferNextAttempt(operationId: string, delayMs: number): Promise<void> {
     await this.db

@@ -210,11 +210,21 @@ export class AccountFundingService {
 
     const paid = params.paymentStatus === 'paid';
     if (!paid) {
-      // Submitted but not settled: record it and keep waiting.
-      await this.operations.note(operation.id, 'collection_update', {
-        eventType: params.eventType,
-        paymentStatus: params.paymentStatus,
-      });
+      // Submitted but not settled. Record it only when the provider status has
+      // actually changed: polling every few seconds while a customer fills in
+      // a card form must not fill the audit log with identical rows.
+      if (params.paymentStatus !== operation.providerStatus) {
+        await this.operations.note(operation.id, 'collection_update', {
+          eventType: params.eventType,
+          paymentStatus: params.paymentStatus,
+        });
+        await this.operations.updateProviderStatus(
+          operation.id,
+          params.paymentStatus,
+        );
+      }
+      // Back off while we wait; a webhook will wake this up sooner if it lands.
+      await this.operations.deferNextAttempt(operation.id, 30_000);
       return { handled: true, operationId: operation.id };
     }
 
