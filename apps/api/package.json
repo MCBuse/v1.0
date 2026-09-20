@@ -37,7 +37,8 @@
     "wallets:key-verify": "ts-node src/solana/rotate-wallet-keys.cli.ts verify",
     "treasury:status": "ts-node src/treasury/treasury-readiness.cli.ts",
     "treasury:send": "ts-node src/treasury/treasury-send.cli.ts",
-    "test:devnet": "jest --config ./jest-devnet.json --runInBand --watchman=false"
+    "test:devnet": "jest --config ./jest-devnet.json --runInBand --watchman=false",
+    "test:clean": "node scripts/clean-test-data.mjs"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.1.0",

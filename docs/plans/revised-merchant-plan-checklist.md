@@ -103,13 +103,13 @@ therefore new work, not a configuration change.
 | --- | --- | --- | --- |
 | A.1 | Routine and Holding account cards on Payment | in-progress | API side done (`GET /accounts`); portal UI not yet built |
 | A.2 | Available and pending balances shown per account | in-progress | In the API response; portal UI not yet built |
-| A.3 | Recent activity and relevant actions per account | not-started | — |
-| A.4 | Today's digital receipts shown separately from spendable funds | not-started | — |
+| A.3 | Recent activity and relevant actions per account | in-progress | API returns both; portal UI not yet built |
+| A.4 | Today's digital receipts shown separately from spendable funds | in-progress | In `GET /accounts` and the day-end view; portal UI not yet built |
 | A.5 | Converted EUR amounts labelled with conversion timestamp | in-progress | `converted.rate`/`quotedAt` in the API; portal UI not yet built |
-| A.6 | Actions named Add money / Move money / Pay / Withdraw | not-started | — |
+| A.6 | Actions named Add money / Move money / Pay / Withdraw | in-progress | API returns these labels per account; portal UI not yet built |
 | A.7 | No token or network selection in the demonstration journey | not-started | — |
 | A.8 | No seed phrases, no address pasting, no user-obtained SOL | not-started | — |
-| A.9 | Custody, fee and conversion information remains accessible | not-started | — |
+| A.9 | Custody, fee and conversion information remains accessible | in-progress | `custody` block in `GET /accounts`; portal UI not yet built |
 | A.10 | EUR display must not imply a fixed EUR entitlement over a USDC balance | in-progress | API carries an explicit note; portal must render it |
 | A.11 | Wallets resolved from the merchant's receiving-wallet owner | built | L — `AccountWalletsService.forMerchantOwner` |
 | A.12 | Money-moving actions restricted to the authorized owner | built | L — a membership alone cannot move money; only the receiving-wallet owner can |
@@ -122,7 +122,7 @@ therefore new work, not a configuration change.
 | F.2 | Bank → Holding via USD ACH Direct Debit, pending until success, then treasury funds Holding | built | L + S — same service with `us_bank_account`; only `payment_status=paid` advances |
 | F.3 | Holding → Routine: reserve, transfer test USDC between wallets, finalize once | verified | D — devnet suite moves 0.25 USDC; ledger and chain agree; repeated finalize writes no second entry |
 | F.4 | Customer Routine → merchant Routine on devnet, with matching receipts | in-progress | Flow exists; has only ever run on the mock provider |
-| F.5 | Merchant Routine → Holding, merchant-confirmed, with day-end option | not-started | — |
+| F.5 | Merchant Routine → Holding, merchant-confirmed, with day-end option | built | L + D — day-end confirm routes through the verified transfer flow |
 | F.6 | Holding → bank: reserve, return USDC to treasury, then Stripe sandbox payout | verified | D + S — chain `3JejC2yM…` returns tokens first (providerRef still null), then payout `po_1UHsax8O…` USD 0.25 |
 | F.7 | Holding → debit card: same sequence to an eligible debit-card destination | verified | S — `card_1UHr6Z8O…` routes to `withdrawal_card` with instant payout method |
 | F.8 | Treasury transfer explicit in implementation and in evidence | verified | D — `5Aex8rYv…` moved treasury 20 → 18.5 USDC; funding and withdrawal both route through the treasury explicitly |
@@ -138,13 +138,13 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| E.1 | Show today's digital receipts | not-started | — |
-| E.2 | Show prior tagged day-end transfers | not-started | — |
-| E.3 | Show current available Routine funds | not-started | — |
-| E.4 | Suggested amount capped by available funds and by today's receipts net of previous day-end transfers | not-started | — |
-| E.5 | Merchant can edit and confirm the amount | not-started | — |
-| E.6 | Merchant timezone used; business date, actor and transfer reference recorded | not-started | — |
-| E.7 | Cash totals explained separately as non-sweepable | not-started | — |
+| E.1 | Show today's digital receipts | built | L — `GET /accounts/day-end`; integration test covers count and total |
+| E.2 | Show prior tagged day-end transfers | built | L — prior `merchant_dayend` operations for the business date, with actor |
+| E.3 | Show current available Routine funds | built | L — available and pending reported alongside the suggestion |
+| E.4 | Suggested amount capped by available funds and by today's receipts net of previous day-end transfers | built | L — 10 unit tests on the cap rule plus integration coverage; reports which limit bound |
+| E.5 | Merchant can edit and confirm the amount | built | L — `POST /accounts/day-end` takes any amount; suggestion is advisory |
+| E.6 | Merchant timezone used; business date, actor and transfer reference recorded | verified | L — live endpoint returned businessDate 2026-09-21 at 22:00 UTC for a Europe/Berlin merchant |
+| E.7 | Cash totals explained separately as non-sweepable | built | L — cash reported in its own currency, excluded from the arithmetic, with an explanatory note |
 
 ### 3A — Product invoices, QR synchronization, history
 
