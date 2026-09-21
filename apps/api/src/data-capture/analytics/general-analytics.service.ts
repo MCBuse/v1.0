@@ -180,6 +180,7 @@ export class GeneralAnalyticsService {
           productId: schema.merchantInvoiceItems.productId,
           quantity: schema.merchantInvoiceItems.quantity,
           amount: schema.merchantInvoiceItems.lineTotalMinor,
+          category: schema.merchantInvoiceItems.category,
           occurredAt: schema.merchantTransactions.occurredAt,
           environment: schema.merchantTransactions.evidenceEnvironment,
         })
@@ -205,6 +206,7 @@ export class GeneralAnalyticsService {
           productId: schema.merchantCashSaleItems.productId,
           quantity: schema.merchantCashSaleItems.quantity,
           amount: schema.merchantCashSaleItems.lineTotalMinor,
+          category: schema.merchantCashSaleItems.category,
           occurredAt: schema.merchantCashSales.occurredAt,
         })
         .from(schema.merchantCashSaleItems)
@@ -267,9 +269,10 @@ export class GeneralAnalyticsService {
               productId: line.productId!,
               quantity: line.quantity,
               amountMinor: line.amount,
-              // Sale-line categories are not captured yet, so this falls back
-              // to the product's current category and is labelled as such.
-              category: null,
+              // Captured on the line since migration 0028. Rows written before
+              // it stay null and fall back to the product's current category,
+              // labelled as such rather than presented as recorded history.
+              category: line.category,
               occurredAt: line.occurredAt,
             }))
         : []),
@@ -278,7 +281,7 @@ export class GeneralAnalyticsService {
             productId: line.productId!,
             quantity: line.quantity,
             amountMinor: line.amount,
-            category: null,
+            category: line.category,
             occurredAt: line.occurredAt,
           }))
         : []),

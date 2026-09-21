@@ -343,6 +343,9 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
             type: 'product',
             name: product.name,
             sku: product.sku,
+            // Snapshotted, so re-categorising the product later does not
+            // rewrite what this sale was.
+            category: product.category,
             quantity: input.quantity,
             unitPriceMinor: product.unitPriceMinor,
             lineTotalMinor: lineTotal,
@@ -356,6 +359,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
             type: 'custom',
             name: input.name!.trim(),
             sku: null,
+            category: null,
             quantity: input.quantity,
             unitPriceMinor,
             lineTotalMinor: lineTotal,

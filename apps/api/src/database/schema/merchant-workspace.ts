@@ -15,7 +15,10 @@ export const merchantCashSales = pgTable('merchant_cash_sales', {
 
 export const merchantCashSaleItems = pgTable('merchant_cash_sale_items', {
   id: uuid('id').primaryKey().defaultRandom(), cashSaleId: uuid('cash_sale_id').notNull().references(() => merchantCashSales.id), productId: uuid('product_id').references(() => merchantProducts.id),
-  type: varchar('type', { length: 20 }).notNull(), name: varchar('name', { length: 160 }).notNull(), sku: varchar('sku', { length: 64 }), quantity: integer('quantity').notNull(), unitPriceMinor: bigint('unit_price_minor', { mode: 'bigint' }).notNull(), lineTotalMinor: bigint('line_total_minor', { mode: 'bigint' }).notNull(),
+  type: varchar('type', { length: 20 }).notNull(), name: varchar('name', { length: 160 }).notNull(), sku: varchar('sku', { length: 64 }),
+  /** The product's category at the moment of sale; NULL on pre-capture rows. */
+  category: varchar('category', { length: 100 }),
+  quantity: integer('quantity').notNull(), unitPriceMinor: bigint('unit_price_minor', { mode: 'bigint' }).notNull(), lineTotalMinor: bigint('line_total_minor', { mode: 'bigint' }).notNull(),
 }, (table) => [index('merchant_cash_sale_items_sale_idx').on(table.cashSaleId), index('merchant_cash_sale_items_product_idx').on(table.productId)]);
 
 /** Append-only quantity changes captured after the merchant workspace upgrade. */

@@ -33,7 +33,11 @@ const allowed = [
   /^me\/imports\/[0-9a-f-]{36}\/commit$/i,
   /^me\/reconciliation$/,
   /^me\/finance-packages$/,
-  /^me\/finance-packages\/[0-9a-f-]{36}(?:\/(?:pdf|data|email))?$/i,
+  /^me\/finance-packages\/email-attempts$/,
+  /^me\/finance-packages\/[0-9a-f-]{36}(?:\/(?:pdf|data|email|preview|assessment))?$/i,
+  /^me\/assessments(?:\/[0-9a-f-]{36})?$/i,
+  /^me\/insights$/,
+  /^me\/analytics\/general$/,
 ];
 
 async function forward(

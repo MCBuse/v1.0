@@ -54,6 +54,25 @@ interface ProductRanking {
   lowStockThreshold: number;
 }
 
+export interface StockOutInterval {
+  /** Local date keys, inclusive. */
+  from: string;
+  to: string;
+  days: number;
+  /** True when the product was still out of stock at the end of the period. */
+  ongoing: boolean;
+}
+
+interface HistoricalStockOut {
+  productId: string;
+  name: string;
+  intervals: StockOutInterval[];
+  totalDays: number;
+  /** False when the history cannot support the reconstruction. */
+  eligible: boolean;
+  reason: string | null;
+}
+
 interface TurnoverEntry {
   productId: string;
   name: string;
@@ -85,6 +104,7 @@ export interface InventoryAnalytics {
   atOrBelowMinimum: ProductRanking[];
   approachingMinimum: ProductRanking[];
   currentStockOuts: ProductRanking[];
+  historicalStockOuts: HistoricalStockOut[];
   turnover: TurnoverEntry[];
   byCategory: Array<{
     category: string;
@@ -233,6 +253,18 @@ export function buildInventoryAnalytics(
     .filter((r) => r.onHandQuantity <= 0)
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  const historicalStockOuts = products
+    .map((p) => stockOutIntervalsFor(p, movements, days, timezone))
+    .filter((entry) => !entry.eligible || entry.intervals.length > 0)
+    .sort(
+      (a, b) => b.totalDays - a.totalDays || a.name.localeCompare(b.name),
+    );
+  if (historicalStockOuts.some((entry) => !entry.eligible)) {
+    notes.push(
+      'Stock-out history is only reconstructed for products whose recorded movements support it.',
+    );
+  }
+
   const turnover = products.map((p) =>
     turnoverFor(
       p,
@@ -308,6 +340,7 @@ export function buildInventoryAnalytics(
     atOrBelowMinimum,
     approachingMinimum,
     currentStockOuts,
+    historicalStockOuts,
     turnover,
     byCategory: [...categories.entries()]
       .map(([category, entry]) => ({
@@ -323,6 +356,127 @@ export function buildInventoryAnalytics(
           a.category.localeCompare(b.category),
       ),
     notes,
+  };
+}
+
+type Reconstruction =
+  | { ok: true; closings: number[] }
+  | { ok: false; reason: string };
+
+/**
+ * Daily closing on-hand stock for one product, walked backwards from today.
+ *
+ * Shared by turnover and by the stock-out history so the two can never
+ * disagree about what the stock level was on a given day. The anchoring rule
+ * is the same in both: without an opening balance the recorded movements are
+ * an unknown fraction of what happened, and a reconstruction from them would
+ * be a guess presented as a fact.
+ */
+function reconstructClosings(
+  product: InventoryProduct,
+  movements: StockMovement[],
+  days: string[],
+  timezone: string,
+): Reconstruction {
+  const own = movements.filter((m) => m.productId === product.id);
+  const anchored = own.some(
+    (m) =>
+      m.kind === 'opening_balance' &&
+      localDateKey(m.occurredAt, timezone) <= days[days.length - 1],
+  );
+  if (!anchored) {
+    return {
+      ok: false,
+      reason:
+        'Opening stock for this period cannot be established from recorded movements.',
+    };
+  }
+
+  const changeByDay = new Map<string, number>();
+  for (const movement of own) {
+    const key = localDateKey(movement.occurredAt, timezone);
+    changeByDay.set(key, (changeByDay.get(key) ?? 0) + movement.onHandChange);
+  }
+
+  const closings: number[] = new Array<number>(days.length);
+  let closing = product.onHandQuantity;
+  for (let index = days.length - 1; index >= 0; index -= 1) {
+    closings[index] = closing;
+    closing -= changeByDay.get(days[index]) ?? 0;
+  }
+
+  if (closings.some((value) => value < 0)) {
+    return {
+      ok: false,
+      reason:
+        'Recorded movements do not reconcile with current stock for this period, so the stock history cannot be trusted.',
+    };
+  }
+
+  return { ok: true, closings };
+}
+
+/**
+ * The days a product spent at zero on-hand stock, as intervals.
+ *
+ * Reconstructed from the same daily closings turnover uses, so a period the
+ * history cannot support is reported as ineligible rather than as "never out
+ * of stock" — which is what an empty list would wrongly imply.
+ */
+function stockOutIntervalsFor(
+  product: InventoryProduct,
+  movements: StockMovement[],
+  days: string[],
+  timezone: string,
+): HistoricalStockOut {
+  const base = { productId: product.id, name: product.name };
+  const reconstruction = reconstructClosings(
+    product,
+    movements,
+    days,
+    timezone,
+  );
+
+  if (!reconstruction.ok) {
+    return {
+      ...base,
+      intervals: [],
+      totalDays: 0,
+      eligible: false,
+      reason: reconstruction.reason,
+    };
+  }
+
+  const intervals: StockOutInterval[] = [];
+  let start: number | null = null;
+  for (let index = 0; index < days.length; index += 1) {
+    const out = reconstruction.closings[index] <= 0;
+    if (out && start === null) start = index;
+    if (!out && start !== null) {
+      intervals.push({
+        from: days[start],
+        to: days[index - 1],
+        days: index - start,
+        ongoing: false,
+      });
+      start = null;
+    }
+  }
+  if (start !== null) {
+    intervals.push({
+      from: days[start],
+      to: days[days.length - 1],
+      days: days.length - start,
+      ongoing: true,
+    });
+  }
+
+  return {
+    ...base,
+    intervals,
+    totalDays: intervals.reduce((sum, interval) => sum + interval.days, 0),
+    eligible: true,
+    reason: null,
   };
 }
 
@@ -347,55 +501,22 @@ function turnoverFor(
     unitsSold,
   };
 
-  const own = movements.filter((m) => m.productId === product.id);
-  // An opening balance anywhere up to the end of the period anchors the
-  // history: from that point every change is recorded, and before it the
-  // product simply did not exist, so its stock was zero. Without any anchor
-  // the movements are an unknown fraction of what actually happened.
-  const anchored = own.some(
-    (m) =>
-      m.kind === 'opening_balance' &&
-      localDateKey(m.occurredAt, timezone) <= days[days.length - 1],
+  const reconstruction = reconstructClosings(
+    product,
+    movements,
+    days,
+    timezone,
   );
-  if (!anchored) {
+  if (!reconstruction.ok) {
     return {
       ...base,
       averageDailyOnHand: null,
       turnoverRatio: null,
       eligible: false,
-      reason:
-        'Opening stock for this period cannot be established from recorded movements.',
+      reason: reconstruction.reason,
     };
   }
-
-  const changeByDay = new Map<string, number>();
-  for (const movement of own) {
-    const key = localDateKey(movement.occurredAt, timezone);
-    changeByDay.set(key, (changeByDay.get(key) ?? 0) + movement.onHandChange);
-  }
-
-  // Walk backwards: the last day closes at today's figure, and each earlier
-  // day closes at the following day's close minus that day's net change.
-  const closings: number[] = new Array<number>(days.length);
-  let closing = product.onHandQuantity;
-  for (let index = days.length - 1; index >= 0; index -= 1) {
-    closings[index] = closing;
-    closing -= changeByDay.get(days[index]) ?? 0;
-  }
-
-  // A negative reconstructed level means the recorded movements contradict
-  // the current stock — most often a sale dated before the product existed.
-  // The history cannot be trusted, so no ratio is offered for it.
-  if (closings.some((value) => value < 0)) {
-    return {
-      ...base,
-      averageDailyOnHand: null,
-      turnoverRatio: null,
-      eligible: false,
-      reason:
-        'Recorded movements do not reconcile with current stock for this period, so turnover cannot be calculated.',
-    };
-  }
+  const { closings } = reconstruction;
 
   const averageDailyOnHand =
     closings.reduce((sum, value) => sum + value, 0) / closings.length;

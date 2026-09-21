@@ -191,9 +191,11 @@ export class MerchantActivityService {
   }
 
   private async resolveCashLine(tx: any, merchantId: string, line: CashLine) {
-    if (line.type === 'custom') { const unitPriceMinor = BigInt(line.unitPriceMinor!); return { productId: null, type: 'custom', name: line.name!.trim(), sku: null, quantity: line.quantity, unitPriceMinor, lineTotalMinor: unitPriceMinor * BigInt(line.quantity) }; }
+    if (line.type === 'custom') { const unitPriceMinor = BigInt(line.unitPriceMinor!); return { productId: null, type: 'custom', name: line.name!.trim(), sku: null, category: null, quantity: line.quantity, unitPriceMinor, lineTotalMinor: unitPriceMinor * BigInt(line.quantity) }; }
     const rows = await tx.select().from(schema.merchantProducts).where(and(eq(schema.merchantProducts.id, line.productId!), eq(schema.merchantProducts.merchantId, merchantId), eq(schema.merchantProducts.status, 'active'))).limit(1); const product = rows[0]; if (!product) throw new BadRequestException('Selected product is unavailable');
-    return { productId: product.id, type: 'product', name: product.name, sku: product.sku, quantity: line.quantity, unitPriceMinor: product.unitPriceMinor, lineTotalMinor: product.unitPriceMinor * BigInt(line.quantity) };
+    // The category is snapshotted here: re-categorising the product later must
+    // not rewrite what this sale was recorded as.
+    return { productId: product.id, type: 'product', name: product.name, sku: product.sku, category: product.category, quantity: line.quantity, unitPriceMinor: product.unitPriceMinor, lineTotalMinor: product.unitPriceMinor * BigInt(line.quantity) };
   }
   private cashSaleFingerprint(dto: CreateMerchantCashSaleDto, occurredAt: Date) {
     const lines = dto.lines.map((line) => line.type === 'product'

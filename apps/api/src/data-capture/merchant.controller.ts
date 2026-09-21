@@ -632,6 +632,32 @@ export class MerchantController {
     return { ...created, assessment };
   }
 
+  @Get('finance-packages')
+  @ApiOperation({ summary: 'Packages this merchant has produced, newest first' })
+  listFinancePackages(@CurrentUser() user: { id: string }) {
+    return this.finance.listPackages(user.id);
+  }
+
+  @Get('finance-packages/email-attempts')
+  @ApiOperation({
+    summary: 'Every attempt to send a package, including failures',
+  })
+  financeEmailHistory(@CurrentUser() user: { id: string }) {
+    return this.finance.emailHistory(user.id);
+  }
+
+  @Get('finance-packages/:id/preview')
+  @ApiOperation({
+    summary:
+      'Preview a package: the stored snapshot plus checksums of the exact artifacts a download returns',
+  })
+  previewFinancePackage(
+    @CurrentUser() user: { id: string },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.finance.preview(user.id, id);
+  }
+
   @Get('finance-packages/:id/assessment')
   @ApiOperation({
     summary: 'The saved assessment this package reports',
