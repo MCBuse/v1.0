@@ -75,6 +75,45 @@ export class SolanaService implements OnModuleInit {
     }
   }
 
+  /**
+   * The same read, but able to say "I could not tell".
+   *
+   * `getTokenBalance` answers 0 for a missing token account *and* for an RPC
+   * that did not respond, which is the right trade for a balance display and
+   * exactly the wrong one for reconciliation: a report that treated an
+   * unreachable RPC as an empty wallet would declare a discrepancy against
+   * every funded wallet at once.
+   */
+  async readTokenBalance(
+    walletPubkey: string,
+    mintAddress: string,
+  ): Promise<{ baseUnits: bigint | null; reason?: string }> {
+    let ata: PublicKey;
+    try {
+      const wallet = new PublicKey(walletPubkey);
+      const mint = new PublicKey(mintAddress);
+      ata = getAssociatedTokenAddressSync(mint, wallet);
+    } catch (error) {
+      return {
+        baseUnits: null,
+        reason: error instanceof Error ? error.message : 'invalid address',
+      };
+    }
+
+    try {
+      const info = await this.connection.getTokenAccountBalance(ata);
+      return { baseUnits: BigInt(info.value.amount) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // A wallet that has never received the token has no account, and that
+      // genuinely is a zero balance.
+      if (/could not find account|account does not exist/i.test(message)) {
+        return { baseUnits: 0n };
+      }
+      return { baseUnits: null, reason: message };
+    }
+  }
+
   getConnection(): Connection {
     return this.connection;
   }

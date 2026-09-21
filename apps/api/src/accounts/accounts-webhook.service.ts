@@ -91,7 +91,8 @@ export class AccountsWebhookService {
       // Drive the operation forward now rather than waiting for the next sweep.
       if (operationId) {
         const operation = await this.operations.require(operationId);
-        await this.runner.step(operation).catch((error: unknown) => {
+        // Exclusive: the recovery sweep may be looking at this same operation.
+        await this.runner.stepExclusively(operation).catch((error: unknown) => {
           this.logger.warn(
             `Post-webhook step for ${operationId} deferred: ${
               error instanceof Error ? error.message : String(error)

@@ -5,6 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import { TreasuryService } from '../treasury/treasury.service';
 import {
   FinancialOperationsService,
@@ -16,6 +17,14 @@ import { AccountWithdrawalService } from './account-withdrawal.service';
 
 const POLL_INTERVAL_MS = 15_000;
 const STARTUP_DELAY_MS = 5_000;
+
+/**
+ * How long a worker holds an operation before another may take it over.
+ *
+ * Long enough that a slow chain submission finishes inside it; short enough
+ * that an instance killed mid-step does not strand the operation for long.
+ */
+const CLAIM_LEASE_MS = 120_000;
 
 /**
  * Drives every in-flight operation to its next step.
@@ -30,6 +39,8 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OperationRunnerService.name);
   private timer?: ReturnType<typeof setInterval>;
   private running = false;
+  /** Identifies this instance's claims; every process gets its own. */
+  private readonly workerId = randomUUID();
 
   constructor(
     private readonly operations: FinancialOperationsService,
@@ -64,8 +75,7 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
       const due = await this.operations.due(limit);
       for (const operation of due) {
         try {
-          await this.step(operation);
-          handled += 1;
+          if (await this.stepExclusively(operation)) handled += 1;
         } catch (error) {
           this.logger.error(
             `Operation ${operation.id} (${operation.kind}/${operation.status}) failed to advance: ${
@@ -80,6 +90,31 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
       this.running = false;
     }
     return handled;
+  }
+
+  /**
+   * Steps an operation only if this worker can take an exclusive lease on it.
+   *
+   * Every caller that might run concurrently with the sweep — the sweep itself
+   * and the post-webhook nudge — goes through here. `step` stays available
+   * unguarded for tests that drive one operation deliberately.
+   */
+  async stepExclusively(operation: FinancialOperation): Promise<boolean> {
+    const claimed = await this.operations.claim(
+      operation.id,
+      this.workerId,
+      CLAIM_LEASE_MS,
+    );
+    if (!claimed) return false;
+
+    try {
+      await this.step(claimed);
+      return true;
+    } finally {
+      await this.operations
+        .release(operation.id, this.workerId)
+        .catch(() => undefined);
+    }
   }
 
   async step(operation: FinancialOperation): Promise<void> {

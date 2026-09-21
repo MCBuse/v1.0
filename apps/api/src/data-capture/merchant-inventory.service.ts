@@ -521,6 +521,11 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
     invoiceId: string,
   ): Promise<MerchantInvoice> {
     const merchant = await this.merchants.requireMerchant(userId);
+    // Establish that the invoice is this merchant's before saying anything
+    // about its state. Without this, another merchant's invoice answered
+    // "only pending invoices can be cancelled", which is both wrong and a
+    // statement about a row the caller has no business hearing about.
+    await this.loadInvoice(merchant.merchantId, invoiceId);
     await this.cancelPendingInvoice(invoiceId, merchant.merchantId);
     return this.loadInvoice(merchant.merchantId, invoiceId);
   }

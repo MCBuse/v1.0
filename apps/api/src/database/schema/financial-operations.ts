@@ -72,6 +72,11 @@ export const financialOperations = pgTable(
     attempts: integer('attempts').notNull().default(0),
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
 
+    // A lease held by whichever worker is acting on this operation right now.
+    // `nextAttemptAt` says when work is due; these say who has it.
+    claimedUntil: timestamp('claimed_until', { withTimezone: true }),
+    claimedBy: varchar('claimed_by', { length: 64 }),
+
     reservedAt: timestamp('reserved_at', { withTimezone: true }),
     collectionSettledAt: timestamp('collection_settled_at', {
       withTimezone: true,
@@ -97,6 +102,7 @@ export const financialOperations = pgTable(
     index('financial_operations_status_idx').on(
       table.status,
       table.nextAttemptAt,
+      table.claimedUntil,
     ),
     index('financial_operations_user_idx').on(table.userId, table.createdAt),
     index('financial_operations_provider_ref_idx').on(table.providerRef),

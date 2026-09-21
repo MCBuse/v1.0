@@ -327,10 +327,67 @@ export class FinancialOperationsService {
             isNull(schema.financialOperations.nextAttemptAt),
             lte(schema.financialOperations.nextAttemptAt, now),
           ),
+          // Skip anything another worker is already acting on.
+          or(
+            isNull(schema.financialOperations.claimedUntil),
+            lte(schema.financialOperations.claimedUntil, now),
+          ),
         ),
       )
       .orderBy(asc(schema.financialOperations.updatedAt))
       .limit(limit);
+  }
+
+  /**
+   * Takes an exclusive lease on an operation, returning it only to the worker
+   * that won.
+   *
+   * Without this, two instances sweeping at the same moment both read an
+   * operation at `reserved`, both pass their status check, and both broadcast
+   * the transfer. The status change would reject the second one — after the
+   * money had already moved twice on chain. The claim has to happen before any
+   * irreversible work, which means before the key is even decrypted.
+   */
+  async claim(
+    operationId: string,
+    workerId: string,
+    leaseMs: number,
+  ): Promise<FinancialOperation | null> {
+    const now = new Date();
+    const [claimed] = await this.db
+      .update(schema.financialOperations)
+      .set({
+        claimedUntil: new Date(now.getTime() + leaseMs),
+        claimedBy: workerId,
+        updatedAt: now,
+        // `attempts` deliberately untouched: taking a lease is not an attempt
+        // at the provider. `deferNextAttempt` is what counts retries.
+      })
+      .where(
+        and(
+          eq(schema.financialOperations.id, operationId),
+          or(
+            isNull(schema.financialOperations.claimedUntil),
+            lte(schema.financialOperations.claimedUntil, now),
+          ),
+        ),
+      )
+      .returning();
+
+    return claimed ?? null;
+  }
+
+  /** Hands the operation back so the next due sweep can pick it up. */
+  async release(operationId: string, workerId: string): Promise<void> {
+    await this.db
+      .update(schema.financialOperations)
+      .set({ claimedUntil: null, claimedBy: null })
+      .where(
+        and(
+          eq(schema.financialOperations.id, operationId),
+          eq(schema.financialOperations.claimedBy, workerId),
+        ),
+      );
   }
 
   actionFor(operation: FinancialOperation): ResumeAction {

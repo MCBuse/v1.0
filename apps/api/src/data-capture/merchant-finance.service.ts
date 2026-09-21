@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -375,7 +376,9 @@ export class MerchantFinanceService {
         )
         .limit(1)
     )[0];
-    if (!row) throw new BadRequestException('Financial package not found');
+    // Not found, rather than a bad request: the id may be well-formed and
+    // simply belong to another merchant, and that is the same answer.
+    if (!row) throw new NotFoundException('Financial package not found');
     return row;
   }
   private async artifact(
