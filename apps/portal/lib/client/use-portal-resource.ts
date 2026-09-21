@@ -3,7 +3,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PortalApiError, portalApi } from "./api";
 
-export function usePortalResource<T>(path: string, intervalMs = 30_000) {
+/**
+ * Module-level so the default is referentially stable. An inline default would
+ * be a new function on every render, which would restart the polling effect
+ * every render.
+ */
+const merchantFetcher = <T,>(path: string) => portalApi<T>(path);
+
+/**
+ * Polls a portal endpoint and keeps the last good value on screen.
+ *
+ * `fetcher` exists because not every endpoint lives under `/api/merchant`:
+ * the account flows have their own proxy. Everything else about the behaviour
+ * — refresh on focus, on reconnect, and on the `merchant:refresh` event — is
+ * the same whichever upstream a path belongs to.
+ */
+export function usePortalResource<T>(
+  path: string,
+  intervalMs = 30_000,
+  /** Must be referentially stable: define it outside the component. */
+  fetcher: (path: string) => Promise<T> = merchantFetcher,
+) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
@@ -12,7 +32,7 @@ export function usePortalResource<T>(path: string, intervalMs = 30_000) {
 
   const refresh = useCallback(async () => {
     try {
-      const value = await portalApi<T>(path);
+      const value = await fetcher(path);
       if (!active.current) return;
       setData(value);
       setError(null);
@@ -24,7 +44,7 @@ export function usePortalResource<T>(path: string, intervalMs = 30_000) {
     } finally {
       if (active.current) setLoading(false);
     }
-  }, [path]);
+  }, [fetcher, path]);
 
   useEffect(() => {
     active.current = true;

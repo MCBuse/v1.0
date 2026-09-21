@@ -86,7 +86,8 @@ test("lists fast payment requests separately from itemised invoices", async ({
   await page.goto("/payment");
   await expect(page.getByRole("heading", { name: "Fast payment requests" })).toBeVisible();
   await expect(page.getByText("Lunch order")).toBeVisible();
-  await expect(page.getByText("pending")).toBeVisible();
+  // Exact: the accounts panel on this page also mentions a pending amount.
+  await expect(page.getByText("pending", { exact: true })).toBeVisible();
   await expect(page.getByText("€18.50")).toBeVisible();
 });
 
