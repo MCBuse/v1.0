@@ -45,6 +45,7 @@ import { CreateMerchantProductDto } from './dto/create-merchant-product.dto';
 import { ListMerchantInvoicesDto } from './dto/list-merchant-invoices.dto';
 import { ListMerchantProductsDto } from './dto/list-merchant-products.dto';
 import { UpdateMerchantProductDto } from './dto/update-merchant-product.dto';
+import { AnalyticsWorkQueueService } from '../analytics-intelligence/analytics-work-queue.service';
 
 const QR_SCHEME = 'mcbuse://pay';
 const QR_VERSION = '1';
@@ -66,6 +67,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
     private readonly merchants: MerchantService,
     private readonly rates: RatesService,
     private readonly images: MerchantImageService,
+    private readonly analyticsWork: AnalyticsWorkQueueService,
   ) {}
 
   onModuleInit() {
@@ -251,6 +253,10 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
       );
     }
     await this.db.insert(schema.merchantStockMovements).values({ merchantId: merchant.merchantId, productId, kind: 'manual_adjustment', onHandChange: dto.change, reservedChange: 0, referenceType: 'product', referenceId: productId });
+    await this.analyticsWork.enqueue(merchant.merchantId, 'stock_adjusted', {
+      type: 'merchant_product',
+      id: productId,
+    });
     return this.productResponse(rows[0]);
   }
 

@@ -176,6 +176,13 @@
       "when": 1799718600000,
       "tag": "0024_merchant_events",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1799722200000,
+      "tag": "0025_merchant_analytics_work",
+      "breakpoints": true
     }
   ]
 }

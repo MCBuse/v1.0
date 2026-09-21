@@ -14,3 +14,4 @@ export * from './merchant-workspace';
 export * from './merchant-intelligence';
 export * from './financial-operations';
 export * from './merchant-events';
+export * from './merchant-analytics-work';

@@ -78,6 +78,23 @@ export class MerchantInsightsService {
     }
   }
 
+  /** Recalculates one merchant, for the change-driven worker. */
+  async runForMerchant(merchantId: string): Promise<{ processed: boolean; reason?: string }> {
+    if (this.config.get<string>('MERCHANT_INTELLIGENCE_ENABLED') !== 'true')
+      return { processed: false, reason: 'disabled' };
+    const rows = await this.db
+      .select({ id: schema.merchants.id, publicId: schema.merchants.publicId, timezone: schema.merchants.timezone })
+      .from(schema.merchants)
+      .where(and(eq(schema.merchants.id, merchantId), eq(schema.merchants.isActive, true)))
+      .limit(1);
+    const merchant = rows[0];
+    if (!merchant) return { processed: false, reason: 'not_found' };
+    if (!this.enabledForMerchant(merchant.id, merchant.publicId))
+      return { processed: false, reason: 'not_in_allowlist' };
+    await this.processMerchant(merchant);
+    return { processed: true };
+  }
+
   private async processMerchant(merchant: { id: string; publicId: string; timezone: string }) {
     const now = new Date(); const from = new Date(now.getTime() - 90 * 86_400_000);
     const [digital, cash, products, digitalLines, cashLines, movements] = await Promise.all([

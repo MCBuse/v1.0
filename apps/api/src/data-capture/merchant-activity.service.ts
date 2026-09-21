@@ -8,6 +8,7 @@ import * as schema from '../database/schema';
 import { MerchantService } from './merchant.service';
 import { merchantLocalDateKey } from './merchant-summary';
 import { CreateMerchantCashSaleDto } from './dto/create-merchant-cash-sale.dto';
+import { AnalyticsWorkQueueService } from '../analytics-intelligence/analytics-work-queue.service';
 
 type CashLine = CreateMerchantCashSaleDto['lines'][number];
 type MerchantActivitySource = 'mcbuse_payment' | 'merchant_cash';
@@ -16,7 +17,11 @@ type ActivityFilters = { source?: MerchantActivitySource; environment?: Merchant
 
 @Injectable()
 export class MerchantActivityService {
-  constructor(@Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>, private readonly merchants: MerchantService) { }
+  constructor(
+    @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
+    private readonly merchants: MerchantService,
+    private readonly analyticsWork: AnalyticsWorkQueueService,
+  ) {}
 
   async listActivity(userId: string, page = 1, pageSize = 20, filters: ActivityFilters = {}): Promise<MerchantActivityPage> {
     const merchant = await this.merchants.requireMerchant(userId);
@@ -38,7 +43,10 @@ export class MerchantActivityService {
     if (Number.isNaN(occurredAt.getTime()) || occurredAt > new Date()) throw new BadRequestException('Cash sale time must be in the past');
     const inputFingerprint = this.cashSaleFingerprint(dto, occurredAt);
     const merchant = await this.merchants.requireMerchant(userId);
-    return this.db.transaction(async (tx) => {
+    // Set inside the transaction, acted on only once it has committed: work is
+    // queued for a sale that actually happened, never for one that rolled back.
+    let queuedSaleId: string | null = null;
+    const result = await this.db.transaction(async (tx) => {
       const existing = await tx.select().from(schema.merchantCashSales).where(and(eq(schema.merchantCashSales.merchantId, merchant.merchantId), eq(schema.merchantCashSales.idempotencyKey, idempotencyKey))).limit(1);
       if (existing[0]) {
         if (existing[0].inputFingerprint === inputFingerprint) return this.cashSaleResponse(existing[0]);
@@ -54,13 +62,22 @@ export class MerchantActivityService {
         await tx.insert(schema.merchantStockMovements).values({ merchantId: merchant.merchantId, productId: line.productId, kind: 'cash_sale', onHandChange: -line.quantity, reservedChange: 0, referenceType: 'cash_sale', referenceId: sale.id, occurredAt });
       }
       await tx.insert(schema.auditLogs).values({ userId, action: 'merchant.cash_sale.recorded', entityType: 'merchant_cash_sale', entityId: sale.id, metadata: JSON.stringify({ stockAccountedFor: sale.stockAccountedFor }) });
+      queuedSaleId = sale.id;
       return this.cashSaleResponse(sale);
     });
+    if (queuedSaleId) {
+      await this.analyticsWork.enqueue(merchant.merchantId, 'cash_sale_recorded', {
+        type: 'merchant_cash_sale',
+        id: queuedSaleId,
+      });
+    }
+    return result;
   }
 
   async voidCashSale(userId: string, id: string, reason: string) {
     const merchant = await this.merchants.requireMerchant(userId);
-    return this.db.transaction(async (tx) => {
+    let voided = false;
+    const result = await this.db.transaction(async (tx) => {
       const rows = await tx.select().from(schema.merchantCashSales).where(and(eq(schema.merchantCashSales.id, id), eq(schema.merchantCashSales.merchantId, merchant.merchantId))).limit(1);
       const sale = rows[0]; if (!sale) throw new NotFoundException('Cash sale not found'); if (sale.status === 'voided') return this.cashSaleResponse(sale);
       if (!sale.stockAccountedFor) {
@@ -72,8 +89,16 @@ export class MerchantActivityService {
       }
       const result = (await tx.update(schema.merchantCashSales).set({ status: 'voided', voidReason: reason.trim(), voidedAt: new Date() }).where(eq(schema.merchantCashSales.id, id)).returning())[0];
       await tx.insert(schema.auditLogs).values({ userId, action: 'merchant.cash_sale.voided', entityType: 'merchant_cash_sale', entityId: id, metadata: JSON.stringify({ restoredStock: !sale.stockAccountedFor }) });
+      voided = true;
       return this.cashSaleResponse(result);
     });
+    if (voided) {
+      await this.analyticsWork.enqueue(merchant.merchantId, 'cash_sale_voided', {
+        type: 'merchant_cash_sale',
+        id,
+      });
+    }
+    return result;
   }
 
   async analytics(userId: string, from: Date, to: Date, filters: ActivityFilters = {}): Promise<MerchantAnalytics> {

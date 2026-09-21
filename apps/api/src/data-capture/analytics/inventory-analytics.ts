@@ -64,6 +64,8 @@ interface TurnoverEntry {
   reason: string | null;
 }
 
+export type CategorySource = 'recorded' | 'current_product' | 'mixed';
+
 export interface InventoryAnalytics {
   range: { from: string; to: string; days: number; timezone: string };
   position: {
@@ -89,9 +91,17 @@ export interface InventoryAnalytics {
     unitsSold: number;
     amountMinor: string;
     productCount: number;
-    categorySource: 'recorded' | 'current_product' | 'mixed';
+    categorySource: CategorySource;
   }>;
   notes: string[];
+}
+
+function categorySourceOf(entry: {
+  recorded: boolean;
+  fallback: boolean;
+}): CategorySource {
+  if (entry.recorded && entry.fallback) return 'mixed';
+  return entry.recorded ? 'recorded' : 'current_product';
 }
 
 const VALUATION_NOTE =
@@ -305,12 +315,7 @@ export function buildInventoryAnalytics(
         unitsSold: entry.units,
         amountMinor: entry.amount.toString(),
         productCount: entry.products.size,
-        categorySource:
-          entry.recorded && entry.fallback
-            ? 'mixed'
-            : entry.recorded
-              ? 'recorded'
-              : 'current_product',
+        categorySource: categorySourceOf(entry),
       }))
       .sort(
         (a, b) =>

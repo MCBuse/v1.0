@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { eq, inArray } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
-import { firstValueFrom, timeout, toArray, take } from 'rxjs';
+import { filter, firstValueFrom, timeout, toArray, take } from 'rxjs';
 import {
   connectTestDatabase,
   type TestDatabase,
@@ -188,6 +188,23 @@ describe('merchant events (integration)', () => {
     await pool.end();
   }, 60_000);
 
+  /**
+   * Waits for one event of a given type.
+   *
+   * NOTIFY delivery is asynchronous, so an event from an earlier case can
+   * still be in flight when the next one subscribes. Filtering by type keeps
+   * each case independent of the ones before it.
+   */
+  function nextEventOfType(type: MerchantEvent['type'], merchant = merchantId) {
+    return firstValueFrom(
+      reader.streamFor(merchant).pipe(
+        filter((event) => event.type === type),
+        take(1),
+        timeout(5_000),
+      ),
+    );
+  }
+
   it('delivers an event written by one instance to a listener on another', async () => {
     const received = firstValueFrom(
       reader.streamFor(merchantId).pipe(take(1), timeout(5_000)),
@@ -279,9 +296,7 @@ describe('merchant events (integration)', () => {
 
   describe('presentation', () => {
     it('persists the presented request server-side and announces it', async () => {
-      const received = firstValueFrom(
-        reader.streamFor(merchantId).pipe(take(1), timeout(5_000)),
-      );
+      const received = nextEventOfType('request_presented');
 
       const view = await presentation.present({
         merchantId,
@@ -317,9 +332,7 @@ describe('merchant events (integration)', () => {
     }, 30_000);
 
     it('announces a status change for the request on screen', async () => {
-      const received = firstValueFrom(
-        reader.streamFor(merchantId).pipe(take(1), timeout(5_000)),
-      );
+      const received = nextEventOfType('request_status_changed');
 
       await presentation.noteStatusChange(
         merchantId,
@@ -343,9 +356,7 @@ describe('merchant events (integration)', () => {
     }, 30_000);
 
     it('clears the presented request and announces that too', async () => {
-      const received = firstValueFrom(
-        reader.streamFor(merchantId).pipe(take(1), timeout(5_000)),
-      );
+      const received = nextEventOfType('request_cleared');
 
       await presentation.clear(merchantId);
       const event = await received;

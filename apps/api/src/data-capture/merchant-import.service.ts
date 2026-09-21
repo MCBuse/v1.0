@@ -7,6 +7,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { MerchantService } from './merchant.service';
+import { AnalyticsWorkQueueService } from '../analytics-intelligence/analytics-work-queue.service';
 
 type ImportKind = 'inventory' | 'settlement';
 type ImportedRow = Record<string, string>;
@@ -14,7 +15,9 @@ type BatchMapping = { headers: string[]; fieldMap?: Record<string, string>; appl
 
 @Injectable()
 export class MerchantImportService {
-  constructor(@Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>, private readonly merchants: MerchantService) {}
+  constructor(@Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>, private readonly merchants: MerchantService,
+    private readonly analyticsWork: AnalyticsWorkQueueService,
+  ) {}
 
   async preview(userId: string, kind: ImportKind, sourceName: string, file: Express.Multer.File, applyStockSnapshot = false) {
     if (!file || file.size === 0 || file.size > 5 * 1024 * 1024) throw new BadRequestException('Upload must be between 1 byte and 5 MB');
@@ -49,7 +52,8 @@ export class MerchantImportService {
   async commit(userId: string, id: string, idempotencyKey?: string) {
     if (!idempotencyKey?.trim()) throw new BadRequestException('Idempotency-Key is required');
     const merchant = await this.merchants.requireMerchant(userId);
-    return this.db.transaction(async (tx) => {
+    let committed = false;
+    const result = await this.db.transaction(async (tx) => {
       const batch = (await tx.select().from(schema.merchantImportBatches).where(and(eq(schema.merchantImportBatches.id, id), eq(schema.merchantImportBatches.merchantId, merchant.merchantId))).limit(1))[0];
       if (!batch) throw new BadRequestException('Import preview not found');
       const mapping = batch.mapping as BatchMapping; const rows = this.mappedRows(batch.rowsJson as ImportedRow[], mapping.fieldMap ?? this.defaultFieldMap(batch.kind as ImportKind, mapping.headers)); const errors = this.validateRows(batch.kind as ImportKind, rows, Boolean(mapping.applyStockSnapshot)); if (errors.length) throw new BadRequestException(errors.join('; '));
@@ -61,8 +65,16 @@ export class MerchantImportService {
       else await this.commitSettlement(tx, merchant.merchantId, batch.id, batch.sourceName, rows);
       await tx.update(schema.merchantImportBatches).set({ status: 'committed', committedAt: new Date(), mapping: { ...mapping, commitIdempotencyKey: idempotencyKey } }).where(eq(schema.merchantImportBatches.id, id));
       await tx.insert(schema.auditLogs).values({ userId, action: `merchant.import.${batch.kind}.committed`, entityType: 'merchant_import_batch', entityId: id, metadata: JSON.stringify({ rows: rows.length }) });
+      committed = true;
       return { id, status: 'committed', imported: rows.length };
     });
+    if (committed) {
+      await this.analyticsWork.enqueue(merchant.merchantId, 'import_committed', {
+        type: 'merchant_import_batch',
+        id,
+      });
+    }
+    return result;
   }
 
   async listReconciliation(userId: string) {
