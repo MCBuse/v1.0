@@ -1,232 +1,223 @@
 # Revised merchant plan — handoff
 
-Session of 20–21 September 2026. Branch `feat/merchant-payment-infrastructure`.
+Sessions of 20–21 September 2026. Branch `feat/merchant-payment-infrastructure`.
 
 Per-requirement status lives in
 [docs/plans/revised-merchant-plan-checklist.md](plans/revised-merchant-plan-checklist.md).
 This file records what changed, what was proven, and what is left.
 
-## 1. What changed and why
+## 1. Where this stands
 
-### The finding that shaped everything
-
-Stage 1 established that `TRANSFER_PROVIDER=mock` on Cloud Run and every
-wallet in the database was empty on chain. **No devnet USDC had ever moved.**
-Every prior "devnet" claim in this repository rests on the mock provider. The
-plan's requirement for actual USDC transfers was therefore new work, not a
-configuration change. That is recorded as S1.13.
-
-### Stage 2 — custody and durable settlement
-
-`financial_operations` plus an append-only event log now back every money
-movement. A per-kind state machine enforces two rules: a chain transfer whose
-outcome is unknown can only be *checked*, never resent, and a failure after
-value has moved must pass through compensation rather than being declared.
-
-Wallet encryption keys are versioned. Rotation verifies each record
-round-trips to the same address before writing, and reports rather than
-rewrites anything it cannot read. The devnet treasury key is held separately
-from the wallet-encryption keys and pays network fees, so users never hold SOL.
-
-### Stage 3 — account flows and QR synchronisation
-
-`GET /accounts` returns Holding and Routine with available and pending
-balances, today's receipts separated from spendable funds, and EUR as a
-labelled conversion rather than an entitlement. Funding, transfers,
-withdrawals and payout destinations each have endpoints; a recovery runner
-resumes any interrupted operation from its last confirmed step.
-
-The day-end sweep suggests the smaller of two limits and names which one bound
-it. Cash is reported but never enters the arithmetic.
-
-Cross-device QR synchronisation uses a durable event log with a Postgres
-NOTIFY trigger, so any API instance serves any device. The portal proxy now
-pipes event streams instead of buffering them.
-
-### Stages 4–6 — analytics, orchestration, assessments
-
-Three analytics sections are implemented as pure modules with no database, no
-clock of their own and no randomness, which is what makes the combined
-explanations reproducible. Orchestration coalesces change triggers into one
-row per merchant and refreshes insights on a one-minute worker. Assessments
-are now immutable saved rows behind a model registry, with finance packages
-linked to the exact assessment they report.
-
-## 2. Coverage
-
-201 tracked requirements.
+The API-side platform is built and its money paths are proven against real
+Stripe and a real chain. The merchant portal now has the account experience,
+General Analytics and a live counter; the mobile app has a merchant Receive
+screen. What remains is almost entirely the **hosted** demonstration: nothing
+has been deployed, so none of the M.* email scenarios can be run.
 
 | Status | Count | Share |
 | --- | --- | --- |
-| verified | 50 | 25% |
-| built (code plus local tests) | 83 | 41% |
-| in-progress | 26 | 13% |
-| not-started | 40 | 20% |
+| verified | 94 | 47% |
+| built (code plus local tests) | 88 | 44% |
+| in-progress | 1 | 0% |
+| not-started | 16 | 8% |
 | blocked / deferred | 2 | 1% |
 
+201 tracked requirements. At the previous handoff this was 50 verified, 83
+built, 26 in-progress, 40 not-started.
+
 "Verified" means evidence of the kind the requirement demands exists. Code
-presence and a passing mock never counted.
+presence and a passing mock never counted. Browser evidence is written
+`B(local)` when it was produced against a local build with the API stubbed at
+the proxy boundary, and `B(hosted)` against the deployed environment. Only
+`B(hosted)` satisfies M.*.
 
-## 3. Tests and demonstrations
+## 2. The findings that mattered
 
-### Automated
+Each of these was found by running the thing, not by reading it.
+
+### Two instances could both broadcast the same transfer
+
+The recovery sweep read an operation at `reserved`, checked the status,
+decrypted the key and signed. Two instances doing that in the same moment both
+passed the check. The database rejected the second status change — after the
+second transaction was already on chain. `financial_operations` now carries a
+lease (`claimed_until`, `claimed_by`, migration 0027) taken before any
+irreversible work, and the post-webhook nudge goes through the same path as the
+sweep. Found by X.1.
+
+### A customer could not pay a merchant on devnet at all
+
+F.4 had "only ever run on the mock provider", and running it explained why: the
+P2P provider made the payer the fee payer and the rent payer for a missing
+destination token account. Users hold no SOL by design, so a first-time
+merchant's payment failed with `TokenAccountNotFoundError`. The provider now
+delegates to the same `sendSplTransfer` the account flows use, with the
+treasury paying. A customer has since paid a merchant invoice on devnet with
+the tokens verified on both sides by independent RPC query.
+
+### Every withdrawal's authorization record was being silently dropped
+
+`audit_logs.entity_id` is a uuid column, and a Stripe payout destination is
+`ba_1UHr…`. The insert failed, and the audit service swallows write failures by
+design so that a bookkeeping problem cannot refuse a legitimate transfer — so
+the records vanished without a trace. Non-uuid subjects now go in the metadata.
+Found by watching the devnet suite's log output.
+
+### The portal's insights route was blocked, and the failure was invisible
+
+`me/insights` was missing from the proxy allowlist, so every request 404'd. The
+panel then hit `return null` on a failed fetch, so a refused route and a
+merchant with nothing to report rendered identically. Both fixed; N.14.
+
+### The finance package quietly truncated its own evidence
+
+It took the first 5,000 sales from a paginated list. A merchant past that would
+have handed a lender a package whose detail disagreed with its own headline and
+said nothing about it. It now reads every sale in the period and carries an
+integrity block comparing the two. R.17.
+
+## 3. What was built
+
+### Money movement and custody
+
+- **O.2/O.3** — `POST /wallets/transfer` generated its own idempotency key, so
+  a retry moved the money twice. The key is now required from the client and
+  namespaced per user on the ledger's unique index.
+- **K.10** — authorizations and signatures are recorded in `audit_logs`: who
+  was allowed or refused and why, and what was signed, by which address and key
+  version. The record shape is closed and a guard refuses metadata naming a
+  secret field.
+- **K.11** — startup refuses the configurations that mix environments in either
+  direction.
+- **X.10** — a reconciler compares each wallet's ledger position against its
+  chain balance and subtracts what in-flight operations account for, so only
+  the unexplained part is reported. An unreadable RPC is its own state.
+- **P.6** — `GET /health/operations` reports pending operations, webhook
+  failures, stream activity and worker backlog, with reconciliation on request.
+
+### The merchant portal
+
+- **A.1–A.10** — Holding and Routine on the Payment page, with pending kept
+  apart from available, today's receipts kept apart from what is spendable, and
+  the euro figure always a labelled conversion. No screen asks for a token, a
+  network, an address or a seed phrase, and a test asserts each of those words
+  is absent.
+- **E.1–E.7** — the day-end panel, with the limit that bound the suggestion
+  named and the amount editable.
+- **Q.1** — "Create invoice / QR" on a catalogue product opens the itemised
+  flow already loaded.
+- **Q.4/Q.6/Q.8/Q.10** — the portal consumes the event stream, shows what is on
+  the counter, and names its connection state; a refused stream falls back to
+  polling and says so.
+- **Q.13** — the receipt history carries settlement, fees, net, stock moved and
+  a reconciliation state that distinguishes "not matched" from "nothing to
+  match against".
+- **T.15/V.7/V.9/V.12** — General Analytics has a portal page for the first
+  time. Every chart carries its numbers, every detail table sorts and pages.
+- **N.13/N.14** — insights report their own freshness and their last failed
+  recalculation, and a failed read says so rather than rendering as nothing.
+
+### Mobile
+
+- **Q.4/Q.8/Q.11** — a merchant Receive screen showing whatever is on the
+  counter, over a real event stream built on Expo's streaming fetch, opened on
+  focus and closed on blur. Metro had to be configured for the monorepo before
+  the app could resolve a workspace package at all; both bundles verified with
+  `expo export`.
+
+### Data
+
+Four additive migrations beyond the previous handoff's 0023–0026:
+
+| Migration | Contents |
+| --- | --- |
+| `0027_operation_claims` | The operation lease that stops two instances acting at once |
+| `0028_sale_line_category_snapshot` | The product category as it stood at the sale |
+
+## 4. Tests and demonstrations
 
 | Suite | Count | Command |
 | --- | --- | --- |
-| API unit | 290 | `pnpm --filter api test` |
-| Integration, real Postgres | 74 | `pnpm --filter api test:integration` |
-| Devnet, real chain | 12 | `pnpm --filter api test:devnet` |
+| API unit | 447 | `pnpm --filter api test` |
+| Integration, real Postgres | 221 | `pnpm --filter api test:integration` |
+| Devnet, real chain | 17 | `pnpm --filter api test:devnet` |
+| Portal browser (mobile, tablet, desktop) | 133 | `pnpm --filter portal test:e2e` |
+| Portal unit | 30 | `pnpm --filter portal test` |
 
 Also passing: `pnpm --filter api build`, `pnpm --filter portal exec tsc
---noEmit`. Lint is clean on all new code; roughly 100 pre-existing files carry
-a Prettier baseline the team previously chose not to rewrite, and that
-decision was left standing.
+--noEmit`, `pnpm --filter mobile exec tsc --noEmit`, and `expo export` for iOS
+and Android. Lint is clean on all new code; the portal's four pre-existing
+warnings and the API's Prettier baseline were left as the team chose.
 
-The integration suites use a real database deliberately. They prove four
-racing requests create one operation, two concurrent reservations leave one
-winner, ten racing reservations never overdraw, three concurrent
-finalizations write one ledger entry, and two service instances sharing only
-the database exchange events inside two seconds.
+### Measured, not asserted once
 
-### Stripe sandbox
-
-- Account `acct_1TVFXW7DIaW4cn1X`: card and ACH Direct Debit both active.
-- Hosted Checkout created for card and for `us_bank_account`.
-- Platform-controlled account `acct_1UHr638OsVu9qy2o` onboarded to
-  `payouts_enabled` with a bank account and a Visa debit card.
-- Instant payout to card `po_1UHr7M8OsVu9qy2otl6GutBz`; standard payout to
-  bank `po_1UHr7O8OsVu9qy2oHVAoL1c8`.
-- **A real hosted Checkout payment of USD 5.00 was completed in a browser**,
-  session `cs_test_a1dPonXN…`, `payment_status: paid`.
+- **Event propagation** between two instances: p50 2.1ms, p95 16.7ms, max
+  28.6ms over 40 events, against a two-second target (Q.12, P.3).
+- **Orchestration**: six merchants with 60 days of sales each refresh in 365ms;
+  worst case including the fixed 60-second cadence is 60.4s against the
+  two-minute target (N.12).
+- **Benchmark at plan scale** (100,000 transactions, 1,000 products): the
+  insight engine 37.1s, the three General Analytics calculators 28.9s (P.1).
+  `pnpm --filter api analytics:load`.
+- **Payment API p95** against a committed baseline, failing only on a
+  regression that is both over 10% and outside a 3ms noise floor (P.2).
+  `pnpm --filter api perf:payment`.
 
 ### Solana devnet
 
 Treasury `82ihqmVixpNYoqJDrGPSexJ6kV2JP8Mis38pAnzzXqV4`, funded by Fred.
+Earlier signatures are listed in the checklist; the new one is F.4:
 
 | Signature | What it proves |
 | --- | --- |
-| `5Aex8rYv…` | Treasury to wallet; treasury 20 → 18.5 USDC |
-| `Hf64i2ug…` | Holding to Routine; both wallets held **zero lamports**, fee payer on chain is the treasury |
-| `8F7Hxzba…` | The funded USD 5.00 delivered as tokens; treasury 12.6 → 7.6, wallet 0 → 5 |
-| `29Yzv7so…` | Holding to Routine through the live API; 5 → 3 and 0 → 2 |
-| `3JejC2yM…` | Withdrawal returning tokens to the treasury *before* any payout existed |
+| `2rkAT2QN…` | A customer paying a merchant invoice: tokens leave the customer's wallet and arrive in the merchant's, both confirmed by independent RPC query, with the receipt and the ledger agreeing |
 
-Every one was verified by independent RPC query, not by trusting the
-application's own status column.
-
-The full funding chain ran end to end in **11 seconds**: collection settled
-21:26:10, chain confirmed 21:26:17, finalized 21:26:21.
-
-### Failures found by running it
-
-These are the substantive ones. All are fixed and pinned by tests.
-
-1. **A compensating operation could be declared failed.** `canTransition`
-   checked `to === 'failed'` before checking whether the operation was already
-   compensating. An operation mid-compensation could be moved straight to
-   `failed`, stranding the reservation in `pending` forever with the tokens
-   already gone. `fail()` made it worse by re-implementing the rules by hand.
-   Found by forcing a real payout failure after tokens had moved.
-
-2. **Step methods trusted a stale snapshot.** A worker holding an operation
-   object taken before another worker advanced it would throw instead of
-   no-opping. The ledger had already prevented a double credit, so this was a
-   crash rather than a money bug.
-
-3. **Polling filled the audit log.** One USD 5.00 funding produced 60
-   identical `collection_update` rows around the 5 that mattered, because the
-   runner logged every poll while the customer filled in the form.
-
-4. **The work queue never cleared finished work.** `complete()` compared a
-   Postgres microsecond timestamp against a JavaScript millisecond Date, so
-   the condition never matched. The status itself already answers the
-   question, so the comparison was removed entirely.
-
-5. **Turnover was ineligible for every new product**, because the anchor
-   demanded an opening balance before the period. A product created
-   mid-period has knowable opening stock: zero, before it existed.
-
-6. **Turnover reported a confident ratio on impossible history.** Backdated
-   movements reconstructed a negative stock level and still produced a ratio
-   of 16 against 0.75 average stock.
-
-7. **An SSE snapshot carried a synthetic id.** A client reconnecting with
-   `Last-Event-ID` would have replayed from near the start of the log. A
-   fresh connection also replayed the entire history after the snapshot.
-
-8. **The merchant-event suite was order-dependent**, catching an event still
-   in flight from an earlier case. Each wait now filters for its own type;
-   three consecutive runs pass.
-
-Also fixed: a migration-journal trap. Entries 0019–0022 carry `when`
-timestamps dated 2027, so a correctly dated new migration is **silently
-skipped** — `drizzle-kit migrate` reports success having done nothing. New
-migrations must continue the 2027 sequence until the journal is repaired.
-
-## 4. Deployment and migration status
+## 5. Deployment status
 
 **Nothing has been deployed.** Per your decision, work stops at the deploy
 boundary.
 
-Four additive migrations were written and applied **to the local development
-database only**:
-
-| Migration | Contents |
-| --- | --- |
-| `0023_financial_operations` | Operations, event log, key versions, webhook dedup |
-| `0024_merchant_events` | Merchant event log, presented request, NOTIFY trigger |
-| `0025_merchant_analytics_work` | Analytics work queue |
-| `0026_merchant_assessments` | Saved assessments, package link |
-
-All are additive: no table is altered destructively and no data is rewritten.
-Existing wallets are labelled `v1`, the key version they were already sealed
-with; all 8 local wallets decrypt and derive their stored addresses.
-
-A hosted release would additionally need:
+Migrations 0023–0028 have been applied **to the local development database
+only**. All are additive: no table is altered destructively and no data is
+rewritten. A hosted release would additionally need:
 
 - A verified pre-migration backup.
-- `SOLANA_TREASURY_SECRET_KEY` in Secret Manager, and the treasury funded on
-  the deployed environment.
-- `TRANSFER_PROVIDER=solana`, which is currently `mock`. Without this, the
-  hosted system still moves no tokens.
+- `SOLANA_TREASURY_SECRET_KEY` in Secret Manager, and the treasury funded there.
+- `TRANSFER_PROVIDER=solana`, which is currently `mock`. Startup now refuses to
+  run production with `mock`, so this cannot be forgotten.
 - Stripe webhook events for `checkout.session.*` and `payout.*` registered
   against the deployed endpoint.
+- `OPS_MONITORING_TOKEN`, or `GET /health/operations` stays a 404.
 
-## 5. Remaining work and blockers
+The migration-journal trap still stands: entries 0019–0028 carry `when`
+timestamps dated 2027, so a correctly dated new migration is **silently
+skipped**. New migrations must continue the 2027 sequence until the journal is
+repaired.
 
-### Not started
+## 6. What is left
 
-- **All 13 remaining hosted demonstrations (M.*).** No email scenario has
-  been demonstrated in a browser or on a device, because no portal or mobile
-  UI has been built. Every account feature so far is API-only.
-- **All 7 performance and rollout items (P.*)**, including the
-  100,000-transaction benchmark and the payment API p95 gate.
-- **9 failure-path checks (X.*)**: concurrent operations under load, Stripe
-  delayed success and failure, ledger/token reconciliation, key-version
-  migration under restore, secrets excluded from logs, analytics boundary
-  cases, each combined example, and automatic stock-risk create/resolve.
-- **Q.1 and Q.11**: the per-product invoice entry point and the mobile
-  Receive screen.
-- **N.14**: the blocked portal insights route.
-- **V.12**: sale lines still carry no category column, so historical category
-  reporting uses the current one — labelled, but not snapshotted.
-- **R.17**: silent export truncation in finance packages.
+### Needs a deployment
 
-### External blockers
+All 15 remaining hosted demonstrations (M.1, M.3–M.10, M.12–M.16) and the three
+rollout items (P.4 backups, P.5 deployment order, P.7 recovery during
+rollback). Every one of these is now blocked only by the deploy decision: the
+software each exercises is built and locally proven.
+
+M.11 and M.16 are the two closest — both need only a hosted run.
+
+### External blockers, unchanged
 
 | Blocker | Blocks | Resolution |
 | --- | --- | --- |
-| Chrome extension not connected | Any browser demonstration I could run myself | Reconnect it, or drive the browser yourself as you did for Checkout |
 | A readable test inbox | R.19, inbox-delivery evidence | A mailbox the tester can open |
-| A physical device | QR acceptance on hardware | Required explicitly by plan §5 |
-| An external inventory export | Pre-existing acceptance gap | A file from a named third-party tool |
+| A physical device | QR acceptance on hardware; the mobile half of Q.4, Q.8 and Q.11 | Required explicitly by plan §5 |
+| An external inventory export | A pre-existing acceptance gap | A file from a named third-party tool |
 | George's scoring model | R.8's adapter target | Formulas, inputs, thresholds, version, expected outputs |
 
 ### Honest summary
 
-The API-side platform is substantially built and the money paths are proven
-against real Stripe and a real chain. What is not done is everything that
-makes it *demonstrable* to someone who is not reading a test report: the
-portal and mobile interfaces, and the hosted acceptance run that depends on
-them. That is the largest single remaining piece of work, and it has not been
-started.
+The work that can be done without deploying is done. The remaining 16
+not-started items are the hosted acceptance run and the rollout steps that
+depend on it, plus four external dependencies that are not mine to resolve.
+Deploying is your decision, and this is the point at which it becomes the
+thing standing between the plan and a demonstration.

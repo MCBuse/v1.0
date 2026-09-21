@@ -73,6 +73,18 @@ const FORBIDDEN_FIELDS = [
   'authorization',
 ];
 
+/**
+ * `audit_logs.entity_id` is a uuid column, but a subject is not always one: a
+ * Stripe payout destination is `ba_1UHr…`. Those ids go into the metadata,
+ * where they are just as searchable, rather than into a column that would
+ * reject the insert and lose the record entirely.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function asEntityId(value: string | null | undefined): string | null {
+  return value && UUID.test(value) ? value : null;
+}
+
 export class AuditSecretLeakError extends Error {
   constructor(field: string) {
     super(
@@ -116,10 +128,13 @@ export function buildAuthorizationRecord(fact: AuthorizationFact): AuditRecord {
     userId: fact.userId,
     action: `money.authorization.${fact.decision}`,
     entityType: fact.subjectType,
-    entityId: fact.subjectId,
+    entityId: asEntityId(fact.subjectId),
     metadata: withoutNulls({
       operationKind: fact.operationKind,
       decision: fact.decision,
+      // Always in the metadata, whether or not it also fitted the column.
+      subjectType: fact.subjectType,
+      subjectId: fact.subjectId,
       reason: fact.reason,
       operationId: fact.operationId,
       amountBaseUnits: fact.amountBaseUnits?.toString(),
@@ -135,7 +150,7 @@ export function buildSigningRecord(fact: SigningFact): AuditRecord {
     userId: fact.userId,
     action: 'money.signature.created',
     entityType: 'financial_operation',
-    entityId: fact.operationId,
+    entityId: asEntityId(fact.operationId),
     metadata: withoutNulls({
       operationKind: fact.operationKind,
       walletId: fact.walletId,

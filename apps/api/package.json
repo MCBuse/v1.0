@@ -38,7 +38,9 @@
     "treasury:status": "ts-node src/treasury/treasury-readiness.cli.ts",
     "treasury:send": "ts-node src/treasury/treasury-send.cli.ts",
     "test:devnet": "jest --config ./jest-devnet.json --runInBand --watchman=false",
-    "test:clean": "node scripts/clean-test-data.mjs"
+    "test:clean": "node scripts/clean-test-data.mjs",
+    "analytics:load": "ts-node -T src/data-capture/analytics/general-analytics.load.ts",
+    "perf:payment": "ts-node -T src/data-capture/payment-api.perf.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.1.0",

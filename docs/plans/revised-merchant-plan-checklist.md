@@ -21,7 +21,10 @@ Evidence categories are kept separate and never substituted for one another:
 - **S** — Stripe sandbox result (real API objects and IDs).
 - **D** — Solana devnet proof (real transaction signatures).
 - **H** — hosted deployment status (Cloud Run revisions, migrations).
-- **B** — authenticated browser or mobile demonstration.
+- **B** — authenticated browser or mobile demonstration. Written `B(local)`
+  when driven against a local build with the API stubbed at the proxy boundary,
+  and `B(hosted)` when driven against the deployed environment. Only
+  `B(hosted)` satisfies the M.* scenarios.
 - **I** — recipient inbox delivery confirmation.
 
 A requirement is only `verified` when evidence of the category it names exists.
@@ -74,16 +77,16 @@ therefore new work, not a configuration change.
 | K.7 | Controlled re-encryption to a new key version | verified | L — `wallets:key-rotate` with dry-run; integration test rotates v1 to v2 preserving every address |
 | K.8 | Old key versions retained until migration and recovery checks pass | verified | L — integration test proves a restored v1 record fails recovery once v1 is dropped and passes while retained |
 | K.9 | Restore encrypted wallet records with the correct key version (tested) | verified | L — `wallets:key-verify`; 8/8 local wallets pass |
-| K.10 | Audit authorizations and signatures without logging secrets | not-started | — |
-| K.11 | Devnet credentials separated from any future production environment | not-started | — |
+| K.10 | Audit authorizations and signatures without logging secrets | verified | L + D — `money.authorization.*` and `money.signature.created` in `audit_logs`, written during the devnet suite; closed-shape records plus a guard that refuses any metadata naming a secret field |
+| K.11 | Devnet credentials separated from any future production environment | verified | L — startup refuses production on a devnet RPC, the devnet mint, a Stripe test key or `TRANSFER_PROVIDER=mock`, and refuses a live Stripe key, mainnet RPC or mainnet mint anywhere else; 20 cases |
 
 ### 2C — Reliable financial operations
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
 | O.1 | Durable operation records for reservations, chain submission/finality, Stripe transfers, payouts, recovery | built | L — `financial_operations` + event log; 18 integration tests |
-| O.2 | Stable client idempotency keys accepted | in-progress | Present for merchant payments, cash sales, imports, finance packages; absent for funding/withdrawal/internal transfer |
-| O.3 | Reuse with different inputs rejected | in-progress | Same coverage as O.2 |
+| O.2 | Stable client idempotency keys accepted | verified | L — the last gap was `POST /wallets/transfer`, which generated its own key; the key is now required, namespaced per user on the ledger's unique index |
+| O.3 | Reuse with different inputs rejected | verified | L — a replay returns the original transfer, the same key with a different amount or direction is refused, and four racing requests leave one ledger entry |
 | O.4 | Persist prepared blockchain signatures and provider references | built | L — signature derived and persisted before broadcast in `spl-transfer.ts` |
 | O.5 | Resume from last confirmed step after timeout or restart | built | L — `OperationRunnerService` dispatches on the stored status every 15s |
 | O.6 | Keep uncertain transactions pending while reconciling; never blindly resend | built | L — state machine has no `resend_chain` action; test asserts it for every kind and status |
@@ -101,16 +104,16 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| A.1 | Routine and Holding account cards on Payment | in-progress | API side done (`GET /accounts`); portal UI not yet built |
-| A.2 | Available and pending balances shown per account | in-progress | In the API response; portal UI not yet built |
-| A.3 | Recent activity and relevant actions per account | in-progress | API returns both; portal UI not yet built |
-| A.4 | Today's digital receipts shown separately from spendable funds | in-progress | In `GET /accounts` and the day-end view; portal UI not yet built |
-| A.5 | Converted EUR amounts labelled with conversion timestamp | in-progress | `converted.rate`/`quotedAt` in the API; portal UI not yet built |
-| A.6 | Actions named Add money / Move money / Pay / Withdraw | in-progress | API returns these labels per account; portal UI not yet built |
-| A.7 | No token or network selection in the demonstration journey | not-started | — |
-| A.8 | No seed phrases, no address pasting, no user-obtained SOL | not-started | — |
-| A.9 | Custody, fee and conversion information remains accessible | in-progress | `custody` block in `GET /accounts`; portal UI not yet built |
-| A.10 | EUR display must not imply a fixed EUR entitlement over a USDC balance | in-progress | API carries an explicit note; portal must render it |
+| A.1 | Routine and Holding account cards on Payment | verified | L + B(local) — both cards render on the Payment page |
+| A.2 | Available and pending balances shown per account | verified | L + B(local) — pending is labelled "not yet spendable" |
+| A.3 | Recent activity and relevant actions per account | verified | L + B(local) |
+| A.4 | Today's digital receipts shown separately from spendable funds | verified | L + B(local) — a Today card distinct from the balances, plus the day-end panel |
+| A.5 | Converted EUR amounts labelled with conversion timestamp | verified | L + B(local) — rate and quote time on both cards |
+| A.6 | Actions named Add money / Move money / Pay / Withdraw | verified | L + B(local) — all four rendered as buttons |
+| A.7 | No token or network selection in the demonstration journey | verified | B(local) — the page text is asserted to contain no network or token chooser, and each money flow takes one input |
+| A.8 | No seed phrases, no address pasting, no user-obtained SOL | verified | B(local) — asserted absent by wording; D — K.5 already proves users hold no SOL |
+| A.9 | Custody, fee and conversion information remains accessible | verified | L + B(local) — one link opens custody, network, fees and the token position |
+| A.10 | EUR display must not imply a fixed EUR entitlement over a USDC balance | verified | L + B(local) — the note renders on both cards |
 | A.11 | Wallets resolved from the merchant's receiving-wallet owner | built | L — `AccountWalletsService.forMerchantOwner` |
 | A.12 | Money-moving actions restricted to the authorized owner | built | L — a membership alone cannot move money; only the receiving-wallet owner can |
 
@@ -121,7 +124,7 @@ therefore new work, not a configuration change.
 | F.1 | Debit card → Holding via Stripe-hosted Checkout, then devnet treasury funds Holding | verified | S + D — `cs_test_a1dPonXN…` paid USD 5.00; devnet `8F7Hxzba…` treasury 12.6→7.6, wallet 0→5; Holding credited 500c in 11s |
 | F.2 | Bank → Holding via USD ACH Direct Debit, pending until success, then treasury funds Holding | built | L + S — same service with `us_bank_account`; only `payment_status=paid` advances |
 | F.3 | Holding → Routine: reserve, transfer test USDC between wallets, finalize once | verified | D — devnet suite moves 0.25 USDC; ledger and chain agree; repeated finalize writes no second entry |
-| F.4 | Customer Routine → merchant Routine on devnet, with matching receipts | in-progress | Flow exists; has only ever run on the mock provider |
+| F.4 | Customer Routine → merchant Routine on devnet, with matching receipts | verified | D — a customer pays a merchant invoice on devnet; tokens verified by independent RPC query on both sides, the ledger credits once, the reserved stock is consumed and the receipt's settlement figures match. **Found why this had never run**: the P2P provider made the payer the fee and rent payer, and users hold no SOL by design, so a first-time merchant's transfer failed with `TokenAccountNotFoundError`. It now uses the treasury, like the account flows |
 | F.5 | Merchant Routine → Holding, merchant-confirmed, with day-end option | built | L + D — day-end confirm routes through the verified transfer flow |
 | F.6 | Holding → bank: reserve, return USDC to treasury, then Stripe sandbox payout | verified | D + S — chain `3JejC2yM…` returns tokens first (providerRef still null), then payout `po_1UHsax8O…` USD 0.25 |
 | F.7 | Holding → debit card: same sequence to an eligible debit-card destination | verified | S — `card_1UHr6Z8O…` routes to `withdrawal_card` with instant payout method |
@@ -150,19 +153,19 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| Q.1 | "Create invoice / QR" on catalogue products opens the itemized invoice flow preloaded | not-started | API already accepts product lines; this is a portal UI entry point only |
+| Q.1 | "Create invoice / QR" on catalogue products opens the itemized invoice flow preloaded | verified | B(local) — the action opens the itemised flow with the product as a line, the line is editable, and the created invoice carries it |
 | Q.2 | Each purchase gets a unique request preserving names, SKUs, quantities, prices, conversion snapshot | built | L — invoice items + quote snapshot |
 | Q.3 | Reserve stock on creation, consume on finalized payment, release on expiry or cancellation | built | L — `merchant-inventory.service.ts` |
-| Q.4 | "Present on app" action and a dedicated merchant Receive screen | in-progress | `POST /merchants/me/payment-requests/:id/present` done; the mobile Receive screen is not built |
+| Q.4 | "Present on app" action and a dedicated merchant Receive screen | built | L + B(local) — the portal presents a request and shows the counter; the mobile Receive screen is built and bundles, but has no device evidence |
 | Q.5 | Selected request persisted server-side | verified | L — `merchant_presented_requests`, one per merchant; a later device reads the same state |
 | Q.6 | Presentation and status changes delivered by authenticated SSE | verified | L — `GET /merchants/me/events/stream` behind the JWT guard; checked live over HTTP |
 | Q.7 | Events backed by a PostgreSQL event log and cross-instance notification | verified | L — `merchant_events` + NOTIFY trigger; two service instances sharing only the database exchange events |
-| Q.8 | Streaming portal proxy and authenticated mobile streaming | in-progress | Portal proxy now pipes the stream and forwards the abort signal; mobile streaming not built |
+| Q.8 | Streaming portal proxy and authenticated mobile streaming | built | L + B(local) — the portal consumes the stream; mobile streams over Expo's fetch with the SSE framing tested (16 cases) and both bundles verified, but has no device evidence |
 | Q.9 | Replay missed events or reload authoritative state on reconnect | verified | L — snapshot on connect, `Last-Event-ID` replay; fresh connect sends no backlog |
-| Q.10 | Polling fallback and visible connection status retained | in-progress | `GET /merchants/me/events?after=` done; connection status is UI work |
-| Q.11 | Receive screen updates without hijacking unrelated mobile screens | not-started | Mobile work; the API side is a pull-based stream, so nothing is pushed at unrelated screens |
-| Q.12 | Two-second p95 propagation, matching request ID, amount and status | in-progress | L — integration test asserts under two seconds between instances; not yet measured across real devices under load |
-| Q.13 | Searchable, paginated transaction history with all listed financial attributes | in-progress | Many attributes exist; stock impact, fees, net amount, reconciliation state incomplete |
+| Q.10 | Polling fallback and visible connection status retained | verified | B(local) — a refused stream falls back to polling, says so on screen, and is proven to actually poll |
+| Q.11 | Receive screen updates without hijacking unrelated mobile screens | built | L — the stream is opened on focus and closed on blur, so no other screen holds a connection; no device evidence |
+| Q.12 | Two-second p95 propagation, matching request ID, amount and status | verified | L — measured over 40 events between two instances: p50 2.1ms, p95 16.7ms, max 28.6ms; a 20-event burst p95 15.5ms. Not yet measured across real devices |
+| Q.13 | Searchable, paginated transaction history with all listed financial attributes | verified | L + B(local) — settlement and rate, fees stated explicitly with who paid the network fee, net amount, stock moved, and a reconciliation state that distinguishes unmatched from nothing-to-match-against |
 | Q.14 | Cash entry, historical sale time, private attachments, stock-already-accounted-for, audited voids retained | built | L + H — existing behaviour to be preserved |
 
 ---
@@ -187,7 +190,7 @@ therefore new work, not a configuration change.
 | T.12 | Merchant-local boundaries and comparable periods | built | L — `merchantLocalDateKey` |
 | T.13 | Explicit partial-period and missing-baseline labels | built | L — running periods marked partial; no baseline yields null, never a percentage |
 | T.14 | Entire selected range accessible, not silently truncated to 14 entries | built | L — test asserts a 99-day range returns 99 points |
-| T.15 | Readable charts plus accessible table detail | not-started | — |
+| T.15 | Readable charts plus accessible table detail | verified | B(local) — every chart carries a screen-reader table and a disclosure that shows the same numbers on screen |
 
 ### 3C — General Inventory Analytics
 
@@ -199,12 +202,12 @@ therefore new work, not a configuration change.
 | V.4 | Fast-moving products ranked by units per day | built | L |
 | V.5 | Slow-moving and stocked-but-unsold products | built | L — an out-of-stock product is not counted as unsold stock |
 | V.6 | Products at or below minimum and approaching minimum | built | L — the two are separate lists |
-| V.7 | Current stock-outs and historical intervals where records support them | in-progress | Current stock-outs done; historical intervals not built |
+| V.7 | Current stock-outs and historical intervals where records support them | verified | L — intervals reconstructed from the same daily closings turnover uses; a product whose history cannot support it is listed as ineligible rather than silently absent |
 | V.8 | Inventory turnover across eligible products | built | L — eligibility is explicit, with the reason when it fails |
-| V.9 | Product and category sales with sortable, paginated detail | in-progress | Category totals now returned; sorting and pagination are UI work |
+| V.9 | Product and category sales with sortable, paginated detail | verified | B(local) — every column sorts with `aria-sort`, and the tables page |
 | V.10 | Turnover = units sold ÷ average recorded daily closing on-hand stock | built | L — closing stock reconstructed backwards from the current position |
 | V.11 | Insufficient history reported where opening stock is unreliable | built | L — also refuses a ratio when movements contradict current stock |
-| V.12 | Category snapshot captured on new sale lines | not-started | Sale lines still carry no category column; the fallback is labelled instead |
+| V.12 | Category snapshot captured on new sale lines | verified | L — migration 0028; re-categorising a product afterwards does not change what a past sale was recorded as |
 | V.13 | Legacy category fallback labelled explicitly | built | L — `categorySource` of recorded, current_product or mixed, plus a note |
 | V.14 | Selling-price valuation never presented as cost, profit or margin | built | L — documented boundary |
 
@@ -238,9 +241,9 @@ therefore new work, not a configuration change.
 | N.9 | One-minute background worker | built | L — `AnalyticsOrchestratorService` ticks every 60s |
 | N.10 | Expensive calculation kept outside payment requests | built | L — worker is a separate Cloud Run job |
 | N.11 | Existing forecast history requirements reused; unreliable projections suppressed | built | L — documented thresholds |
-| N.12 | Two-minute p95 insight update under demonstration load | not-started | — |
-| N.13 | Freshness and failures shown | in-progress | Staleness threshold exists |
-| N.14 | Blocked portal insights route fixed; fetch failure never renders as an empty panel | not-started | — |
+| N.12 | Two-minute p95 insight update under demonstration load | verified | L — six merchants with 60 days of sales each refresh in 365ms; worst case including the fixed 60-second cadence is 60.4s against the two-minute target |
+| N.13 | Freshness and failures shown | verified | L + B(local) — the response carries age, threshold and the last failed recalculation with its reason and attempt count; the portal shows both |
+| N.14 | Blocked portal insights route fixed; fetch failure never renders as an empty panel | verified | B(local) — `me/insights` was missing from the proxy allowlist and the panel returned null on failure; both fixed, with a test that a 404 and a 503 each say so |
 | N.15 | Automatic purchasing and paid intelligence excluded | deferred | By agreement |
 
 ---
@@ -259,13 +262,13 @@ therefore new work, not a configuration change.
 | R.8 | Adapter boundary for George's future model | built | L — `AssessmentModel` interface and registry; an unregistered id is refused with a 400 naming what exists |
 | R.9 | No fabricated credit score; fallback never claimed as George's integration | built | L — documented |
 | R.10 | Finance Match package linked to a saved assessment | verified | L — explicit join; package read back cites the same assessment id |
-| R.11 | Preview and download the same immutable PDF/data snapshot | in-progress | Immutable package exists; no preview |
-| R.12 | 7/30/90-day reporting preserved, assessment window labelled separately | in-progress | — |
+| R.11 | Preview and download the same immutable PDF/data snapshot | verified | L — the preview carries a SHA-256 of the stored artifact bytes, compared against what a download returns, and does not change between previews |
+| R.12 | 7/30/90-day reporting preserved, assessment window labelled separately | verified | L — the package carries a named reporting window distinct from the linked assessment's evidence window |
 | R.13 | Provenance, limitations and demonstration labels included | built | L + H |
-| R.14 | Package and email-attempt history | in-progress | Attempts recorded; no history view |
+| R.14 | Package and email-attempt history | verified | L — both listed, newest first, with acceptance never reported as delivery |
 | R.15 | Explicit recipient confirmation preserved | built | L + H |
 | R.16 | Retries never duplicate packages or messages | built | L + H — idempotency fingerprints |
-| R.17 | Silent export truncation removed; exported detail reconciles to totals | not-started | — |
+| R.17 | Silent export truncation removed; exported detail reconciles to totals | verified | L — the package took the first 5,000 sales from a paginated list; it now reads every sale in the period and carries an integrity block checking the detail against the headline totals. The PDF's top-ten tables say what they omit and where the rest is |
 | R.18 | SMTP acceptance distinguished from confirmed inbox delivery | built | H — recorded as `accepted_by_smtp` |
 | R.19 | Delivery verified to a designated test inbox | blocked | Needs a mailbox the tester can read |
 | R.20 | Sending to a financial institution remains an explicit merchant action | built | L |
@@ -278,24 +281,24 @@ therefore new work, not a configuration change.
 
 | ID | Check | Status |
 | --- | --- | --- |
-| X.1 | Concurrent operations | not-started |
+| X.1 | Concurrent operations | verified (L) — twelve concurrent transfers against a ten-unit balance never overdraw; two runners sweeping together step each operation once; a batch drives to finalized with the ledger and balances agreeing. **Found a real bug**: two instances could both broadcast the same transfer, fixed with an exclusive lease (migration 0027) |
 | X.2 | Insufficient funds | verified (L + D) — refused for transfer and withdrawal; concurrent reservations never overdraw |
 | X.3 | Duplicate submissions | verified (L) — idempotent replay, conflicting reuse refused, 4-way race yields one record |
-| X.4 | Unauthorized cross-merchant access | in-progress |
-| X.5 | Blockchain timeout, restart, reconciliation without duplicate transfer | in-progress |
-| X.6 | Stripe delayed success | not-started |
-| X.7 | Stripe failure | not-started |
+| X.4 | Unauthorized cross-merchant access | verified (L) — two merchants side by side, every sub-resource id tried across the boundary: products, invoices, cash sales, assessments, finance packages, imports. Two honest-error fixes came out of it |
+| X.5 | Blockchain timeout, restart, reconciliation without duplicate transfer | verified (L) — three recovery passes and a restart leave exactly one submission; the confirmation is recorded as recovered; a chain failure releases the reservation |
+| X.6 | Stripe delayed success | verified (L) — a completed ACH Checkout session is not settled money; twenty polls leave one audit row; only the async success advances it |
+| X.7 | Stripe failure | verified (L) — a refused debit fails the operation and credits nothing; an expired session fails without inventing an outcome; a late success does not resurrect it |
 | X.8 | Duplicate Stripe webhooks | built (L) — events persisted by id; redelivery recognised, differing body refused |
 | X.9 | Payout failure after token movement | verified (D) — also found a real bug: a compensating operation could be declared failed, stranding the reservation |
-| X.10 | Ledger and token reconciliation and recovery | not-started |
-| X.11 | Key-version migration and backup restoration | not-started |
-| X.12 | Secrets excluded from responses and logs | not-started |
+| X.10 | Ledger and token reconciliation and recovery | verified (L) — a reconciler compares each wallet's ledger position against its chain balance and subtracts what in-flight operations account for; an unreadable RPC is its own state rather than a discrepancy |
+| X.11 | Key-version migration and backup restoration | verified (L) — a backup sealed at v1 restored after rotation opens, rotates preserving every address, and is reported by id rather than mangled once v1 is retired or the wrong key is present |
+| X.12 | Secrets excluded from responses and logs | verified (L) — a wallet sealed with the platform's real encryption never appears in the wallets response, the accounts summary, the operations list, the audit trail or an HTTP log line |
 | X.13 | Invoice reservation, expiry, cancellation, cash void | built |
 | X.14 | Cross-device event replay, reconnect, multiple API instances | built (L) — two instances, cursor replay, reconnect, per-merchant isolation, ordered bursts |
-| X.15 | Analytics totals, timezone boundaries, empty periods, missing baselines, mixed sources, incomplete stock history | not-started |
-| X.16 | Every combined-analysis example | not-started |
-| X.17 | Automatic stock-risk creation and resolution | not-started |
-| X.18 | Assessment reproducibility, package immutability, email retry | in-progress |
+| X.15 | Analytics totals, timezone boundaries, empty periods, missing baselines, mixed sources, incomplete stock history | verified (L) — 22 cases, including sales either side of local midnight and an empty period reported as zero rather than a decline |
+| X.16 | Every combined-analysis example | verified (L) — all four analyses in every branch, including the three refusals, plus byte-identical output for identical input |
+| X.17 | Automatic stock-risk creation and resolution | verified (L) — raised from recorded demand, cleared on replenishment, raised again on drawdown; the resolved row is kept with its resolution time |
+| X.18 | Assessment reproducibility, package immutability, email retry | verified (L) — a replayed key returns the original package, the same key with a different period is refused, the stored artifact is byte-identical on re-download, and a failed send is recorded |
 
 ### Hosted demonstration — the email scenarios
 
@@ -322,12 +325,12 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| P.1 | Re-run the 100,000-transaction / 1,000-product benchmark | not-started |
-| P.2 | Payment API p95 degradation within the 10% rollout gate | not-started |
-| P.3 | QR and orchestration latency measured against targets | not-started |
+| P.1 | Re-run the 100,000-transaction / 1,000-product benchmark | verified (L) — insight engine 37.1s; the three General Analytics calculators, which did not exist when the original benchmark was written, 28.9s combined (`pnpm --filter api analytics:load`) |
+| P.2 | Payment API p95 degradation within the 10% rollout gate | built (L) — `pnpm --filter api perf:payment` checks the payment path's p95 against a committed baseline and fails on a regression that is both over 10% and outside a 3ms noise floor. The hosted p95 still needs the deployed environment |
+| P.3 | QR and orchestration latency measured against targets | verified (L) — propagation p95 16.7ms against a two-second target; orchestration 365ms for six merchants, worst case 60.4s against a two-minute target |
 | P.4 | Backups verified before migrations | not-started |
 | P.5 | API deployed before clients; demonstration merchants enabled first | not-started |
-| P.6 | Monitoring for pending operations, reconciliation differences, webhook failures, stream health, worker backlog | not-started |
+| P.6 | Monitoring for pending operations, reconciliation differences, webhook failures, stream health, worker backlog | built (L) — `GET /health/operations` behind a shared token, 404 when unconfigured, reconciliation on request; 13 integration cases. Not deployed |
 | P.7 | Recovery workers keep running during rollback | not-started |
 
 ---

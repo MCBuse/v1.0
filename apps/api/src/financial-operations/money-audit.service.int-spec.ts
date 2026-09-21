@@ -84,8 +84,9 @@ describe('MoneyAuditService (integration)', () => {
       userId,
       operationKind: 'withdrawal_bank',
       decision: 'refused',
+      // A Stripe id, which is not a uuid: it must still be written.
+      subjectId: 'ba_1UHr6e8OsVu9qy2oahQAuKmk',
       subjectType: 'payout_destination',
-      subjectId: null,
       reason: 'destination_ineligible',
     });
 
@@ -93,9 +94,36 @@ describe('MoneyAuditService (integration)', () => {
       (r) => r.action === 'money.authorization.refused',
     );
     expect(written).toHaveLength(1);
-    expect(JSON.parse(written[0].metadata!).reason).toBe(
-      'destination_ineligible',
+    expect(written[0].entityId).toBeNull();
+    const metadata = JSON.parse(written[0].metadata!) as Record<string, string>;
+    expect(metadata.reason).toBe('destination_ineligible');
+    expect(metadata.subjectId).toBe('ba_1UHr6e8OsVu9qy2oahQAuKmk');
+  });
+
+  it('writes an authorization whose subject is a Stripe id rather than losing it', async () => {
+    // The bug this replaces: `entity_id` is a uuid column, the insert failed,
+    // and the service swallows write failures, so every withdrawal
+    // authorization vanished without a trace.
+    const before = (await rows()).length;
+
+    await audit.authorization({
+      userId,
+      operationKind: 'withdrawal_card',
+      decision: 'granted',
+      subjectType: 'payout_destination',
+      subjectId: 'card_1UHr6Z8OsVu9qy2o1JkHBd8v',
+      operationId: randomUUID(),
+      amountBaseUnits: 250_000n,
+      currency: 'USDC',
+    });
+
+    const after = await rows();
+    expect(after).toHaveLength(before + 1);
+    const written = after.find(
+      (row) =>
+        row.metadata?.includes('card_1UHr6Z8OsVu9qy2o1JkHBd8v') ?? false,
     );
+    expect(written).toBeDefined();
   });
 
   it('writes a signing record carrying no key material', async () => {

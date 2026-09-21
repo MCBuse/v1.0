@@ -1,9 +1,13 @@
 import {
   AuditSecretLeakError,
+  asEntityId,
   assertNoSecretFields,
   buildAuthorizationRecord,
   buildSigningRecord,
 } from './money-audit';
+
+const OPERATION_ID = '11111111-2222-4333-8444-555555555555';
+const WALLET_ID = '66666666-7777-4888-8999-aaaaaaaaaaaa';
 
 describe('money audit records', () => {
   describe('authorization', () => {
@@ -13,8 +17,8 @@ describe('money audit records', () => {
         operationKind: 'internal_transfer',
         decision: 'granted',
         subjectType: 'wallet',
-        subjectId: 'wallet-1',
-        operationId: 'op-1',
+        subjectId: WALLET_ID,
+        operationId: OPERATION_ID,
         amountBaseUnits: 2_500_000n,
         currency: 'USDC',
       });
@@ -23,11 +27,13 @@ describe('money audit records', () => {
         userId: 'user-1',
         action: 'money.authorization.granted',
         entityType: 'wallet',
-        entityId: 'wallet-1',
+        entityId: WALLET_ID,
         metadata: {
           operationKind: 'internal_transfer',
           decision: 'granted',
-          operationId: 'op-1',
+          subjectType: 'wallet',
+          subjectId: WALLET_ID,
+          operationId: OPERATION_ID,
           amountBaseUnits: '2500000',
           currency: 'USDC',
         },
@@ -76,7 +82,38 @@ describe('money audit records', () => {
       expect(Object.keys(record.metadata).sort()).toEqual([
         'decision',
         'operationKind',
+        'subjectType',
       ]);
+    });
+
+    it('keeps a non-uuid subject id out of the uuid column and in the metadata', () => {
+      // A Stripe payout destination. Writing this into `entity_id` made the
+      // insert fail, and the audit service swallows write failures, so every
+      // withdrawal authorization was being lost.
+      const record = buildAuthorizationRecord({
+        userId: 'user-1',
+        operationKind: 'withdrawal_bank',
+        decision: 'granted',
+        subjectType: 'payout_destination',
+        subjectId: 'ba_1UHr6e8OsVu9qy2oahQAuKmk',
+        operationId: OPERATION_ID,
+      });
+
+      expect(record.entityId).toBeNull();
+      expect(record.metadata.subjectId).toBe('ba_1UHr6e8OsVu9qy2oahQAuKmk');
+      expect(record.metadata.subjectType).toBe('payout_destination');
+    });
+
+    it('still uses the column when the subject really is a uuid', () => {
+      expect(
+        buildAuthorizationRecord({
+          userId: 'user-1',
+          operationKind: 'internal_transfer',
+          decision: 'granted',
+          subjectType: 'wallet',
+          subjectId: WALLET_ID,
+        }).entityId,
+      ).toBe(WALLET_ID);
     });
   });
 
@@ -84,9 +121,9 @@ describe('money audit records', () => {
     it('records the public address, key version and chain signature', () => {
       const record = buildSigningRecord({
         userId: 'user-1',
-        operationId: 'op-1',
+        operationId: OPERATION_ID,
         operationKind: 'internal_transfer',
-        walletId: 'wallet-1',
+        walletId: WALLET_ID,
         walletAddress: '82ihqmVixpNYoqJDrGPSexJ6kV2JP8Mis38pAnzzXqV4',
         keyVersion: 'v1',
         chainSignature: '5Aex8rYv',
@@ -97,7 +134,7 @@ describe('money audit records', () => {
 
       expect(record.action).toBe('money.signature.created');
       expect(record.entityType).toBe('financial_operation');
-      expect(record.entityId).toBe('op-1');
+      expect(record.entityId).toBe(OPERATION_ID);
       expect(record.metadata).toMatchObject({
         walletAddress: '82ihqmVixpNYoqJDrGPSexJ6kV2JP8Mis38pAnzzXqV4',
         keyVersion: 'v1',
@@ -124,6 +161,19 @@ describe('money audit records', () => {
       expect(serialized).not.toMatch(/keypair/i);
       expect(serialized).not.toMatch(/secret/i);
       expect(record.metadata.keyVersion).toBe('v2');
+    });
+  });
+
+  describe('entity ids', () => {
+    it.each([
+      ['11111111-2222-4333-8444-555555555555', '11111111-2222-4333-8444-555555555555'],
+      ['ba_1UHr6e8OsVu9qy2oahQAuKmk', null],
+      ['card_1UHr6Z8OsVu9qy2o1JkHBd8v', null],
+      ['', null],
+      [null, null],
+      [undefined, null],
+    ])('maps %s to %s', (input, expected) => {
+      expect(asEntityId(input as string | null | undefined)).toBe(expected);
     });
   });
 

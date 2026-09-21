@@ -1,7 +1,8 @@
-import { getMint, getOrCreateAssociatedTokenAccount } from '@solana/spl-token';
+import { getAccount, getMint } from '@solana/spl-token';
 import { Keypair, Transaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { SolanaService } from '../../solana/solana.service';
+import type { TreasuryService } from '../../treasury/treasury.service';
 import type { TransferParams } from '../transfer-provider.interface';
 import { SolanaTransferProvider } from './solana-transfer.provider';
 
@@ -11,21 +12,24 @@ jest.mock('@solana/spl-token', () => {
   return {
     ...actual,
     getMint: jest.fn(),
-    getOrCreateAssociatedTokenAccount: jest.fn(),
+    getAccount: jest.fn(),
   };
 });
 
 const mockedGetMint = getMint as jest.MockedFunction<typeof getMint>;
-const mockedGetOrCreateAssociatedTokenAccount =
-  getOrCreateAssociatedTokenAccount as jest.MockedFunction<
-    typeof getOrCreateAssociatedTokenAccount
-  >;
+const mockedGetAccount = getAccount as jest.MockedFunction<typeof getAccount>;
 
-function setup() {
+function setup({
+  destinationExists = true,
+  treasuryConfigured = true,
+}: { destinationExists?: boolean; treasuryConfigured?: boolean } = {}) {
   const payer = Keypair.generate();
   const payee = Keypair.generate();
+  const treasuryKeypair = Keypair.generate();
   const blockhash = Keypair.generate().publicKey.toBase58();
   const events: string[] = [];
+  const broadcast: Transaction[] = [];
+
   const connection = {
     getLatestBlockhash: jest.fn().mockResolvedValue({
       blockhash,
@@ -33,28 +37,31 @@ function setup() {
     }),
     sendRawTransaction: jest.fn((wireTransaction: Buffer) => {
       events.push('broadcast');
-      const signature = Transaction.from(wireTransaction).signature;
-      if (!signature) throw new Error('Test transaction was not signed');
-      return Promise.resolve(bs58.encode(signature));
+      const transaction = Transaction.from(wireTransaction);
+      broadcast.push(transaction);
+      if (!transaction.signature)
+        throw new Error('Test transaction was not signed');
+      return Promise.resolve(bs58.encode(transaction.signature));
     }),
     confirmTransaction: jest.fn().mockResolvedValue({ value: { err: null } }),
     getSignatureStatuses: jest.fn().mockResolvedValue({
       value: [{ err: null, confirmationStatus: 'finalized' }],
     }),
   };
+
   const solana = {
     getConnection: jest.fn(() => connection),
     decryptKeypair: jest.fn(() => payer),
   } as unknown as SolanaService;
-  const provider = new SolanaTransferProvider(solana);
 
-  mockedGetOrCreateAssociatedTokenAccount
-    .mockResolvedValueOnce({
-      address: Keypair.generate().publicKey,
-    } as never)
-    .mockResolvedValueOnce({
-      address: Keypair.generate().publicKey,
-    } as never);
+  const treasury = {
+    feePayer: () => (treasuryConfigured ? treasuryKeypair : undefined),
+  } as unknown as TreasuryService;
+
+  const provider = new SolanaTransferProvider(solana, treasury);
+
+  if (destinationExists) mockedGetAccount.mockResolvedValue({} as never);
+  else mockedGetAccount.mockRejectedValue(new Error('not found'));
   mockedGetMint.mockResolvedValue({ decimals: 6 } as never);
 
   const params: TransferParams = {
@@ -68,7 +75,7 @@ function setup() {
     idempotencyKey: 'payment-attempt',
   };
 
-  return { connection, events, params, provider };
+  return { broadcast, connection, events, params, payer, provider, treasuryKeypair };
 }
 
 describe('SolanaTransferProvider', () => {
@@ -138,6 +145,58 @@ describe('SolanaTransferProvider', () => {
     expect(result).toEqual({
       txSignature: preparedSignature,
       status: 'pending',
+    });
+  });
+
+  describe('who pays', () => {
+    it('makes the treasury the fee payer, never the customer', async () => {
+      // The customer holds no SOL by design, so a transaction that asked them
+      // to pay the fee could not execute at all.
+      const { broadcast, params, provider, treasuryKeypair } = setup();
+
+      await provider.execute(params);
+
+      expect(broadcast).toHaveLength(1);
+      expect(broadcast[0]!.feePayer?.toBase58()).toBe(
+        treasuryKeypair.publicKey.toBase58(),
+      );
+    });
+
+    it('creates the merchant’s token account when they have never been paid', async () => {
+      const { broadcast, params, provider, treasuryKeypair } = setup({
+        destinationExists: false,
+      });
+
+      await provider.execute(params);
+
+      const instructions = broadcast[0]!.instructions;
+      // Two instructions: create the destination account, then transfer.
+      expect(instructions).toHaveLength(2);
+      // The treasury funds the rent, not the payer.
+      expect(instructions[0]!.keys[0]!.pubkey.toBase58()).toBe(
+        treasuryKeypair.publicKey.toBase58(),
+      );
+    });
+
+    it('sends only the transfer when the merchant already has an account', async () => {
+      const { broadcast, params, provider } = setup({
+        destinationExists: true,
+      });
+
+      await provider.execute(params);
+
+      expect(broadcast[0]!.instructions).toHaveLength(1);
+    });
+
+    it('refuses rather than asking the customer to cover the fee', async () => {
+      const { connection, params, provider } = setup({
+        treasuryConfigured: false,
+      });
+
+      await expect(provider.execute(params)).rejects.toThrow(
+        /treasury is not configured/i,
+      );
+      expect(connection.sendRawTransaction).not.toHaveBeenCalled();
     });
   });
 });
