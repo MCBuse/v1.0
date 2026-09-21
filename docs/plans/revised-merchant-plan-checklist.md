@@ -174,52 +174,52 @@ therefore new work, not a configuration change.
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
 | T.1 | Shared date, source and environment filters | built | L — existing analytics filters |
-| T.2 | Today filter | not-started | — |
-| T.3 | Explicit daily / weekly / monthly grouping | in-progress | Grouping is currently implied by range length |
+| T.2 | Today filter | built | L — `period=today` resolves the merchant's own calendar day, not a rolling 24 hours |
+| T.3 | Explicit daily / weekly / monthly grouping | built | L — `grouping` parameter; ISO weeks Monday to Sunday |
 | T.4 | Total recorded sales and transaction count | built | L |
 | T.5 | Average transaction value | built | L |
-| T.6 | Cash and digital amounts, counts and percentage shares | in-progress | Amounts exist; counts and shares incomplete |
-| T.7 | Daily, weekly and monthly sales | in-progress | — |
+| T.6 | Cash and digital amounts, counts and percentage shares | built | L — amount and count shares for both sources |
+| T.7 | Daily, weekly and monthly sales | built | L — one series driven by the grouping parameter |
 | T.8 | All 24 hourly sales and transaction buckets | built | L — `hourlyRhythm` |
-| T.9 | Peak hours and trading windows | not-started | — |
-| T.10 | Sales, transaction-count and average-value trends | in-progress | Sales trend only |
-| T.11 | Payment-method distribution | not-started | Payment method is not yet separated from capture channel |
+| T.9 | Peak hours and trading windows | built | L — peak hour, busiest contiguous three-hour window, observed trading window |
+| T.10 | Sales, transaction-count and average-value trends | built | L — all three against the comparable preceding period |
+| T.11 | Payment-method distribution | built | L — grouped by payment method, independent of capture channel |
 | T.12 | Merchant-local boundaries and comparable periods | built | L — `merchantLocalDateKey` |
-| T.13 | Explicit partial-period and missing-baseline labels | not-started | — |
-| T.14 | Entire selected range accessible, not silently truncated to 14 entries | not-started | — |
+| T.13 | Explicit partial-period and missing-baseline labels | built | L — running periods marked partial; no baseline yields null, never a percentage |
+| T.14 | Entire selected range accessible, not silently truncated to 14 entries | built | L — test asserts a 99-day range returns 99 points |
 | T.15 | Readable charts plus accessible table detail | not-started | — |
 
 ### 3C — General Inventory Analytics
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| V.1 | On-hand, reserved and available quantities | in-progress | On-hand exists |
-| V.2 | Inventory value at current selling prices | not-started | — |
-| V.3 | Period-specific stock movements by type | in-progress | Movements recorded; not reported by type per period |
-| V.4 | Fast-moving products ranked by units per day | not-started | — |
-| V.5 | Slow-moving and stocked-but-unsold products | not-started | — |
-| V.6 | Products at or below minimum and approaching minimum | in-progress | Low-stock count exists |
-| V.7 | Current stock-outs and historical intervals where records support them | not-started | — |
-| V.8 | Inventory turnover across eligible products | not-started | — |
-| V.9 | Product and category sales with sortable, paginated detail | in-progress | Product sales exist; category detail does not |
-| V.10 | Turnover = units sold ÷ average recorded daily closing on-hand stock | not-started | — |
-| V.11 | Insufficient history reported where opening stock is unreliable | not-started | — |
-| V.12 | Category snapshot captured on new sale lines | not-started | — |
-| V.13 | Legacy category fallback labelled explicitly | not-started | — |
+| V.1 | On-hand, reserved and available quantities | built | L — all three, never negative |
+| V.2 | Inventory value at current selling prices | built | L — labelled `current_selling_price` with an explicit not-cost note |
+| V.3 | Period-specific stock movements by type | built | L — totals and entry counts per kind, period-scoped |
+| V.4 | Fast-moving products ranked by units per day | built | L |
+| V.5 | Slow-moving and stocked-but-unsold products | built | L — an out-of-stock product is not counted as unsold stock |
+| V.6 | Products at or below minimum and approaching minimum | built | L — the two are separate lists |
+| V.7 | Current stock-outs and historical intervals where records support them | in-progress | Current stock-outs done; historical intervals not built |
+| V.8 | Inventory turnover across eligible products | built | L — eligibility is explicit, with the reason when it fails |
+| V.9 | Product and category sales with sortable, paginated detail | in-progress | Category totals now returned; sorting and pagination are UI work |
+| V.10 | Turnover = units sold ÷ average recorded daily closing on-hand stock | built | L — closing stock reconstructed backwards from the current position |
+| V.11 | Insufficient history reported where opening stock is unreliable | built | L — also refuses a ratio when movements contradict current stock |
+| V.12 | Category snapshot captured on new sale lines | not-started | Sale lines still carry no category column; the fallback is labelled instead |
+| V.13 | Legacy category fallback labelled explicitly | built | L — `categorySource` of recorded, current_product or mixed, plus a note |
 | V.14 | Selling-price valuation never presented as cost, profit or margin | built | L — documented boundary |
 
 ### 3D — Combined Analytics
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| C.1 | Sales versus stock: revenue, units, opening/closing stock, restocking, adjustments, net change | not-started | — |
-| C.2 | Trading concentration: transaction and revenue shares, default busiest contiguous three-hour window | not-started | — |
-| C.3 | Volume versus value: transaction growth, revenue growth, average-ticket change together | not-started | — |
-| C.4 | Velocity versus availability: sales speed, available stock, threshold, replenishment guidance | not-started | — |
-| C.5 | Explanations generated deterministically | not-started | — |
+| C.1 | Sales versus stock: revenue, units, opening/closing stock, restocking, adjustments, net change | built | L |
+| C.2 | Trading concentration: transaction and revenue shares, default busiest contiguous three-hour window | built | L |
+| C.3 | Volume versus value: transaction growth, revenue growth, average-ticket change together | built | L — interpreted as a relationship, and declines to interpret without a baseline |
+| C.4 | Velocity versus availability: sales speed, available stock, threshold, replenishment guidance | built | L — cover counted down to the reorder level, not to zero |
+| C.5 | Explanations generated deterministically | built | L — no model call, no randomness; a test asserts identical output for identical input |
 | C.6 | AI wording optional and never alters calculations | built | L — narration is already separated from calculation |
-| C.7 | Sales filters applied consistently | not-started | — |
-| C.8 | Physical stock labelled as whole-stock data; no false discrepancies against filtered sales | not-started | — |
+| C.7 | Sales filters applied consistently | built | L — one filter set drives all three sections |
+| C.8 | Physical stock labelled as whole-stock data; no false discrepancies against filtered sales | built | L — scope note always present; a filter caveat is added only when one is applied |
 
 ---
 
@@ -227,15 +227,15 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| N.1 | Sale or stock change → recalculate metrics → update stock risk → refresh or resolve insight | not-started | Insight engine exists but is schedule-driven only |
-| N.2 | Triggered by finalized digital sales | not-started | — |
-| N.3 | Triggered by cash entry and void | not-started | — |
-| N.4 | Triggered by stock adjustments | not-started | — |
-| N.5 | Triggered by committed imports | not-started | — |
-| N.6 | Reservation changes affect availability but not completed-sales totals | not-started | — |
-| N.7 | Durable events with source transactions | not-started | — |
-| N.8 | Repeated changes coalesced | not-started | — |
-| N.9 | One-minute background worker | not-started | Worker currently runs every six hours |
+| N.1 | Sale or stock change → recalculate metrics → update stock risk → refresh or resolve insight | built | L — queue plus a one-minute worker calling the existing insight engine |
+| N.2 | Triggered by finalized digital sales | built | L — enqueued after the finalize transaction commits |
+| N.3 | Triggered by cash entry and void | verified | L — exercised live; seven sales produced one coalesced row |
+| N.4 | Triggered by stock adjustments | verified | L — exercised live against the running API |
+| N.5 | Triggered by committed imports | built | L — enqueued only when the commit transaction succeeds |
+| N.6 | Reservation changes affect availability but not completed-sales totals | built | L — reservations move `reserved`, never the finalized-sale totals |
+| N.7 | Durable events with source transactions | built | L — each trigger records reason, source type and source id |
+| N.8 | Repeated changes coalesced | verified | L — merchant id is the primary key; seven sales left one row |
+| N.9 | One-minute background worker | built | L — `AnalyticsOrchestratorService` ticks every 60s |
 | N.10 | Expensive calculation kept outside payment requests | built | L — worker is a separate Cloud Run job |
 | N.11 | Existing forecast history requirements reused; unreliable projections suppressed | built | L — documented thresholds |
 | N.12 | Two-minute p95 insight update under demonstration load | not-started | — |
@@ -249,16 +249,16 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| R.1 | "Run assessment" action | not-started | Assessment is currently computed on read |
-| R.2 | Immutable persisted `readiness-rules-v1` result | not-started | — |
-| R.3 | Result carries ID, model/version, timestamp, evidence window | in-progress | Version exists; not persisted per run |
-| R.4 | Result carries business profile and consent | in-progress | — |
+| R.1 | "Run assessment" action | verified | L — `POST /merchants/me/assessments`; two runs produced two distinct rows |
+| R.2 | Immutable persisted `readiness-rules-v1` result | verified | L — append-only `merchant_assessments`; never updated |
+| R.3 | Result carries ID, model/version, timestamp, evidence window | verified | L — all four on every saved row |
+| R.4 | Result carries business profile and consent | built | L — snapshotted at the moment of the run |
 | R.5 | Result carries passed/missing requirements and readiness stage | built | L — `merchant-readiness.ts` |
-| R.6 | Result carries reliability metrics, source coverage, limitations | in-progress | — |
-| R.7 | Assessment history | not-started | — |
-| R.8 | Adapter boundary for George's future model | not-started | — |
+| R.6 | Result carries reliability metrics, source coverage, limitations | built | L — all three on every saved row |
+| R.7 | Assessment history | verified | L — `GET /merchants/me/assessments`, newest first |
+| R.8 | Adapter boundary for George's future model | built | L — `AssessmentModel` interface and registry; an unregistered id is refused with a 400 naming what exists |
 | R.9 | No fabricated credit score; fallback never claimed as George's integration | built | L — documented |
-| R.10 | Finance Match package linked to a saved assessment | not-started | Packages exist but are not linked to a saved assessment |
+| R.10 | Finance Match package linked to a saved assessment | verified | L — explicit join; package read back cites the same assessment id |
 | R.11 | Preview and download the same immutable PDF/data snapshot | in-progress | Immutable package exists; no preview |
 | R.12 | 7/30/90-day reporting preserved, assessment window labelled separately | in-progress | — |
 | R.13 | Provenance, limitations and demonstration labels included | built | L + H |
