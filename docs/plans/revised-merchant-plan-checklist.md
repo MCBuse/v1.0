@@ -150,18 +150,18 @@ therefore new work, not a configuration change.
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| Q.1 | "Create invoice / QR" on catalogue products opens the itemized invoice flow preloaded | not-started | Itemized invoice flow exists; no per-product entry point |
+| Q.1 | "Create invoice / QR" on catalogue products opens the itemized invoice flow preloaded | not-started | API already accepts product lines; this is a portal UI entry point only |
 | Q.2 | Each purchase gets a unique request preserving names, SKUs, quantities, prices, conversion snapshot | built | L — invoice items + quote snapshot |
 | Q.3 | Reserve stock on creation, consume on finalized payment, release on expiry or cancellation | built | L — `merchant-inventory.service.ts` |
-| Q.4 | "Present on app" action and a dedicated merchant Receive screen | not-started | — |
-| Q.5 | Selected request persisted server-side | not-started | — |
-| Q.6 | Presentation and status changes delivered by authenticated SSE | not-started | — |
-| Q.7 | Events backed by a PostgreSQL event log and cross-instance notification | not-started | — |
-| Q.8 | Streaming portal proxy and authenticated mobile streaming | not-started | Portal proxy currently buffers JSON |
-| Q.9 | Replay missed events or reload authoritative state on reconnect | not-started | — |
-| Q.10 | Polling fallback and visible connection status retained | not-started | — |
-| Q.11 | Receive screen updates without hijacking unrelated mobile screens | not-started | — |
-| Q.12 | Two-second p95 propagation, matching request ID, amount and status | not-started | — |
+| Q.4 | "Present on app" action and a dedicated merchant Receive screen | in-progress | `POST /merchants/me/payment-requests/:id/present` done; the mobile Receive screen is not built |
+| Q.5 | Selected request persisted server-side | verified | L — `merchant_presented_requests`, one per merchant; a later device reads the same state |
+| Q.6 | Presentation and status changes delivered by authenticated SSE | verified | L — `GET /merchants/me/events/stream` behind the JWT guard; checked live over HTTP |
+| Q.7 | Events backed by a PostgreSQL event log and cross-instance notification | verified | L — `merchant_events` + NOTIFY trigger; two service instances sharing only the database exchange events |
+| Q.8 | Streaming portal proxy and authenticated mobile streaming | in-progress | Portal proxy now pipes the stream and forwards the abort signal; mobile streaming not built |
+| Q.9 | Replay missed events or reload authoritative state on reconnect | verified | L — snapshot on connect, `Last-Event-ID` replay; fresh connect sends no backlog |
+| Q.10 | Polling fallback and visible connection status retained | in-progress | `GET /merchants/me/events?after=` done; connection status is UI work |
+| Q.11 | Receive screen updates without hijacking unrelated mobile screens | not-started | Mobile work; the API side is a pull-based stream, so nothing is pushed at unrelated screens |
+| Q.12 | Two-second p95 propagation, matching request ID, amount and status | in-progress | L — integration test asserts under two seconds between instances; not yet measured across real devices under load |
 | Q.13 | Searchable, paginated transaction history with all listed financial attributes | in-progress | Many attributes exist; stock impact, fees, net amount, reconciliation state incomplete |
 | Q.14 | Cash entry, historical sale time, private attachments, stock-already-accounted-for, audited voids retained | built | L + H — existing behaviour to be preserved |
 
