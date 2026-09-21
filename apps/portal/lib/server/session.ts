@@ -82,7 +82,22 @@ export async function getMerchantSessionState(): Promise<MerchantSessionState> {
   }
 }
 
-export async function remoteRequest(path: string, init: RequestInit = {}) {
+export interface RemoteRequestOptions {
+  /**
+   * A long-lived response body, such as server-sent events. The request
+   * timeout is dropped, because the point of the connection is to stay open,
+   * and the caller is expected to pipe the body rather than read it.
+   */
+  stream?: boolean;
+  /** Ties the upstream request to the client's connection. */
+  signal?: AbortSignal;
+}
+
+export async function remoteRequest(
+  path: string,
+  init: RequestInit = {},
+  options: RemoteRequestOptions = {},
+) {
   const jar = await cookies();
   let accessToken = jar.get(ACCESS_COOKIE)?.value;
   const refreshToken = jar.get(REFRESH_COOKIE)?.value;
@@ -90,9 +105,11 @@ export async function remoteRequest(path: string, init: RequestInit = {}) {
     fetch(`${API_URL}${path}`, {
       ...init,
       cache: "no-store",
-      signal: AbortSignal.timeout(12_000),
+      signal: options.stream
+        ? options.signal
+        : (options.signal ?? AbortSignal.timeout(12_000)),
       headers: {
-        Accept: "application/json",
+        Accept: options.stream ? "text/event-stream" : "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.body && !new Headers(init.headers).has("Content-Type")
           ? { "Content-Type": "application/json" }
