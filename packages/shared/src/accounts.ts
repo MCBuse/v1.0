@@ -122,3 +122,64 @@ export type DayEndView = {
   /** Cash is reported but never swept: it has no settlement value to move. */
   cashNote: string;
 };
+
+// ── Merchant live events ────────────────────────────────────────────────────
+
+export type MerchantEventType =
+  | "request_presented"
+  | "request_status_changed"
+  | "request_cleared";
+
+export type MerchantEvent = {
+  sequence: string;
+  merchantId: string;
+  type: MerchantEventType;
+  paymentRequestId: string | null;
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type PresentedRequestView = {
+  paymentRequestId: string;
+  nonce: string;
+  status: string;
+  displayAmountMinor: string | null;
+  displayCurrency: string;
+  settlementAmount: string | null;
+  settlementCurrency: string | null;
+  description: string | null;
+  invoiceNumber: string | null;
+  expiresAt: string | null;
+  presentedAt: string;
+  presentedByUserId: string;
+  lines: Array<{
+    name: string;
+    quantity: number;
+    unitPriceMinor: string;
+    lineTotalMinor: string;
+  }>;
+};
+
+export type PresentedRequestResponse = {
+  request: PresentedRequestView | null;
+  latestSequence: string | null;
+};
+
+export type MerchantEventsPage = {
+  events: MerchantEvent[];
+  latestSequence: string | null;
+};
+
+/**
+ * What the merchant is told about their live connection.
+ *
+ * Q.10 — "polling" is a real, named state rather than something that silently
+ * happens: a device that has fallen back is slower, and the person standing at
+ * the counter should know that before they wonder why the screen has not moved.
+ */
+export type LiveConnectionStatus =
+  | "connecting"
+  | "live"
+  | "reconnecting"
+  | "polling"
+  | "offline";

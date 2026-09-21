@@ -84,11 +84,15 @@ test("lists fast payment requests separately from itemised invoices", async ({
     }),
   );
   await page.goto("/payment");
-  await expect(page.getByRole("heading", { name: "Fast payment requests" })).toBeVisible();
-  await expect(page.getByText("Lunch order")).toBeVisible();
-  // Exact: the accounts panel on this page also mentions a pending amount.
-  await expect(page.getByText("pending", { exact: true })).toBeVisible();
-  await expect(page.getByText("€18.50")).toBeVisible();
+  // Scoped to the card: the counter display on this page also shows an amount
+  // and a status for whatever is currently presented.
+  const requests = page
+    .getByRole("heading", { name: "Fast payment requests" })
+    .locator("../..");
+  await expect(requests).toBeVisible();
+  await expect(requests.getByText("Lunch order")).toBeVisible();
+  await expect(requests.getByText("pending", { exact: true })).toBeVisible();
+  await expect(requests.getByText("€18.50")).toBeVisible();
 });
 
 test("keeps activity provenance filters and pagination in the URL", async ({

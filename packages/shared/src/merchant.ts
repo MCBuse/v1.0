@@ -67,6 +67,39 @@ export type MerchantTransaction = {
   description: string | null;
   status: MerchantTransactionStatus;
   receivedAt: string;
+  /**
+   * Q.13 — the financial attributes a merchant needs to answer "what did this
+   * sale actually do?" without opening three other screens.
+   */
+  settlement: {
+    amount: string;
+    currency: string;
+    /** The rate the amount above was quoted at, scaled by 1e9. */
+    quoteRateScaled: string;
+  };
+  /** Explicit rather than omitted: zero is a fact, an absent field is not. */
+  fees: {
+    merchantFeeMinor: string;
+    networkFeePaidBy: "treasury";
+    note: string;
+  };
+  netAmount: MoneyValue;
+  stockImpact: {
+    /** Null when the sale had no product lines to move stock. */
+    unitsSold: number | null;
+    lines: number;
+    note: string | null;
+  };
+  reconciliation: {
+    state:
+      | "matched"
+      | "unmatched"
+      | "no_source_records";
+    /** The imported settlement reference, when one matched. */
+    reference: string | null;
+    note: string;
+  };
+  environment: MerchantEvidenceEnvironment;
 };
 
 export type MerchantTransactionPage = {

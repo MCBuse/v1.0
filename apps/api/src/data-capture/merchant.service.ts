@@ -12,10 +12,11 @@ import type {
   MerchantPaymentRequestPage,
   MerchantProfile,
   MerchantSummary,
+  MerchantTransaction,
   MerchantTransactionPage,
 } from '@repo/shared';
 import { randomUUID } from 'crypto';
-import { and, count, desc, eq, gte, ilike, isNull, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, inArray, isNull, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
@@ -350,25 +351,151 @@ export class MerchantService {
     ]);
     const totalItems = totalRows[0]?.value ?? 0;
 
+    const [stockByRequest, reconciliationByTransaction, hasSourceRecords] =
+      await Promise.all([
+        this.stockImpactFor(rows.map((row) => row.paymentRequestId)),
+        this.reconciliationFor(rows.map((row) => row.id)),
+        this.hasSettlementImports(merchant.merchantId),
+      ]);
+
     return {
-      items: rows.map((row) => ({
-        id: row.id,
-        receiptNumber: row.receiptNumber,
-        amount: {
-          minor: row.displayAmountMinor.toString(),
-          currency: 'EUR',
-          estimated: false,
-          rateTimestamp: null,
-        },
-        description: row.description,
-        status: 'received',
-        receivedAt: row.occurredAt.toISOString(),
-      })),
+      items: rows.map((row) => {
+        const stock = stockByRequest.get(row.paymentRequestId);
+        const matched = reconciliationByTransaction.get(row.id) ?? null;
+        return {
+          id: row.id,
+          receiptNumber: row.receiptNumber,
+          amount: {
+            minor: row.displayAmountMinor.toString(),
+            currency: 'EUR' as const,
+            estimated: false,
+            rateTimestamp: null,
+          },
+          description: row.description,
+          status: 'received' as const,
+          receivedAt: row.occurredAt.toISOString(),
+          settlement: {
+            amount: row.settlementAmount.toString(),
+            currency: row.settlementCurrency,
+            quoteRateScaled: row.quoteRateScaled.toString(),
+          },
+          fees: {
+            // No merchant fee is charged in this release, and the network fee
+            // was paid by the treasury. Both are stated rather than omitted:
+            // a missing field reads as unknown, and this is known.
+            merchantFeeMinor: '0',
+            networkFeePaidBy: 'treasury' as const,
+            note: 'No merchant fee was charged. The network fee was paid by MCBuse, not deducted from this sale.',
+          },
+          netAmount: {
+            minor: row.displayAmountMinor.toString(),
+            currency: 'EUR' as const,
+            estimated: false,
+            rateTimestamp: null,
+          },
+          stockImpact: {
+            unitsSold: stock?.units ?? null,
+            lines: stock?.lines ?? 0,
+            note: stock
+              ? null
+              : 'This sale had no product lines, so it moved no stock.',
+          },
+          reconciliation: matched
+            ? {
+                state: 'matched' as const,
+                reference: matched,
+                note: 'An imported settlement record references this sale.',
+              }
+            : hasSourceRecords
+              ? {
+                  state: 'unmatched' as const,
+                  reference: null,
+                  note: 'No imported settlement record references this sale yet.',
+                }
+              : {
+                  state: 'no_source_records' as const,
+                  reference: null,
+                  note: 'No settlement records have been imported, so there is nothing to reconcile against.',
+                },
+          environment:
+            row.evidenceEnvironment as MerchantTransaction['environment'],
+        };
+      }),
       page,
       pageSize,
       totalItems,
       totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
     };
+  }
+
+  /** Units and line counts per payment request, for the sales in one page. */
+  private async stockImpactFor(paymentRequestIds: string[]) {
+    const impact = new Map<string, { units: number; lines: number }>();
+    if (!paymentRequestIds.length) return impact;
+
+    const lines = await this.db
+      .select({
+        paymentRequestId: schema.merchantInvoiceItems.paymentRequestId,
+        quantity: schema.merchantInvoiceItems.quantity,
+        productId: schema.merchantInvoiceItems.productId,
+      })
+      .from(schema.merchantInvoiceItems)
+      .where(
+        inArray(schema.merchantInvoiceItems.paymentRequestId, paymentRequestIds),
+      );
+
+    for (const line of lines) {
+      const entry = impact.get(line.paymentRequestId) ?? { units: 0, lines: 0 };
+      entry.lines += 1;
+      // Only product lines move stock; a custom line is just money.
+      if (line.productId) entry.units += line.quantity;
+      impact.set(line.paymentRequestId, entry);
+    }
+    return impact;
+  }
+
+  /** The imported settlement reference matching each sale, where one exists. */
+  private async reconciliationFor(transactionIds: string[]) {
+    const matched = new Map<string, string>();
+    if (!transactionIds.length) return matched;
+
+    const allocations = await this.db
+      .select({
+        merchantTransactionId:
+          schema.merchantPayoutAllocations.merchantTransactionId,
+        paymentReference: schema.merchantPayoutAllocations.paymentReference,
+      })
+      .from(schema.merchantPayoutAllocations)
+      .where(
+        inArray(
+          schema.merchantPayoutAllocations.merchantTransactionId,
+          transactionIds,
+        ),
+      );
+
+    for (const allocation of allocations) {
+      if (allocation.merchantTransactionId)
+        matched.set(
+          allocation.merchantTransactionId,
+          allocation.paymentReference,
+        );
+    }
+    return matched;
+  }
+
+  /**
+   * Whether anything has been imported to reconcile against.
+   *
+   * Without this, every sale would be reported as "unmatched", which reads as
+   * a problem when it is simply that no settlement file has been uploaded.
+   */
+  private async hasSettlementImports(merchantId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: schema.merchantPayouts.id })
+      .from(schema.merchantPayouts)
+      .where(eq(schema.merchantPayouts.merchantId, merchantId))
+      .limit(1);
+    return Boolean(row);
   }
 
   async getConsent(userId: string): Promise<MerchantConsent> {

@@ -79,6 +79,7 @@ export function ReceivePaymentDrawer({
   const [invoiceDescription, setInvoiceDescription] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [presented, setPresented] = useState(false);
   const products = usePortalResource<MerchantProductPage>(
     "me/products?status=active&page=1&pageSize=100",
     60_000,
@@ -214,9 +215,34 @@ export function ReceivePaymentDrawer({
     }
   }
 
+  /**
+   * Q.4 — puts this request on the counter, server-side, so every signed-in
+   * device shows it rather than each one being told separately.
+   */
+  async function presentOnApp() {
+    if (!request) return;
+    setPending(true);
+    try {
+      await portalApi(`me/payment-requests/${request.id}/present`, {
+        method: "POST",
+      });
+      setPresented(true);
+      setError("");
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "The request could not be presented.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
   function createAnother() {
     setRequest(null);
     setError("");
+    setPresented(false);
     setLines([]);
     setInvoiceDescription("");
     setMode("quick");
@@ -250,7 +276,18 @@ export function ReceivePaymentDrawer({
               <div><p className="font-mono text-3xl font-medium tracking-tight text-slate-950">{formatMoney(request.amount)}</p>{request.description ? <p className="mt-1 text-sm text-slate-500">{request.description}</p> : null}{isInvoice(request) ? <p className="mt-1 text-xs font-medium text-blue-700">{request.invoiceNumber} · {request.lines.length} itemised line{request.lines.length === 1 ? "" : "s"}</p> : null}</div>
               {completed ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800"><span className="flex items-center gap-2 font-semibold"><CheckCircle2 aria-hidden="true" />Payment received</span></Alert> : inactive ? <Alert className="border-amber-200 bg-amber-50 text-amber-900">This request is {request.status}. Create a new one to continue.</Alert> : <><div className="mx-auto rounded-xl border border-slate-200 bg-white p-4"><QRCodeSVG value={request.qrPayload} size={220} level="M" marginSize={1} aria-label="Payment request QR code" /></div><div className="flex items-center justify-center gap-2 text-sm text-slate-500"><RefreshCw className="animate-spin" size={15} aria-hidden="true" /><span>{request.status === "processing" ? "Payment is finalizing…" : "Waiting for customer payment…"}</span></div><p className="flex items-center justify-center gap-1.5 text-xs text-slate-500"><Clock3 size={13} aria-hidden="true" />Expires {new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(request.expiresAt))}</p></>}
             </div>
-            <DrawerFooter className="border-t border-slate-200"><Button variant={completed ? "primary" : "secondary"} onClick={createAnother}>Create another request</Button></DrawerFooter>
+            <DrawerFooter className="border-t border-slate-200">
+              {!completed && !inactive ? (
+                <Button
+                  variant="primary"
+                  onClick={() => void presentOnApp()}
+                  disabled={pending || presented}
+                >
+                  {presented ? "On the counter" : "Present on app"}
+                </Button>
+              ) : null}
+              <Button variant={completed ? "primary" : "secondary"} onClick={createAnother}>Create another request</Button>
+            </DrawerFooter>
           </>
         ) : (
           <form className="flex min-h-0 flex-1 flex-col" onSubmit={mode === "quick" ? createQuickRequest : createItemisedRequest}>

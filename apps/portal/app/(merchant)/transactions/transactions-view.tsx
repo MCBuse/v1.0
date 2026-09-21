@@ -20,6 +20,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
 import { portalApi } from "@/lib/client/api";
+import { ReceiptHistory } from "@/components/receipt-history";
 
 function evidenceLabel(value: string) {
   return value.replaceAll("_", " ");
@@ -156,6 +157,7 @@ export function TransactionsView() {
           )}
         </CardContent>
       </Card>
+      <ReceiptHistory />
     </div>
   );
 }

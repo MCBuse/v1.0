@@ -27,6 +27,23 @@ function isMerchantAccess(token) {
 }
 
 
+/** The request currently on the counter, so the display has something to show. */
+let presentedRequest = {
+  paymentRequestId: "00000000-0000-4000-8000-00000000000a",
+  nonce: "mcbuse://pay?nonce=00000000-0000-4000-8000-00000000000a&v=1",
+  status: "pending",
+  displayAmountMinor: "1850",
+  displayCurrency: "EUR",
+  settlementAmount: "20000000",
+  settlementCurrency: "USDC",
+  description: "Counter sale",
+  invoiceNumber: null,
+  expiresAt: "2026-09-21T18:00:00.000Z",
+  presentedAt: "2026-09-21T17:00:00.000Z",
+  presentedByUserId: "00000000-0000-4000-8000-000000000009",
+  lines: [],
+};
+
 /** Requests the UI made, so a test can assert what was actually sent. */
 const recorded = [];
 let dayEndMoved = 0n;
@@ -579,6 +596,29 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "GET" && url.pathname === "/api/v1/__recorded") {
     return send(response, 200, { recorded });
+  }
+
+  if (
+    request.method === "GET" &&
+    url.pathname === "/api/v1/merchants/me/presented-request"
+  ) {
+    if (!isMerchantAccess(bearer(request)))
+      return send(response, 401, { message: "Unauthorized" });
+    return send(response, 200, { request: presentedRequest, latestSequence: "12" });
+  }
+
+  if (
+    request.method === "DELETE" &&
+    url.pathname === "/api/v1/merchants/me/presented-request"
+  ) {
+    presentedRequest = null;
+    return send(response, 200, { cleared: true });
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/v1/merchants/me/events") {
+    if (!isMerchantAccess(bearer(request)))
+      return send(response, 401, { message: "Unauthorized" });
+    return send(response, 200, { events: [], latestSequence: "12" });
   }
 
   if (request.method === "GET" && url.pathname === "/api/v1/merchants/me") {

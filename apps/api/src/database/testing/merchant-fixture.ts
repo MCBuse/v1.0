@@ -187,6 +187,21 @@ export async function destroyMerchantFixture(
   await db
     .delete(schema.merchantCashSales)
     .where(eq(schema.merchantCashSales.merchantId, merchantId));
+  // Payout allocations point at merchant transactions, so they go first.
+  const payoutIds = (
+    await db
+      .select({ id: schema.merchantPayouts.id })
+      .from(schema.merchantPayouts)
+      .where(eq(schema.merchantPayouts.merchantId, merchantId))
+  ).map((row) => row.id);
+  if (payoutIds.length) {
+    await db
+      .delete(schema.merchantPayoutAllocations)
+      .where(inArray(schema.merchantPayoutAllocations.payoutId, payoutIds));
+  }
+  await db
+    .delete(schema.merchantPayouts)
+    .where(eq(schema.merchantPayouts.merchantId, merchantId));
   await db
     .delete(schema.merchantTransactions)
     .where(eq(schema.merchantTransactions.merchantId, merchantId));
@@ -248,5 +263,19 @@ export async function destroyMerchantFixture(
   await db
     .delete(schema.auditLogs)
     .where(eq(schema.auditLogs.userId, fixture.userId));
+  // Anything else that points at the user, so the final delete cannot fail
+  // and strand a fixture for the next run to trip over.
+  await db
+    .delete(schema.refreshTokens)
+    .where(eq(schema.refreshTokens.userId, fixture.userId));
+  await db
+    .delete(schema.passwordResetCodes)
+    .where(eq(schema.passwordResetCodes.userId, fixture.userId));
+  await db
+    .delete(schema.onrampTransactions)
+    .where(eq(schema.onrampTransactions.userId, fixture.userId));
+  await db
+    .delete(schema.offrampTransactions)
+    .where(eq(schema.offrampTransactions.userId, fixture.userId));
   await db.delete(schema.users).where(eq(schema.users.id, fixture.userId));
 }
