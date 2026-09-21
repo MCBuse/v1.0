@@ -7,6 +7,7 @@ import {
   Headers,
   StreamableFile,
   ServiceUnavailableException,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -37,6 +38,8 @@ import {
 import { ListMerchantAnalyticsDto } from './dto/list-merchant-analytics.dto';
 import { GeneralAnalyticsQueryDto } from './dto/general-analytics.dto';
 import { GeneralAnalyticsService } from './analytics/general-analytics.service';
+import { MerchantAssessmentService } from './assessment/merchant-assessment.service';
+import { availableAssessmentModels } from './assessment/assessment-model';
 import { MerchantActivityService } from './merchant-activity.service';
 import { MerchantImportService } from './merchant-import.service';
 import { MerchantFinanceService } from './merchant-finance.service';
@@ -63,6 +66,7 @@ export class MerchantController {
     private readonly insights: MerchantInsightsService,
     private readonly config: ConfigService,
     private readonly generalAnalytics: GeneralAnalyticsService,
+    private readonly assessments: MerchantAssessmentService,
   ) {}
 
   @Get()
@@ -450,6 +454,34 @@ export class MerchantController {
     return this.insights.getForUser(user.id);
   }
 
+  @Post('assessments')
+  @ApiOperation({
+    summary: 'Run and save an immutable evidence-readiness assessment',
+  })
+  runAssessment(
+    @CurrentUser() user: { id: string },
+    @Body() body: { modelId?: string } = {},
+  ) {
+    return this.assessments.run(user.id, body?.modelId);
+  }
+
+  @Get('assessments')
+  @ApiOperation({ summary: 'List saved assessments, newest first' })
+  async listAssessments(@CurrentUser() user: { id: string }) {
+    return {
+      assessments: await this.assessments.history(user.id),
+      // Named so a reader can see which models exist and that George's is
+      // not among them yet.
+      availableModels: availableAssessmentModels(),
+    };
+  }
+
+  @Get('assessments/:id')
+  @ApiOperation({ summary: 'Get one saved assessment' })
+  getAssessment(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    return this.assessments.require(user.id, id);
+  }
+
   @Get('credit-assessment')
   @ApiOperation({
     summary: 'Get the versioned, demonstration evidence-readiness assessment',
@@ -575,17 +607,45 @@ export class MerchantController {
   @ApiOperation({
     summary: 'Create an immutable merchant financial evidence package',
   })
-  createFinancePackage(
+  async createFinancePackage(
     @CurrentUser() user: { id: string },
     @Body() dto: CreateMerchantFinancePackageDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.finance.createPackage(
+    const created = await this.finance.createPackage(
       user.id,
       dto.periodDays ?? 30,
       dto.demonstrationData ?? false,
       idempotencyKey ?? '',
     );
+
+    // A package reports an assessment, so it is tied to the exact saved one.
+    // If the merchant named a specific assessment we use it; otherwise the
+    // latest saved run, and if there is none we run one now so the package is
+    // never citing a result that was never recorded.
+    const assessment = dto.assessmentId
+      ? await this.assessments.require(user.id, dto.assessmentId)
+      : ((await this.assessments.latest(user.id)) ??
+        (await this.assessments.run(user.id)));
+    await this.assessments.linkToPackage(created.id, assessment.id);
+
+    return { ...created, assessment };
+  }
+
+  @Get('finance-packages/:id/assessment')
+  @ApiOperation({
+    summary: 'The saved assessment this package reports',
+  })
+  async getFinancePackageAssessment(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    // Reading the package first keeps this scoped to the caller's merchant.
+    await this.finance.getPackage(user.id, id);
+    const assessment = await this.assessments.forPackage(id);
+    if (!assessment)
+      throw new NotFoundException('No assessment is linked to this package');
+    return assessment;
   }
 
   @Get('finance-packages/:id')

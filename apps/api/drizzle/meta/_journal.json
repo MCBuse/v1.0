@@ -183,6 +183,13 @@
       "when": 1799722200000,
       "tag": "0025_merchant_analytics_work",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1799725800000,
+      "tag": "0026_merchant_assessments",
+      "breakpoints": true
     }
   ]
 }
