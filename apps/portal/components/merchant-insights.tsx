@@ -3,8 +3,10 @@
 import type { MerchantInsight, MerchantInsightsResponse } from "@repo/shared";
 import { Alert } from "@repo/ui/alert";
 import { Badge } from "@repo/ui/badge";
+import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardHeader } from "@repo/ui/card";
 import { Skeleton } from "@repo/ui/skeleton";
+import { RefreshCw } from "lucide-react";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
 
 const tone = (
@@ -27,8 +29,47 @@ export function MerchantInsightsPanel({
     "me/insights",
     60_000,
   );
+  const headingId = inventoryOnly
+    ? "inventory-insights"
+    : limit
+      ? "overview-insights"
+      : "analytics-insights";
+
   if (resource.loading && !resource.data) return <Skeleton className="h-40" />;
   const data = resource.data;
+
+  // N.14 — a failed fetch used to fall through to `return null`, so a route the
+  // proxy was refusing looked exactly like a merchant with nothing to say. It
+  // now says what went wrong and offers a retry.
+  if (!data && resource.error)
+    return (
+      <section className="grid gap-3" aria-labelledby={headingId}>
+        <h2 id={headingId} className="font-semibold text-slate-950">
+          {inventoryOnly ? "Inventory insights" : "Business insights"}
+        </h2>
+        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          <p className="font-semibold">Insights could not be loaded.</p>
+          <p className="mt-1">
+            {resource.offline
+              ? "You appear to be offline. They will return when the connection does."
+              : resource.error.message}
+          </p>
+          <p className="mt-1 text-xs">
+            This is a problem reading them, not a finding that there is nothing
+            to report.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-3"
+            onClick={() => void resource.refresh()}
+          >
+            <RefreshCw className="size-4" aria-hidden /> Try again
+          </Button>
+        </Alert>
+      </section>
+    );
+
   if (!data || data.status === "disabled") return null;
   if (data.status === "updating")
     return (
@@ -52,11 +93,6 @@ export function MerchantInsightsPanel({
     typeof limit === "number"
       ? matchingInsights.slice(0, limit)
       : matchingInsights;
-  const headingId = inventoryOnly
-    ? "inventory-insights"
-    : limit
-      ? "overview-insights"
-      : "analytics-insights";
   const calculationPeriod =
     data.scope.periodFrom && data.scope.periodTo
       ? `${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(data.scope.periodFrom))} – ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(data.scope.periodTo))}`
@@ -84,6 +120,27 @@ export function MerchantInsightsPanel({
           <Badge tone="success">Current</Badge>
         )}
       </div>
+      {resource.error ? (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          These insights are the last ones that loaded; the most recent refresh
+          failed.
+        </Alert>
+      ) : null}
+      {data.lastFailure ? (
+        <Alert className="border-red-200 bg-red-50 text-red-800">
+          <p className="font-semibold">
+            The last recalculation failed, so these figures may be out of date.
+          </p>
+          <p className="mt-1">
+            {data.lastFailure.reason} · {data.lastFailure.attempts} attempt
+            {data.lastFailure.attempts === 1 ? "" : "s"} since{" "}
+            {new Intl.DateTimeFormat("en-GB", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }).format(new Date(data.lastFailure.at))}
+          </p>
+        </Alert>
+      ) : null}
       {data.message ? (
         <Alert className="border-amber-200 bg-amber-50 text-amber-900">
           {data.message}

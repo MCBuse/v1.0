@@ -4,3 +4,4 @@ export * from './enums/transaction-type.enum';
 export * from './enums/payment-request-status.enum';
 export * from './merchant';
 export * from './accounts';
+export * from './general-analytics';

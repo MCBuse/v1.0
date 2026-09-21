@@ -21,6 +21,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Drawer,
@@ -45,8 +46,33 @@ function isInvoice(value: Request): value is MerchantInvoice {
   return "invoiceNumber" in value;
 }
 
-export function ReceivePaymentDrawer() {
-  const [open, setOpen] = useState(false);
+/**
+ * Q.1 — the same drawer, opened from a product.
+ *
+ * `preloadProductIds` starts it on the itemised tab with those products
+ * already as lines, so "Create invoice / QR" on a catalogue row lands the
+ * merchant in the flow rather than at the beginning of it. In controlled mode
+ * the caller owns `open`, which is how the inventory page keeps one drawer for
+ * a whole table of products.
+ */
+export function ReceivePaymentDrawer({
+  open: controlledOpen,
+  onOpenChange,
+  preloadProductIds,
+  trigger,
+}: {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  preloadProductIds?: string[];
+  trigger?: ReactNode;
+} = {}) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const controlled = controlledOpen !== undefined;
+  const open = controlled ? controlledOpen : uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (!controlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const [request, setRequest] = useState<Request | null>(null);
   const [mode, setMode] = useState<"quick" | "itemised">("quick");
   const [lines, setLines] = useState<DraftLine[]>([]);
@@ -68,6 +94,24 @@ export function ReceivePaymentDrawer() {
     }
     return total + BigInt(euroInputToMinor(line.price) || "0") * BigInt(line.quantity);
   }, 0n);
+
+  const preloadKey = (preloadProductIds ?? []).join(",");
+  useEffect(() => {
+    if (!open || !preloadKey) return;
+    // Seeding happens on open rather than on every render, so a merchant who
+    // edits the preloaded lines does not have their edits overwritten.
+    setRequest(null);
+    setError("");
+    setMode("itemised");
+    setLines(
+      preloadKey.split(",").map((productId) => ({
+        id: crypto.randomUUID(),
+        type: "product" as const,
+        productId,
+        quantity: 1,
+      })),
+    );
+  }, [open, preloadKey]);
 
   useEffect(() => {
     if (!request || !["pending", "processing"].includes(request.status)) return;
@@ -183,9 +227,16 @@ export function ReceivePaymentDrawer() {
 
   return (
     <Drawer direction="right" open={open} onOpenChange={handleOpenChange}>
-      <DrawerTrigger asChild>
-        <Button><CircleDollarSign data-icon="inline-start" aria-hidden="true" />Create request</Button>
-      </DrawerTrigger>
+      {controlled ? null : (
+        <DrawerTrigger asChild>
+          {trigger ?? (
+            <Button>
+              <CircleDollarSign data-icon="inline-start" aria-hidden="true" />
+              Create request
+            </Button>
+          )}
+        </DrawerTrigger>
+      )}
       <DrawerContent className="h-dvh w-full overflow-hidden rounded-none sm:max-w-md">
         <DrawerHeader className="relative border-b border-slate-200 pr-16">
           <p className="text-xs font-semibold uppercase tracking-[.12em] text-blue-700">Receive payment</p>

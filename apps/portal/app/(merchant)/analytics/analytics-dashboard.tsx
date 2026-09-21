@@ -262,6 +262,9 @@ export function AnalyticsDashboard() {
           <h2 className="font-semibold">Actions</h2>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
+          <Button asChild>
+            <Link href="/analytics/general">General analytics</Link>
+          </Button>
           <Button asChild variant="secondary">
             <Link href="/analytics/transactions">Transactions</Link>
           </Button>

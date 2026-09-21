@@ -32,18 +32,29 @@ export class MerchantInsightsService {
     if (!merchant || !this.enabledForMerchant(merchant.merchantId, merchant.publicId)) return this.emptyResponse('disabled', 'Business intelligence is not enabled for this merchant.');
     const snapshots = await this.db.select().from(schema.merchantAnalyticsSnapshots).where(eq(schema.merchantAnalyticsSnapshots.merchantId, merchant.merchantId)).orderBy(desc(schema.merchantAnalyticsSnapshots.generatedAt)).limit(1);
     const snapshot = snapshots[0];
-    if (!snapshot) return this.emptyResponse('updating', 'Insights are being prepared from recorded activity.');
+    const lastFailure = await this.lastFailure(merchant.merchantId);
+    if (!snapshot) return { ...this.emptyResponse('updating', 'Insights are being prepared from recorded activity.'), lastFailure };
     const rowsForSnapshot = await this.db.select().from(schema.merchantInsights).where(and(eq(schema.merchantInsights.snapshotId, snapshot.id), eq(schema.merchantInsights.active, true))).orderBy(asc(schema.merchantInsights.priority), asc(schema.merchantInsights.code));
     const sourceCoverage = snapshot.sourceCoverage as Record<string, number>;
     const snapshotBody = snapshot.snapshot as { metrics?: Record<string, unknown> };
     const mixedData = (sourceCoverage.test ?? 0) + (sourceCoverage.synthetic ?? 0) + (sourceCoverage.unknown ?? 0) > 0;
+    const staleAfterMinutes = this.config.get<number>('MERCHANT_INTELLIGENCE_STALE_AFTER_MINUTES', 375);
+    const ageMs = Date.now() - snapshot.generatedAt.getTime();
+    const isStale = ageMs > staleAfterMinutes * 60 * 1000;
     return {
       status: 'ready',
       calculationVersion: snapshot.calculationVersion,
       generatedAt: snapshot.generatedAt.toISOString(),
-      stale: Date.now() - snapshot.generatedAt.getTime() > this.config.get<number>('MERCHANT_INTELLIGENCE_STALE_AFTER_MINUTES', 375) * 60 * 1000,
+      stale: isStale,
       snapshot: { metrics: snapshotBody.metrics ?? {} },
       scope: { label: 'all_recorded_activity', periodFrom: snapshot.periodFrom.toISOString(), periodTo: snapshot.periodTo.toISOString(), mixedData, sourceCoverage },
+      freshness: {
+        generatedAt: snapshot.generatedAt.toISOString(),
+        ageSeconds: Math.max(0, Math.floor(ageMs / 1000)),
+        stale: isStale,
+        staleAfterMinutes,
+      },
+      lastFailure,
       insights: rowsForSnapshot.map((row) => ({ id: row.id, code: row.code, kind: row.kind as 'stock_risk' | 'discrepancy' | 'anomaly' | 'performance', priority: row.priority, title: row.title, summary: row.summary, recommendation: row.recommendation, evidence: row.evidence as Array<{ id: string; label: string; value: string }>, limitations: row.limitations as string[], narrationSource: row.narrationSource as 'deterministic' | 'groq' })),
       message: mixedData ? 'Mixed recorded activity—included test or unclassified records.' : null,
     };
@@ -138,7 +149,50 @@ export class MerchantInsightsService {
     return !allowlist.length || allowlist.includes(id) || allowlist.includes(publicId);
   }
 
+  /**
+   * The last time a refresh for this merchant failed, if it did.
+   *
+   * Reported separately from staleness: a figure that is old because nothing
+   * has happened and a figure that is old because the worker keeps crashing
+   * look identical on screen otherwise.
+   */
+  private async lastFailure(merchantId: string) {
+    const rows = await this.db
+      .select({
+        attempts: schema.merchantAnalyticsWork.attempts,
+        lastError: schema.merchantAnalyticsWork.lastError,
+        lastQueuedAt: schema.merchantAnalyticsWork.lastQueuedAt,
+      })
+      .from(schema.merchantAnalyticsWork)
+      .where(eq(schema.merchantAnalyticsWork.merchantId, merchantId))
+      .limit(1);
+
+    const row = rows[0];
+    if (!row?.lastError) return null;
+    return {
+      at: row.lastQueuedAt.toISOString(),
+      reason: row.lastError,
+      attempts: row.attempts,
+    };
+  }
+
   private emptyResponse(status: 'updating' | 'disabled', message: string): MerchantInsightsResponse {
-    return { status, calculationVersion: ANALYTICS_CALCULATION_VERSION, generatedAt: null, stale: false, snapshot: null, scope: { label: 'all_recorded_activity', periodFrom: null, periodTo: null, mixedData: false, sourceCoverage: {} }, insights: [], message };
+    return {
+      status,
+      calculationVersion: ANALYTICS_CALCULATION_VERSION,
+      generatedAt: null,
+      stale: false,
+      snapshot: null,
+      scope: { label: 'all_recorded_activity', periodFrom: null, periodTo: null, mixedData: false, sourceCoverage: {} },
+      insights: [],
+      message,
+      freshness: {
+        generatedAt: null,
+        ageSeconds: null,
+        stale: false,
+        staleAfterMinutes: this.config.get<number>('MERCHANT_INTELLIGENCE_STALE_AFTER_MINUTES', 375),
+      },
+      lastFailure: null,
+    };
   }
 }

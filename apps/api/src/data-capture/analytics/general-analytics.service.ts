@@ -1,3 +1,4 @@
+import type { GeneralAnalyticsResponse as SharedGeneralAnalyticsResponse } from '@repo/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -36,7 +37,14 @@ export interface GeneralAnalyticsQuery {
   now?: Date;
 }
 
-export interface GeneralAnalytics {
+/**
+ * The shape the clients are typed against. Declaring the local interface to
+ * extend it makes drift between the API and `@repo/shared` a compile error
+ * rather than something a chart discovers at runtime.
+ */
+export type GeneralAnalyticsContract = SharedGeneralAnalyticsResponse;
+
+export interface GeneralAnalytics extends GeneralAnalyticsContract {
   transactions: TransactionAnalytics;
   inventory: InventoryAnalytics;
   combined: CombinedAnalytics;

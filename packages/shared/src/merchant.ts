@@ -324,6 +324,22 @@ export type MerchantInsightsResponse = {
   };
   insights: MerchantInsight[];
   message: string | null;
+  /**
+   * N.13 — how fresh the calculation is, and whether the last attempt to
+   * refresh it failed. A stale figure with a working worker and a stale figure
+   * with a broken one look identical without this.
+   */
+  freshness: {
+    generatedAt: string | null;
+    ageSeconds: number | null;
+    stale: boolean;
+    staleAfterMinutes: number;
+  };
+  lastFailure: {
+    at: string;
+    reason: string;
+    attempts: number;
+  } | null;
 };
 
 export type MerchantCashSaleLine = {
