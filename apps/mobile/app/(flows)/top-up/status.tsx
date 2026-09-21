@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { finishMoneyIntent } from '@/lib/api/money-intent';
 import { useTheme } from '@shopify/restyle';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'iconsax-react-native';
@@ -9,7 +11,7 @@ import { Box, Button, Text } from '@/components/ui';
 import { useOnrampStatus } from '@/features/onramp';
 import type { Theme } from '@/theme';
 
-const TERMINAL = new Set(['completed', 'failed', 'cancelled', 'expired']);
+const TERMINAL = new Set(['completed', 'failed', 'cancelled', 'expired', 'refunded']);
 
 export default function TopUpStatusScreen() {
   const { colors } = useTheme<Theme>();
@@ -18,6 +20,7 @@ export default function TopUpStatusScreen() {
   const transactionId = params.transactionId;
   const [timedOut, setTimedOut] = useState(false);
 
+  const client = useQueryClient();
   const { data, error } = useOnrampStatus(transactionId, Boolean(transactionId));
 
   useEffect(() => {
@@ -25,12 +28,17 @@ export default function TopUpStatusScreen() {
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => { if (data?.status === 'completed') { void client.invalidateQueries({ queryKey: ['wallets'] }); } }, [data?.status, client]);
+
   const label = useMemo(() => {
     const s = data?.status;
     if (!s) return 'Starting…';
     if (s === 'pending') return 'Waiting for payment';
     if (s === 'processing') return 'Payment received, finalizing';
     if (s === 'completed') return 'Money added to Holding';
+    if (s === 'refunded') return 'Payment refunded';
+    if (s === 'refund_pending') return 'Refund pending';
+    if (s === 'refund_action_required') return 'Refund needs attention. Contact support with your reference.';
     if (s === 'failed') return 'Top-up failed';
     if (s === 'cancelled') return 'Top-up cancelled';
     if (s === 'expired') return 'Session expired';
@@ -77,7 +85,7 @@ export default function TopUpStatusScreen() {
       </Box>
 
       {terminal ? (
-        <Button label="Done" onPress={() => router.replace('/(tabs)')} />
+        <Button label="Done" onPress={() => { void finishMoneyIntent('funding'); router.replace('/(tabs)'); }} />
       ) : null}
     </Box>
   );

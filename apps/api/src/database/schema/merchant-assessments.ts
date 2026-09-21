@@ -1,5 +1,6 @@
 import {
   index,
+  uniqueIndex,
   jsonb,
   pgTable,
   timestamp,
@@ -29,6 +30,7 @@ export const merchantAssessments = pgTable(
     merchantId: uuid('merchant_id')
       .notNull()
       .references(() => merchants.id),
+    idempotencyKey: varchar('idempotency_key', { length: 128 }),
     modelId: varchar('model_id', { length: 64 }).notNull(),
     modelVersion: varchar('model_version', { length: 32 }).notNull(),
     /** The window of activity the result was derived from. */
@@ -47,6 +49,7 @@ export const merchantAssessments = pgTable(
       .defaultNow(),
   },
   (table) => [
+    uniqueIndex('merchant_assessments_idempotency_unique').on(table.merchantId, table.idempotencyKey),
     index('merchant_assessments_merchant_idx').on(
       table.merchantId,
       table.createdAt,

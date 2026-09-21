@@ -19,7 +19,7 @@ const IN_FLIGHT = [
 ];
 
 /** Beyond this, an in-flight operation has stopped being "in progress". */
-const OPERATION_STALE_MS = 15 * 60 * 1000;
+const OPERATION_STALE_MS = 10 * 60 * 1000;
 /** Beyond this, the analytics worker is not keeping up with its one-minute tick. */
 const WORKER_BACKLOG_STALE_MS = 5 * 60 * 1000;
 /** Beyond this, an event stream has gone quiet enough to be worth checking. */
@@ -45,6 +45,8 @@ export interface OperationsHealth {
   };
   workerBacklog: {
     pending: number;
+    deferred: number;
+    lastSuccessfulCalculation: string | null;
     oldestAgeSeconds: number | null;
     failing: number;
   };
@@ -75,7 +77,7 @@ export class OperationsHealthService {
     const pendingOperations = await this.pendingOperations(now);
     if (pendingOperations.staleCount > 0) {
       concerns.push(
-        `${pendingOperations.staleCount} operation(s) have not advanced in 15 minutes`,
+        `${pendingOperations.staleCount} operation(s) have not advanced in 10 minutes`,
       );
     }
 
@@ -241,10 +243,11 @@ export class OperationsHealthService {
     const rows = await this.db
       .select({
         firstQueuedAt: schema.merchantAnalyticsWork.firstQueuedAt,
+        status: schema.merchantAnalyticsWork.status,
         attempts: schema.merchantAnalyticsWork.attempts,
       })
       .from(schema.merchantAnalyticsWork)
-      .where(eq(schema.merchantAnalyticsWork.status, 'pending'));
+      ;
 
     const oldest = rows.reduce<Date | null>(
       (earliest, row) =>
@@ -252,7 +255,10 @@ export class OperationsHealthService {
       null,
     );
 
+    const [latest] = await this.db.select({ at: sql<Date | null>`max(${schema.merchantAnalyticsSnapshots.generatedAt})` }).from(schema.merchantAnalyticsSnapshots);
     return {
+      deferred: rows.filter(row => row.status === 'deferred').length,
+      lastSuccessfulCalculation: latest?.at ? new Date(latest.at).toISOString() : null,
       pending: rows.length,
       oldestAgeSeconds: oldest
         ? Math.max(0, Math.floor((now.getTime() - oldest.getTime()) / 1000))

@@ -29,20 +29,25 @@ export class MerchantInsightsService {
   async getForUser(userId: string): Promise<MerchantInsightsResponse> {
     const rows = await this.db.select({ merchantId: schema.merchants.id, publicId: schema.merchants.publicId }).from(schema.merchantMemberships).innerJoin(schema.merchants, eq(schema.merchants.id, schema.merchantMemberships.merchantId)).where(eq(schema.merchantMemberships.userId, userId)).limit(1);
     const merchant = rows[0];
-    if (!merchant || !this.enabledForMerchant(merchant.merchantId, merchant.publicId)) return this.emptyResponse('disabled', 'Business intelligence is not enabled for this merchant.');
+    if (!merchant) return this.emptyResponse('disabled', 'Business intelligence is not enabled for this merchant.');
+    const [work] = await this.db.select().from(schema.merchantAnalyticsWork).where(eq(schema.merchantAnalyticsWork.merchantId, merchant.merchantId)).limit(1);
+    const backlog = work ? { status: work.status, ageSeconds: Math.max(0, Math.floor((Date.now() - work.firstQueuedAt.getTime()) / 1000)), attempts: work.attempts, reason: work.lastError } : null;
+    if (!this.enabledForMerchant(merchant.merchantId, merchant.publicId)) return { ...this.emptyResponse('disabled', 'Business intelligence is not enabled for this merchant.'), stale: Boolean(work), backlog };
+
     const snapshots = await this.db.select().from(schema.merchantAnalyticsSnapshots).where(eq(schema.merchantAnalyticsSnapshots.merchantId, merchant.merchantId)).orderBy(desc(schema.merchantAnalyticsSnapshots.generatedAt)).limit(1);
     const snapshot = snapshots[0];
     const lastFailure = await this.lastFailure(merchant.merchantId);
-    if (!snapshot) return { ...this.emptyResponse('updating', 'Insights are being prepared from recorded activity.'), lastFailure };
+    if (!snapshot) return { ...this.emptyResponse('updating', 'Insights are being prepared from recorded activity.'), stale: Boolean(work), backlog, lastFailure };
     const rowsForSnapshot = await this.db.select().from(schema.merchantInsights).where(and(eq(schema.merchantInsights.snapshotId, snapshot.id), eq(schema.merchantInsights.active, true))).orderBy(asc(schema.merchantInsights.priority), asc(schema.merchantInsights.code));
     const sourceCoverage = snapshot.sourceCoverage as Record<string, number>;
     const snapshotBody = snapshot.snapshot as { metrics?: Record<string, unknown> };
     const mixedData = (sourceCoverage.test ?? 0) + (sourceCoverage.synthetic ?? 0) + (sourceCoverage.unknown ?? 0) > 0;
     const staleAfterMinutes = this.config.get<number>('MERCHANT_INTELLIGENCE_STALE_AFTER_MINUTES', 375);
     const ageMs = Date.now() - snapshot.generatedAt.getTime();
-    const isStale = ageMs > staleAfterMinutes * 60 * 1000;
+    const isStale = Boolean(work) || ageMs > staleAfterMinutes * 60 * 1000;
     return {
       status: 'ready',
+      backlog,
       calculationVersion: snapshot.calculationVersion,
       generatedAt: snapshot.generatedAt.toISOString(),
       stale: isStale,
@@ -60,33 +65,16 @@ export class MerchantInsightsService {
     };
   }
 
+  /** The full sweep feeds the same leased queue as source changes. */
   async runAll() {
-    if (this.config.get<string>('MERCHANT_INTELLIGENCE_ENABLED') !== 'true') return { skipped: true, reason: 'disabled' };
-    const lockResult = await this.db.execute(sql`select pg_try_advisory_lock(${WORKER_LOCK_ID}) as acquired`) as unknown as { rows: Array<{ acquired: boolean }> };
-    if (!lockResult.rows[0]?.acquired) return { skipped: true, reason: 'already_running' };
-    const run = (await this.db.insert(schema.merchantAnalyticsRuns).values({ calculationVersion: ANALYTICS_CALCULATION_VERSION }).returning())[0];
-    let processed = 0; let failed = 0; const errors: string[] = [];
-    try {
-      const merchants = await this.db.select({ id: schema.merchants.id, publicId: schema.merchants.publicId, timezone: schema.merchants.timezone }).from(schema.merchants).where(eq(schema.merchants.isActive, true));
-      for (const merchant of merchants.filter((item) => this.enabledForMerchant(item.id, item.publicId))) {
-        try {
-          await this.processMerchant(merchant);
-          processed++;
-        } catch (error) {
-          failed++;
-          const message = error instanceof Error ? error.message : 'unknown error';
-          errors.push(`${merchant.publicId}: ${message}`);
-          this.logger.error(`Analytics failed for merchant ${merchant.publicId}: ${message}`);
-        }
-      }
-      await this.db.update(schema.merchantAnalyticsRuns).set({ status: failed ? 'partial' : 'completed', processedMerchants: processed, failedMerchants: failed, errorSummary: errors.slice(0, 20).join('\n') || null, completedAt: new Date() }).where(eq(schema.merchantAnalyticsRuns.id, run.id));
-      return { skipped: false, processed, failed };
-    } catch (error) {
-      await this.db.update(schema.merchantAnalyticsRuns).set({ status: 'failed', processedMerchants: processed, failedMerchants: failed, errorSummary: error instanceof Error ? error.message : 'unknown error', completedAt: new Date() }).where(eq(schema.merchantAnalyticsRuns.id, run.id));
-      throw error;
-    } finally {
-      await this.db.execute(sql`select pg_advisory_unlock(${WORKER_LOCK_ID})`);
+    if (this.config.get<string>('MERCHANT_INTELLIGENCE_ENABLED') !== 'true') return { skipped: true, queued: 0 };
+    const merchants = await this.db.select({ id: schema.merchants.id, publicId: schema.merchants.publicId }).from(schema.merchants).where(eq(schema.merchants.isActive, true));
+    let queued = 0;
+    for (const merchant of merchants.filter(item => this.enabledForMerchant(item.id, item.publicId))) {
+      await this.db.execute(sql`select enqueue_merchant_analytics(${merchant.id}::uuid,'reconciliation','full_sweep',NULL)`);
+      queued += 1;
     }
+    return { skipped: false, queued };
   }
 
   /** Recalculates one merchant, for the change-driven worker. */

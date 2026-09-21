@@ -20,7 +20,7 @@ function stubTransfers() {
     Promise.resolve({
       operationId: randomUUID(),
       status: 'reserved',
-      amountCents: params.amountCents.toString(),
+      amountCents: params.amountCents!.toString(),
       from: params.from,
       to: params.to,
       replayed: false,
@@ -181,6 +181,7 @@ describe('DayEndService (integration)', () => {
     await db
       .delete(schema.merchantMemberships)
       .where(eq(schema.merchantMemberships.merchantId, merchantId));
+    await db.delete(schema.merchantAnalyticsWork).where(eq(schema.merchantAnalyticsWork.merchantId, merchantId));
     await db
       .delete(schema.merchants)
       .where(eq(schema.merchants.id, merchantId));

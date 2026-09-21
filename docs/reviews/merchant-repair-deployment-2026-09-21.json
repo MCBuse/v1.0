@@ -1,0 +1,704 @@
+{
+  "recordedAt": "2026-09-21T13:30:13.888916+00:00",
+  "status": "hosted_deployment_verified",
+  "acceptanceComplete": false,
+  "baseCommit": "e46f3ec1d75503edf6974ae58ed499a7b7cd3a76",
+  "sourceUncommitted": true,
+  "workingTreeSourceDigestSha256": "3ea1aeb36e7cb1638d380ac202df50d6bb3f77b667025f937117b3fc04651aaf",
+  "builds": {
+    "api": {
+      "id": "fff32a4f-0ed9-489f-ba84-acedf83460d0",
+      "digest": "sha256:aaa137de28c3fbc976a02498b7a543668b8c100f52f96b87fc9d5e72e9406414"
+    },
+    "portal": {
+      "id": "61af9833-77e2-4270-935d-4c509cd018c8",
+      "digest": "sha256:f8165f2ce7698019a7bbd66c4d84dd94a55f6161059eedeade2b5c3b83fc1ebe"
+    }
+  },
+  "runtime": {
+    "checkedAt": "2026-09-21T13:27:54.116Z",
+    "services": [
+      {
+        "name": "mcbuse-api",
+        "readyRevision": "mcbuse-api-00042-v97",
+        "url": "https://mcbuse-api-vtg5cj3ynq-ew.a.run.app",
+        "traffic": [
+          {
+            "latestRevision": true,
+            "percent": 100,
+            "revisionName": "mcbuse-api-00042-v97"
+          }
+        ],
+        "image": "europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/api@sha256:aaa137de28c3fbc976a02498b7a543668b8c100f52f96b87fc9d5e72e9406414",
+        "settings": {
+          "NODE_ENV": "production",
+          "TRANSFER_PROVIDER": "solana",
+          "FINANCIAL_MODE": "sandbox",
+          "PROCESS_ROLE": "api",
+          "MONEY_INITIATION_ENABLED": "false",
+          "MERCHANT_INTELLIGENCE_ENABLED": "true",
+          "MERCHANT_INTELLIGENCE_ALLOWLIST": "mrc_7226ebf0b0b84c81b775",
+          "MERCHANT_AI_NARRATION_ENABLED": "false",
+          "SOLANA_NETWORK": "devnet"
+        },
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-09-21T13:22:32.664157Z",
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-09-21T13:22:18.283941Z",
+            "status": "True",
+            "type": "ConfigurationsReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-21T13:22:32.624556Z",
+            "status": "True",
+            "type": "RoutesReady"
+          }
+        ]
+      },
+      {
+        "name": "mcbuse-portal",
+        "readyRevision": "mcbuse-portal-00027-wfk",
+        "url": "https://mcbuse-portal-vtg5cj3ynq-ew.a.run.app",
+        "traffic": [
+          {
+            "latestRevision": true,
+            "percent": 100,
+            "revisionName": "mcbuse-portal-00027-wfk"
+          }
+        ],
+        "image": "europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/portal@sha256:f8165f2ce7698019a7bbd66c4d84dd94a55f6161059eedeade2b5c3b83fc1ebe",
+        "settings": {
+          "NODE_ENV": "production",
+          "MCBUSE_API_URL": "https://mcbuse-api-332810840225.europe-west1.run.app/api/v1",
+          "PORTAL_ORIGIN": "https://merchant.mcbuse.com"
+        },
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-09-21T13:25:41.119935Z",
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-09-21T13:25:36.218431Z",
+            "status": "True",
+            "type": "ConfigurationsReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-21T13:25:41.091265Z",
+            "status": "True",
+            "type": "RoutesReady"
+          }
+        ]
+      }
+    ],
+    "jobs": [
+      {
+        "name": "mcbuse-api-financial-recovery",
+        "image": "europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/api@sha256:aaa137de28c3fbc976a02498b7a543668b8c100f52f96b87fc9d5e72e9406414",
+        "args": [
+          "dist/src/accounts/recovery-worker.js"
+        ],
+        "executions": [
+          {
+            "name": "mcbuse-api-financial-recovery-wrstk",
+            "creator": "mcbuse-analytics-scheduler@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com",
+            "startTime": "2026-09-21T13:27:14.719290Z",
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T13:28:00.143628Z",
+                "message": "Waiting for execution to complete.",
+                "status": "Unknown",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:27:11.643779Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:27:59.089137Z",
+                "message": "Started deployed execution in 47.44s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:27:11.464206Z",
+                "message": "Imported container image.",
+                "status": "True",
+                "type": "ContainerReady"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:28:00.143628Z",
+                "message": "System will retry after 00:05 from lastTransitionTime for polling interval",
+                "reason": "WaitingForOperation",
+                "severity": "Info",
+                "status": "True",
+                "type": "Retry"
+              }
+            ]
+          },
+          {
+            "name": "mcbuse-api-financial-recovery-dtk6z",
+            "creator": "mcbuse-analytics-scheduler@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com",
+            "startTime": "2026-09-21T13:26:04.727220Z",
+            "completionTime": "2026-09-21T13:27:21.398744Z",
+            "succeededCount": 1,
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T13:27:21.398744Z",
+                "message": "Execution completed successfully in 1m16.67s.",
+                "status": "True",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:26:02.047508Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:27:10.454908Z",
+                "message": "Started deployed execution in 1m8.4s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:26:01.866462Z",
+                "message": "Imported container image.",
+                "status": "True",
+                "type": "ContainerReady"
+              }
+            ]
+          },
+          {
+            "name": "mcbuse-api-financial-recovery-rhjm4",
+            "creator": "nernuer@gmail.com",
+            "startTime": "2026-09-21T13:25:18.724975Z",
+            "completionTime": "2026-09-21T13:26:07.909009Z",
+            "succeededCount": 1,
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T13:26:07.909009Z",
+                "message": "Execution completed successfully in 49.18s.",
+                "status": "True",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:25:15.803215Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:25:58.286751Z",
+                "message": "Started deployed execution in 42.48s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:25:15.611427Z",
+                "message": "Imported container image.",
+                "status": "True",
+                "type": "ContainerReady"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "mcbuse-api-analytics",
+        "image": "europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/api@sha256:aaa137de28c3fbc976a02498b7a543668b8c100f52f96b87fc9d5e72e9406414",
+        "args": [
+          "dist/src/analytics-intelligence/worker.js"
+        ],
+        "executions": [
+          {
+            "name": "mcbuse-api-analytics-kw62g",
+            "creator": "nernuer@gmail.com",
+            "startTime": "2026-09-21T13:24:20.722860Z",
+            "completionTime": "2026-09-21T13:25:15.321916Z",
+            "succeededCount": 1,
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T13:25:15.321916Z",
+                "message": "Execution completed successfully in 54.59s.",
+                "status": "True",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:24:18.237050Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:25:10.867053Z",
+                "message": "Started deployed execution in 52.63s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:24:18.055771Z",
+                "message": "Imported container image.",
+                "status": "True",
+                "type": "ContainerReady"
+              }
+            ]
+          },
+          {
+            "name": "mcbuse-api-analytics-x5s87",
+            "creator": "mcbuse-analytics-scheduler@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com",
+            "startTime": "2026-09-21T12:01:00.590159Z",
+            "completionTime": "2026-09-21T12:02:03.281949Z",
+            "succeededCount": 1,
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T12:02:03.281949Z",
+                "message": "Execution completed successfully in 1m2.69s.",
+                "status": "True",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T12:00:57.338790Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T12:01:55.420588Z",
+                "message": "Started deployed execution in 58.08s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T12:00:57.005700Z",
+                "message": "Imported container image in 1.55s.",
+                "status": "True",
+                "type": "ContainerReady"
+              }
+            ]
+          },
+          {
+            "name": "mcbuse-api-analytics-6x655",
+            "creator": "mcbuse-analytics-scheduler@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com",
+            "startTime": "2026-09-21T06:00:10.129502Z",
+            "completionTime": "2026-09-21T06:01:05.144600Z",
+            "succeededCount": 1,
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T06:01:05.144600Z",
+                "message": "Execution completed successfully in 55.01s.",
+                "status": "True",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T06:00:05.255924Z",
+                "message": "Provisioned imported containers in 1.09s.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T06:00:58.332122Z",
+                "message": "Started deployed execution in 53.07s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T06:00:04.163603Z",
+                "message": "Imported container image in 1.4s.",
+                "status": "True",
+                "type": "ContainerReady"
+              }
+            ]
+          },
+          {
+            "name": "mcbuse-api-analytics-tq7x2",
+            "creator": "mcbuse-analytics-scheduler@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com",
+            "startTime": "2026-09-21T00:00:07.870466Z",
+            "completionTime": "2026-09-21T00:00:38.375739Z",
+            "succeededCount": 1,
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T00:00:38.375739Z",
+                "message": "Execution completed successfully in 30.5s.",
+                "status": "True",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T00:00:04.213636Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T00:00:30.876304Z",
+                "message": "Started deployed execution in 26.66s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T00:00:03.998032Z",
+                "message": "Imported container image in 1.17s.",
+                "status": "True",
+                "type": "ContainerReady"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "mcbuse-api-analytics-queue",
+        "image": "europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/api@sha256:aaa137de28c3fbc976a02498b7a543668b8c100f52f96b87fc9d5e72e9406414",
+        "args": [
+          "dist/src/analytics-intelligence/worker.js",
+          "--queue"
+        ],
+        "executions": [
+          {
+            "name": "mcbuse-api-analytics-queue-p6jmk",
+            "creator": "mcbuse-analytics-scheduler@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com",
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T13:28:05.625733Z",
+                "message": "Waiting for execution to start.",
+                "status": "Unknown",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:28:05.579578Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:28:05.625733Z",
+                "message": "Waiting for execution to start.",
+                "status": "Unknown",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:28:05.377891Z",
+                "message": "Imported container image.",
+                "status": "True",
+                "type": "ContainerReady"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:28:05.690143Z",
+                "message": "System will retry after 00:01 from lastTransitionTime for polling interval",
+                "reason": "WaitingForOperation",
+                "severity": "Info",
+                "status": "True",
+                "type": "Retry"
+              }
+            ]
+          },
+          {
+            "name": "mcbuse-api-analytics-queue-4zwps",
+            "creator": "mcbuse-analytics-scheduler@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com",
+            "startTime": "2026-09-21T13:27:08.729610Z",
+            "completionTime": "2026-09-21T13:28:03.470732Z",
+            "succeededCount": 1,
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T13:28:03.470732Z",
+                "message": "Execution completed successfully in 54.74s.",
+                "status": "True",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:27:04.897806Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:27:59.047088Z",
+                "message": "Started deployed execution in 54.14s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:27:04.646429Z",
+                "message": "Imported container image.",
+                "status": "True",
+                "type": "ContainerReady"
+              }
+            ]
+          },
+          {
+            "name": "mcbuse-api-analytics-queue-scnq2",
+            "creator": "mcbuse-analytics-scheduler@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com",
+            "startTime": "2026-09-21T13:26:04.727241Z",
+            "completionTime": "2026-09-21T13:27:17.644932Z",
+            "succeededCount": 1,
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T13:27:17.644932Z",
+                "message": "Execution completed successfully in 1m12.91s.",
+                "status": "True",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:26:02.137275Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:27:10.423636Z",
+                "message": "Started deployed execution in 1m8.28s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:26:01.939645Z",
+                "message": "Imported container image.",
+                "status": "True",
+                "type": "ContainerReady"
+              }
+            ]
+          },
+          {
+            "name": "mcbuse-api-analytics-queue-scws4",
+            "creator": "nernuer@gmail.com",
+            "startTime": "2026-09-21T13:25:42.728393Z",
+            "completionTime": "2026-09-21T13:26:39.379817Z",
+            "succeededCount": 1,
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-09-21T13:26:39.379817Z",
+                "message": "Execution completed successfully in 56.65s.",
+                "status": "True",
+                "type": "Completed"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:25:40.144740Z",
+                "message": "Provisioned imported containers.",
+                "status": "True",
+                "type": "ResourcesAvailable"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:26:31.486667Z",
+                "message": "Started deployed execution in 51.34s.",
+                "status": "True",
+                "type": "Started"
+              },
+              {
+                "lastTransitionTime": "2026-09-21T13:25:39.963102Z",
+                "message": "Imported container image.",
+                "status": "True",
+                "type": "ContainerReady"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "schedulers": [
+      {
+        "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-financial-recovery-every-minute",
+        "schedule": "* * * * *",
+        "timeZone": "Etc/UTC",
+        "state": "ENABLED",
+        "lastAttemptTime": "2026-09-21T13:28:04.515143Z",
+        "status": {}
+      },
+      {
+        "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-every-10-minutes",
+        "schedule": "0 */6 * * *",
+        "timeZone": "Etc/UTC",
+        "state": "ENABLED",
+        "lastAttemptTime": "2026-09-21T12:00:55.261432Z",
+        "status": {}
+      },
+      {
+        "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-queue-every-minute",
+        "schedule": "* * * * *",
+        "timeZone": "Etc/UTC",
+        "state": "ENABLED",
+        "lastAttemptTime": "2026-09-21T13:28:04.509548Z",
+        "status": {}
+      }
+    ],
+    "expo": "not deployed, as requested"
+  },
+  "smoke": {
+    "checkedAt": "2026-09-21T13:26:25.593Z",
+    "apiBase": "https://mcbuse-api-vtg5cj3ynq-ew.a.run.app/api/v1",
+    "checks": [
+      {
+        "route": "/health",
+        "status": 200,
+        "durationMs": 717,
+        "body": {
+          "status": "ok",
+          "timestamp": "2026-09-21T13:26:29.109Z",
+          "uptime": 248,
+          "environment": "production",
+          "services": {
+            "database": "ok"
+          }
+        }
+      },
+      {
+        "route": "/accounts",
+        "status": 200,
+        "durationMs": 699
+      },
+      {
+        "route": "/accounts/day-end",
+        "status": 200,
+        "durationMs": 438
+      },
+      {
+        "route": "/merchants/me",
+        "status": 200,
+        "durationMs": 216
+      },
+      {
+        "route": "/merchants/me/analytics/general?period=30d&grouping=day",
+        "status": 200,
+        "durationMs": 491
+      },
+      {
+        "route": "/merchants/me/insights",
+        "status": 200,
+        "durationMs": 318,
+        "freshness": {
+          "generatedAt": "2026-09-21T13:25:12.756Z",
+          "ageSeconds": 78,
+          "stale": false,
+          "staleAfterMinutes": 375
+        }
+      },
+      {
+        "route": "/merchants/me/assessments",
+        "status": 200,
+        "durationMs": 263
+      },
+      {
+        "route": "/merchants/me/finance-packages",
+        "status": 200,
+        "durationMs": 251
+      },
+      {
+        "route": "/merchants/me/finance-packages/email-attempts",
+        "status": 200,
+        "durationMs": 279
+      }
+    ],
+    "migrations": {
+      "count": 33,
+      "latest": "1799733000004"
+    },
+    "wallets": 8,
+    "unprotectedTables": [],
+    "remainingClientGrants": 0,
+    "monitoring": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "checkedAt": "2026-09-21T13:26:33.369Z",
+        "concerns": [],
+        "pendingOperations": {
+          "total": 0,
+          "byStatus": {},
+          "oldestAgeSeconds": null,
+          "staleCount": 0
+        },
+        "webhooks": {
+          "failedLastDay": 0,
+          "unprocessedLastHour": 0
+        },
+        "streams": {
+          "eventsLastHour": 0,
+          "lastEventAgeSeconds": null
+        },
+        "workerBacklog": {
+          "deferred": 0,
+          "lastSuccessfulCalculation": "2026-09-21T13:25:12.756Z",
+          "pending": 0,
+          "oldestAgeSeconds": null,
+          "failing": 0
+        },
+        "reconciliation": null
+      }
+    },
+    "passed": true,
+    "portal": [
+      {
+        "route": "/overview",
+        "status": 200,
+        "finalPath": "/overview",
+        "runAssessmentVisible": false,
+        "runtimeErrors": []
+      },
+      {
+        "route": "/payment",
+        "status": 200,
+        "finalPath": "/payment",
+        "runAssessmentVisible": false,
+        "runtimeErrors": []
+      },
+      {
+        "route": "/analytics",
+        "status": 200,
+        "finalPath": "/analytics",
+        "runAssessmentVisible": false,
+        "runtimeErrors": []
+      },
+      {
+        "route": "/inventory",
+        "status": 200,
+        "finalPath": "/inventory",
+        "runAssessmentVisible": false,
+        "runtimeErrors": []
+      },
+      {
+        "route": "/credit-assessment",
+        "status": 200,
+        "finalPath": "/credit-assessment",
+        "runAssessmentVisible": true,
+        "runtimeErrors": []
+      },
+      {
+        "route": "/finance-match",
+        "status": 200,
+        "finalPath": "/finance-match",
+        "runAssessmentVisible": false,
+        "runtimeErrors": []
+      }
+    ]
+  },
+  "walletVerification": {
+    "checkedAt": "2026-09-21T13:23:04.267Z",
+    "hostedWallets": 8,
+    "recordsMatchPreMigrationRestore": true,
+    "decryptedAddressesVerified": 8,
+    "keyVersions": [
+      {
+        "encryption_key_version": "v1",
+        "count": 8
+      }
+    ]
+  },
+  "privateTableRegression": {
+    "passed": true,
+    "protectedTables": 44,
+    "denialChecks": 448,
+    "serverWalletReadCount": 8
+  },
+  "migrationExecution": "mcbuse-api-migrate-7vrmx",
+  "sourceNote": "Cloud Build archives and immutable image digests identify deployed code. The base commit alone omits working-tree repairs. Deployment-script edits after image builds configure monitoring and required GCP APIs without changing runtime application code.",
+  "limitations": [
+    "New financial initiation remains disabled pending historical settlement reconciliation.",
+    "Expo deployment explicitly deferred by user.",
+    "Full hosted financial, device, inbox, six-merchant timing and large-workload performance acceptance remains open.",
+    "No qualifying pre-deployment performance baseline was captured."
+  ]
+}

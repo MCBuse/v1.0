@@ -48,6 +48,7 @@ export class OnrampSessionsService {
   }
 
   async createSession(userId: string, dto: CreateOnrampSessionDto) {
+    if (process.env.MONEY_INITIATION_ENABLED === 'false') throw new BadRequestException('New money movements are temporarily disabled');
     const provider = (dto.provider ?? 'stripe') as 'stripe' | 'moonpay';
     if (provider !== 'stripe' && provider !== 'moonpay') {
       throw new BadRequestException('Unsupported provider');

@@ -1,0 +1,701 @@
+{
+  "recordedAt": "2026-09-21T13:36:39.817237+00:00",
+  "status": "hosted_deployed_acceptance_pending",
+  "baseCommit": "e46f3ec1d75503edf6974ae58ed499a7b7cd3a76",
+  "branch": "codex/merchant-repair",
+  "uncommitted": true,
+  "sourceDigestSha256": "3ea1aeb36e7cb1638d380ac202df50d6bb3f77b667025f937117b3fc04651aaf",
+  "sourceFiles": [
+    {
+      "path": "apps/api/.env.example",
+      "sha256": "0c5993262f60005ae2d4d2fe5d35bad2a2dd93e2b6647c926d8e75091175dd6b"
+    },
+    {
+      "path": "apps/api/drizzle/0029_merchant_repair.sql",
+      "sha256": "2ac0335acce3269fe6bba99bb7a307499de75361e4053cabeb789cf10448e45e"
+    },
+    {
+      "path": "apps/api/drizzle/0030_chain_attempt_intent.sql",
+      "sha256": "9c6888cf7d7b18ba5e9c16acf7835a991fa930697ba9ac6470df6ebe2d7a3a2f"
+    },
+    {
+      "path": "apps/api/drizzle/0031_private_application_tables.sql",
+      "sha256": "e98613a23d5cc61c37824f6c194cc91417337c77e9fa93582fe76ea730ba4584"
+    },
+    {
+      "path": "apps/api/drizzle/0032_private_analytics_outbox.sql",
+      "sha256": "6bf0721433b917b75409eda61f6dbd46ec00b25de03df123e539bbc971cfb688"
+    },
+    {
+      "path": "apps/api/drizzle/meta/_journal.json",
+      "sha256": "fa5a0763d04fe9bb2288991976726bb9d6e48f2c1ceb133eacf9469802f223f7"
+    },
+    {
+      "path": "apps/api/package.json",
+      "sha256": "2947b9cc4e63042b2cce8b6d8f245d25bd6b7457797282cd1591a40e84a055fd"
+    },
+    {
+      "path": "apps/api/scripts/check-migration-order.cjs",
+      "sha256": "6e0fc51c1cb479814f6bdb119c839f7762b8c87b4b4e8bbf85666277def838f3"
+    },
+    {
+      "path": "apps/api/src/accounts/account-funding.devnet-int-spec.ts",
+      "sha256": "f035a52f34ba7246535e354a6e56880446b93263bfc9d05f00b023a27d1a5dfe"
+    },
+    {
+      "path": "apps/api/src/accounts/account-funding.service.ts",
+      "sha256": "940999a81248b40dd48da5fe07a937ae91948b88831c4cb7dc7c1a9b903583db"
+    },
+    {
+      "path": "apps/api/src/accounts/account-transfer.devnet-int-spec.ts",
+      "sha256": "4a469e1925ddc817c824af3326c8d6d1fcb7e5253486adeb05f89008736c7f9e"
+    },
+    {
+      "path": "apps/api/src/accounts/account-transfer.service.ts",
+      "sha256": "2aff1646d31ce4dd7ace084aaa05d00eac7026b5da897940ccd10a2ca4f8784a"
+    },
+    {
+      "path": "apps/api/src/accounts/account-withdrawal.devnet-int-spec.ts",
+      "sha256": "4b82e3b6fc9bc14ef03b06b38db4b0bf393a83d6391224f7d1e673ecc9594c50"
+    },
+    {
+      "path": "apps/api/src/accounts/account-withdrawal.service.ts",
+      "sha256": "5cd69c5c5a493b325761c1e34918ced7d4d6bdb00202e30b2b52da915750ee4c"
+    },
+    {
+      "path": "apps/api/src/accounts/accounts.controller.ts",
+      "sha256": "7dd08fb8719f1c79b70d8ae460d30c11aa8d2bbb9bc4155d6a13d3ef8417c9e5"
+    },
+    {
+      "path": "apps/api/src/accounts/day-end.service.int-spec.ts",
+      "sha256": "4c4fd105a0d8374b077df30e88b6ad8a3ee40b8d3adeaad36fa59cdfa9a2a8b1"
+    },
+    {
+      "path": "apps/api/src/accounts/failure-paths.int-spec.ts",
+      "sha256": "93238755776b131c55355009e0811413249b39da25aa2001724aa5b69605af32"
+    },
+    {
+      "path": "apps/api/src/accounts/funding-creation.int-spec.ts",
+      "sha256": "1ef32aa7e00209b25b3838c4b6b6024acc610c06b7d1d4eec073ba029af2e0a2"
+    },
+    {
+      "path": "apps/api/src/accounts/funding-refund.spec.ts",
+      "sha256": "8045f7d58572b5a496efaf964f29ce5e916899fc2ff2ac11400edb49fcf24a64"
+    },
+    {
+      "path": "apps/api/src/accounts/operation-runner.service.ts",
+      "sha256": "a53dda7c60084c736ac1c76adacdaaa5c1ec41079a211a1d4ce7f953533671e9"
+    },
+    {
+      "path": "apps/api/src/accounts/recovery-worker.ts",
+      "sha256": "4d91c72cf00d5490217b442a5adfadbef2cdfee79c35de1961af6304926cd1f7"
+    },
+    {
+      "path": "apps/api/src/accounts/testing/devnet-sweep.ts",
+      "sha256": "8875cf0054578ad21a49f7fd2aab8b5e846843d7bf0bc5f0907b84b3480493bb"
+    },
+    {
+      "path": "apps/api/src/analytics-intelligence/analytics-orchestrator.service.ts",
+      "sha256": "c9a36206ab29cd2ab4c14415444df4005afb68e958b02c974899554bcd6e43cb"
+    },
+    {
+      "path": "apps/api/src/analytics-intelligence/analytics-work-queue.service.int-spec.ts",
+      "sha256": "5f4ebe2b7cbea45b838260fdec5ca5d63ebf8c0bc8fff1683dd38b312f9b03b7"
+    },
+    {
+      "path": "apps/api/src/analytics-intelligence/analytics-work-queue.service.ts",
+      "sha256": "008f75522e8387a365137f8461d0a8e15fd910e651ef54689a2803dc52276e95"
+    },
+    {
+      "path": "apps/api/src/analytics-intelligence/merchant-insights.service.spec.ts",
+      "sha256": "28f10b871d66020884df0832c9bc923ac82d275ae4cbf7a488c4873d1a816dd6"
+    },
+    {
+      "path": "apps/api/src/analytics-intelligence/merchant-insights.service.ts",
+      "sha256": "73c1655da38ca4d8c58522650b92089ec03fb855b5fa39397130a0078f193c09"
+    },
+    {
+      "path": "apps/api/src/analytics-intelligence/worker.ts",
+      "sha256": "cd1d4b2ce1ae49c091f43f2faa1dd2f72967468dd34db8ac62fc0051ab8954fd"
+    },
+    {
+      "path": "apps/api/src/config/config.validation.ts",
+      "sha256": "5126003db61a8e9e5e18922807e1743db02f700cd6af86fa658fbd1fdaa87163"
+    },
+    {
+      "path": "apps/api/src/config/environment-separation.spec.ts",
+      "sha256": "d8464540e8fac81455990ced3c9aedd8a56a1942e8f75057339f6dc78f13fd8f"
+    },
+    {
+      "path": "apps/api/src/config/environment-separation.ts",
+      "sha256": "4e7f94777474d184b5f010dab3dc058da6038d4ea96a3ddc730ec99ed0d95799"
+    },
+    {
+      "path": "apps/api/src/data-capture/analytics/analytics-boundaries.spec.ts",
+      "sha256": "10f6f0d76f2db3556bb7aadc8fcb3b3ca65a47602a58559ff4ab604df31c06a5"
+    },
+    {
+      "path": "apps/api/src/data-capture/analytics/combined-analytics.ts",
+      "sha256": "b4a2b32232240ccd240be5099dc1cf90d301d81426d6e027bb5befbcb071906d"
+    },
+    {
+      "path": "apps/api/src/data-capture/analytics/combined-examples.spec.ts",
+      "sha256": "c17aa213854f68dcb6200d7840a466a2eed25ea4766576c485515ac751e1b9b7"
+    },
+    {
+      "path": "apps/api/src/data-capture/analytics/general-analytics.service.ts",
+      "sha256": "01ec9792db3f6997ab402e0f842227ec5e59bb896aecc66d7a1abdab476917ae"
+    },
+    {
+      "path": "apps/api/src/data-capture/analytics/inventory-analytics.ts",
+      "sha256": "3b444fb6bd8fb4b7556c31cf7e7cc39eb155ec459dd594ed32c166c00d554688"
+    },
+    {
+      "path": "apps/api/src/data-capture/analytics/merchant-repair.spec.ts",
+      "sha256": "15ea4883b91091020150b2a53381e5e66089d069d7ec7a0266ed3bbc242b217e"
+    },
+    {
+      "path": "apps/api/src/data-capture/analytics/transaction-analytics.spec.ts",
+      "sha256": "9ba7d42e356de9b6c6fc03f02049292990549731ecc3e742203044a3271e3a53"
+    },
+    {
+      "path": "apps/api/src/data-capture/analytics/transaction-analytics.ts",
+      "sha256": "24dda5a0a0957deba64f7422dcf9922314e9a02b959254e1297587725f376038"
+    },
+    {
+      "path": "apps/api/src/data-capture/assessment/merchant-assessment.service.ts",
+      "sha256": "62517a0f57af9224e91cc2bb1f4093df99d17a0097641b9aa159fc90c08ea895"
+    },
+    {
+      "path": "apps/api/src/data-capture/cross-merchant-access.int-spec.ts",
+      "sha256": "f5e81c32d91c5b1064b8117220abbe6478a7ce1ea8c176276d8ec547eb6a3690"
+    },
+    {
+      "path": "apps/api/src/data-capture/dto/adjust-merchant-product-stock.dto.ts",
+      "sha256": "53185619c8eacdab5582d11890784aefd475d0a6626ea05daf57d75211343628"
+    },
+    {
+      "path": "apps/api/src/data-capture/finance-package.int-spec.ts",
+      "sha256": "a0b037f6cafddb9802404216b6040eb880d100dc34215200b7227dcfd3555090"
+    },
+    {
+      "path": "apps/api/src/data-capture/merchant-activity.service.spec.ts",
+      "sha256": "6ac040eb03ffda775257e3e709888a5cb6691c8919fb842b4c6314d40e8cfe9e"
+    },
+    {
+      "path": "apps/api/src/data-capture/merchant-activity.service.ts",
+      "sha256": "c7010bdbb5226de2b15aae1b7386110c11c3f0535342670655eff6eb208902bc"
+    },
+    {
+      "path": "apps/api/src/data-capture/merchant-finance.service.ts",
+      "sha256": "c67c1d7a2ee577b8a312f20a140713a313ce53d1f22beef9c6f6d312f5ba708b"
+    },
+    {
+      "path": "apps/api/src/data-capture/merchant-import.service.spec.ts",
+      "sha256": "535a259b21ccecda597dcb5dae663bd5ba7c73caee8dc07df60bd2e88e1ea747"
+    },
+    {
+      "path": "apps/api/src/data-capture/merchant-import.service.ts",
+      "sha256": "4e8f8ea7837bc29e3e1fe14c6e037e45c0472614c2962d123c8227fe04085bfc"
+    },
+    {
+      "path": "apps/api/src/data-capture/merchant-inventory.service.ts",
+      "sha256": "c98d7bfe16b2feb4ba312be65365137c028f708c1037fd446af9b559cf92af53"
+    },
+    {
+      "path": "apps/api/src/data-capture/merchant.controller.ts",
+      "sha256": "93a8f2ec1797ef4b43239f91b4ba265289c2ef5a14930bd03248b40096ff1b4d"
+    },
+    {
+      "path": "apps/api/src/data-capture/stock-movements.ts",
+      "sha256": "80d27db6698dc21d99940e3c0cf91b68d4d1169fe9f48620fa3dcd9dcc046a82"
+    },
+    {
+      "path": "apps/api/src/database/schema/financial-operations.ts",
+      "sha256": "d2953ec42e1023f27a801bb73612ecb66ed2f9ba8d528fc8995f3b985a9f83d2"
+    },
+    {
+      "path": "apps/api/src/database/schema/merchant-analytics-work.ts",
+      "sha256": "1533b32aec234fddfd09ffa99c45a1480a064a59bbfadff3bcf7945191eb9303"
+    },
+    {
+      "path": "apps/api/src/database/schema/merchant-assessments.ts",
+      "sha256": "f132dc518318b1abd6cb965df2eb78f77e9f23f3dc33206fbbeddbb1b18b1547"
+    },
+    {
+      "path": "apps/api/src/financial-operations/financial-operations.service.ts",
+      "sha256": "18e9348f8e6f4b6f363d27616bbd9e71c09ff01536593f61187cd4a749ba6f92"
+    },
+    {
+      "path": "apps/api/src/financial-operations/operation-state.ts",
+      "sha256": "42e0e175ad6c150bd705a297ff7ce12dd94a54534e8e9dde087df1d641499bc1"
+    },
+    {
+      "path": "apps/api/src/health/operations-health.service.ts",
+      "sha256": "a10b69f2576545368f032431d0fe67ee89b76a5099e12a4ed2baa21f9d9ed562"
+    },
+    {
+      "path": "apps/api/src/offramp/offramp.service.ts",
+      "sha256": "a2bc5378a1996e2c10b26fdfb39675ad841b84bc9df6e7cf619adf1d5370f826"
+    },
+    {
+      "path": "apps/api/src/onramp/onramp-sessions.service.ts",
+      "sha256": "3f8cf6229bcc131d61fa646ff84f02500b806581481b0fe6064b4ec3286fd79e"
+    },
+    {
+      "path": "apps/api/src/onramp/onramp.service.ts",
+      "sha256": "ce3fa7ea3e83c4829a2d3732dda4bdf51632d942958464eafdcdce3d1f04156a"
+    },
+    {
+      "path": "apps/api/src/payments/customer-merchant-payment.devnet-int-spec.ts",
+      "sha256": "47a0e9a675b28fd9a059d8ea2cbfd5b706b9ec7fb4ffbfbc193f6c9d9f802052"
+    },
+    {
+      "path": "apps/api/src/payments/payments.service.ts",
+      "sha256": "4e1ebd80d4e7b617c84fc4824e01300bd0d2a3656eafcf041b32954cb9792a5f"
+    },
+    {
+      "path": "apps/api/src/payments/providers/solana-transfer.provider.spec.ts",
+      "sha256": "9e7ad47e34686276f50c836fc7183292daca1ba4ad03c89e60443c3cfbfdf2b6"
+    },
+    {
+      "path": "apps/api/src/payments/providers/solana-transfer.provider.ts",
+      "sha256": "da234c98f1721e6498f097ee6e227a77b4ad5d344c721ff0a8c235dbbb154f99"
+    },
+    {
+      "path": "apps/api/src/solana/prepared-recovery.spec.ts",
+      "sha256": "d05a0d3e0f6b3d55fa4fd2c20da08839d9a7be7ee5f0236c9a82bb5eb270f622"
+    },
+    {
+      "path": "apps/api/src/solana/rotate-wallet-keys.int-spec.ts",
+      "sha256": "7a8b3f819cbfa123d9ae5f52c9167f949152f043e6657928dae6fab370939430"
+    },
+    {
+      "path": "apps/api/src/solana/solana.service.ts",
+      "sha256": "ef69b3cf11876d1eb75ca80587d4d2d27a93097d6da57321ea2fd803a3353dab"
+    },
+    {
+      "path": "apps/api/src/solana/spl-transfer.ts",
+      "sha256": "72fa7325e1f71e896121e457ee0b07f5cf56c10cba7d11f46d333e542f4bc9b0"
+    },
+    {
+      "path": "apps/api/src/treasury/treasury.service.ts",
+      "sha256": "05e0f6eadfaf10deec976290113f74817550eb70c7e4e0a331f3c145d5116b30"
+    },
+    {
+      "path": "apps/api/src/wallets/wallets-idempotency.int-spec.ts",
+      "sha256": "62dc04d8534d8aa6614952f26bdf3b347d09ce8a15f0b9943dfcc2a0ee9390db"
+    },
+    {
+      "path": "apps/api/src/wallets/wallets.module.ts",
+      "sha256": "4723b37ef86fd008a812339a721fe33e68a8ed6906ee0df807686962b41b1b18"
+    },
+    {
+      "path": "apps/api/src/wallets/wallets.service.ts",
+      "sha256": "7b5eb236ab47ef9d9a690370e35d86560f08dfb7cdda041e47e1804a3b2a2082"
+    },
+    {
+      "path": "apps/mobile/app/(flows)/top-up/checkout.tsx",
+      "sha256": "36595a2702c7108d26530b212341b279f6645f3d012d3b810e3d37ffb5f2a77d"
+    },
+    {
+      "path": "apps/mobile/app/(flows)/top-up/index.tsx",
+      "sha256": "6045779badfa78fc96f9a7504b66644ad2594bda603e2603854d35906db57f77"
+    },
+    {
+      "path": "apps/mobile/app/(flows)/top-up/status.tsx",
+      "sha256": "8ba281a189f43455daef34f591bfdc9e20a08c84819fa47435c7d71014b044a0"
+    },
+    {
+      "path": "apps/mobile/app/(flows)/transfer/index.tsx",
+      "sha256": "dd94e6801cd71f00154a7e3af5ccc1cc7c2d1ee3392dea3daa7aea7690d7df37"
+    },
+    {
+      "path": "apps/mobile/features/onramp/session-models.ts",
+      "sha256": "81f653579db14c11e664b105dd8a12e85189ca0b231a3d5917c3f60ca6c17afd"
+    },
+    {
+      "path": "apps/mobile/features/onramp/session-repository.ts",
+      "sha256": "9681e51004c585de362d555b2964f73dbd9a5d2b62fb73a1b9df993f83943285"
+    },
+    {
+      "path": "apps/mobile/features/onramp/use-onramp-status.ts",
+      "sha256": "34924927f9ced8e6bbdc81b6ba1db37e9661e6e8c362541045280b3b105cc22b"
+    },
+    {
+      "path": "apps/mobile/features/transfer/models.ts",
+      "sha256": "9a0d9b91fd4730a71dad2b873d853bc111503283440ca3828673ec9a94c59c30"
+    },
+    {
+      "path": "apps/mobile/features/transfer/repository.ts",
+      "sha256": "50f48f3a8bda4046a72c7556631be63df5f7233bc479e9ada946f8e4d6f7b53d"
+    },
+    {
+      "path": "apps/mobile/lib/api/money-intent.ts",
+      "sha256": "0bd70f4e6751aed2f9ea77720329668cb91c3ef29aab905b8564506f573fefb0"
+    },
+    {
+      "path": "apps/mobile/lib/api/storage.ts",
+      "sha256": "9184da57d36db2ec701987032f07b13980c65ba9a8bd774c087e0c7f18f93a4a"
+    },
+    {
+      "path": "apps/portal/app/(merchant)/credit-assessment/credit-assessment.tsx",
+      "sha256": "909870e3ad5be26f760adebf64cbb5fe7c0a2051e8df20c55fef78dbead786cc"
+    },
+    {
+      "path": "apps/portal/app/(merchant)/finance-match/page.tsx",
+      "sha256": "c4f24df44e2582bd7101eef874d5feb103ad9af4ed76364d59769d2a43c8c9cf"
+    },
+    {
+      "path": "apps/portal/app/(merchant)/inventory/inventory-view.tsx",
+      "sha256": "0fb8243103e8cc63342381ba2875665006eace9bcf1d03c8db48b9bbcaa4d214"
+    },
+    {
+      "path": "apps/portal/components/account-cards.tsx",
+      "sha256": "e4653df7043747c2c8c481a7d2496d6ae83729a5908b8f9ed9eb831f85e72516"
+    },
+    {
+      "path": "apps/portal/components/general-analytics/general-analytics-view.tsx",
+      "sha256": "33db4122762c2bace489ad23466d7966938325c434473e267f988b05e925730c"
+    },
+    {
+      "path": "apps/portal/components/logout-button.tsx",
+      "sha256": "4330c6bfbcad19d062c205bed2bd17980708efd9d22964a13755e0b43d7fbea3"
+    },
+    {
+      "path": "apps/portal/components/merchant-insights.tsx",
+      "sha256": "e25de0f845c9b18e9c3f76d24454dfa1e13dcfde8450489a694da0e5f049586d"
+    },
+    {
+      "path": "apps/portal/components/saved-assessment.tsx",
+      "sha256": "dc59c7e4c2f597ec6d70fda7a545fb24b69b4a3e569416403d9c0d93f7213e0e"
+    },
+    {
+      "path": "apps/portal/lib/client/accounts-api.ts",
+      "sha256": "77c463527bb8590401683445e73f7a94816bc6779a3d117fff9553214b953b8c"
+    },
+    {
+      "path": "apps/portal/lib/client/api.ts",
+      "sha256": "eff3a80da8ae1ae53b7941e19a93fcf0e99a420b98c7dc091cc9183a3c44f373"
+    },
+    {
+      "path": "apps/portal/lib/client/operation-intent.ts",
+      "sha256": "4ccebfa4c79cfc683f7c18b89562b83687d4f1c960b77933597abbc7ef9a2b82"
+    },
+    {
+      "path": "apps/portal/tests/assessment-finance.spec.ts",
+      "sha256": "6fb86eb6313a7bbb99e28e1b6d740692f05a93df6cbc1a30d0268f06b9805532"
+    },
+    {
+      "path": "apps/portal/tests/general-analytics.spec.ts",
+      "sha256": "6f6d652970805a67602c605bceba29e9081d36e0ea00c8b129c82963effe9cec"
+    },
+    {
+      "path": "deploy/cloud-run/api.env.yaml",
+      "sha256": "cd5eb56200942eb27f79116018152867046150b6671501622906d2f2ae88e9da"
+    },
+    {
+      "path": "packages/shared/src/accounts.ts",
+      "sha256": "4b39ac3aadaa92352dc716391199afae6118801a7836c984d995014f5e00c948"
+    },
+    {
+      "path": "packages/shared/src/general-analytics.ts",
+      "sha256": "9d4872b77b2ec8be85c30f8cc85a356a43701a1c58006a8d23eb3abd7ddcc5ac"
+    },
+    {
+      "path": "packages/shared/src/index.ts",
+      "sha256": "88a0e9c2ba38311398863e1c978ab91649a264f69eaf67b74484e996aed47973"
+    },
+    {
+      "path": "packages/shared/src/merchant-assessment.ts",
+      "sha256": "4feb751a1cd7a3cdc1cd63f72f355a5bff8c92edbc1fe78e014f77193f8199cc"
+    },
+    {
+      "path": "packages/shared/src/merchant.ts",
+      "sha256": "6fb3e0396f3379d4b6d6e0da43ccb85ff47c9262fcea4f10fd5b0d9053c15b9b"
+    },
+    {
+      "path": "scripts/cloud-run/deploy-analytics-worker.sh",
+      "sha256": "646241c9b056a1b94c8a380999ccfb8b8b4edd20cc8c1dfeca0c057d5d37cc12"
+    },
+    {
+      "path": "scripts/cloud-run/deploy-recovery-worker.sh",
+      "sha256": "69d90132e9f8395c9710ff54525970725e12fcb672a2c3e685bdd325cd503d7e"
+    },
+    {
+      "path": "scripts/cloud-run/deploy.sh",
+      "sha256": "82ee87cf82779452ab99921b7e0a6e2ce4b9fbcafe4593b14029cff13cd16221"
+    }
+  ],
+  "tests": {
+    "apiUnitFullRun": {
+      "suites": 47,
+      "passed": 461
+    },
+    "preparedRecoveryAfterLastAddition": {
+      "passed": 9,
+      "overlapsFullRun": true,
+      "additionalCases": [
+        "pruned RPC history must stay pending",
+        "mock financial mode cannot rebroadcast"
+      ]
+    },
+    "apiIntegration": {
+      "suites": 21,
+      "passed": 236
+    },
+    "portalUnit": {
+      "passed": 30
+    },
+    "desktopBrowserPrevious": {
+      "passed": 76,
+      "api": "mock"
+    },
+    "assessmentFinanceBrowserFinal": {
+      "passed": 2,
+      "api": "mock"
+    },
+    "devnetStripeSandbox": {
+      "suites": 4,
+      "passed": 17,
+      "fundingCollection": "stubbed",
+      "chainMovements": "actual devnet",
+      "withdrawalPayouts": "actual Stripe sandbox"
+    }
+  },
+  "localAnalyticsBenchmark": {
+    "transactionCount": 100000,
+    "productCount": 1000,
+    "movementCount": 101000,
+    "transactionsMs": 22616,
+    "inventoryMs": 5867,
+    "combinedMs": 3,
+    "totalMs": 28486,
+    "budgetMs": 120000,
+    "seriesPoints": 91,
+    "turnoverRows": 1000,
+    "analyses": 4
+  },
+  "localRestore": {
+    "matchedOriginalWalletRecords": 60,
+    "hostedBackup": true,
+    "verifiedCiphertextAndAddressPreservation": true
+  },
+  "migrations": {
+    "added": [
+      "0029_merchant_repair",
+      "0030_chain_attempt_intent"
+    ],
+    "journalEntries": 31,
+    "appliedTo": "restored local acceptance database",
+    "hostedApplied": true,
+    "latestHostedTimestamp": "1799711400000",
+    "hostedAppliedCount": 33,
+    "pendingHostedEntries": 8,
+    "hostedLatestTimestamp": "1799733000004"
+  },
+  "hosted": {
+    "apiRevisionObserved": "mcbuse-api-00040-mm7",
+    "repairDeployed": false,
+    "health": {
+      "at": "2026-09-21T11:55:45.421Z",
+      "runtime": "production",
+      "database": "ok"
+    },
+    "blocked": [
+      "physical phone unavailable; CoreDevice discovery timeout",
+      "designated readable test inbox not supplied"
+    ],
+    "unmeasured": [
+      "physical mobile QR p95 across 40 updates",
+      "deployed insights p95 across 40 changes and six merchants",
+      "hosted payment API p95 before/after at 100000 transactions and 1000 products",
+      "download/email artifact hashes and confirmed inbox receipt"
+    ],
+    "aggregateInventory": {
+      "checkedAt": "2026-09-21T12:28:43.659Z",
+      "scope": "hosted read-only aggregate inventory; no merchant or encrypted-wallet rows exported",
+      "schemaCapabilities": {
+        "operations": false,
+        "key_versions": false
+      },
+      "migrationHistory": {
+        "applied_count": 23,
+        "latest_recorded_timestamp": "1799711400000"
+      },
+      "legacyProviderStates": {
+        "onramp_transactions": [
+          {
+            "status": "completed",
+            "count": 7
+          },
+          {
+            "status": "expired",
+            "count": 11
+          }
+        ],
+        "offramp_transactions": []
+      },
+      "totals": {
+        "wallets": 42
+      },
+      "unresolvedOperations": [],
+      "walletKeyVersions": [
+        {
+          "encryption_key_version": "legacy_unversioned",
+          "count": 42
+        }
+      ],
+      "historicalLedgerOnlyTransfers": 4
+    },
+    "backupRestore": {
+      "verifiedAt": "2026-09-21T12:53:27.256Z",
+      "source": "hosted",
+      "restoreScope": "Application public and drizzle schemas; full Supabase archive retained",
+      "directory": "/private/tmp/mcbuse-hosted-repair-backup",
+      "restoredDatabase": "mcbuse_hosted_repair_app_restore_v2_20260921",
+      "bytes": 543988,
+      "sha256": "ebe8f5825591f7126d583c1212b5583aa4670ecb1e7d5dfc0c158c2ca724cbb2",
+      "archiveListingVerified": true,
+      "restoredWallets": 42,
+      "identicalWalletRecords": true,
+      "keyRecoveryFailures": [],
+      "complete": true
+    },
+    "walletCleanup": {
+      "evidence": "merchant-wallet-cleanup-2026-09-21.json",
+      "deletedWallets": 34,
+      "remainingWallets": 8,
+      "realUserAccounts": 4,
+      "preservedWalletRecordsIdentical": true
+    },
+    "migrationRehearsal": {
+      "checkedAt": "2026-09-21T12:56:52.797Z",
+      "environment": "isolated hosted backup restore after cleanup rehearsal",
+      "previous": {
+        "count": 23,
+        "latest": "1799711400000"
+      },
+      "current": {
+        "count": 31,
+        "latest": "1799733000002"
+      },
+      "remainingWallets": 8,
+      "walletRecordsIdentical": true
+    },
+    "mobileDeployment": "explicitly deferred by user",
+    "deploymentEvidence": "merchant-repair-deployment-2026-09-21.json",
+    "deployed": true,
+    "apiRevision": "mcbuse-api-00042-v97",
+    "portalRevision": "mcbuse-portal-00027-wfk",
+    "moneyInitiationEnabled": false,
+    "remainingPilotMerchants": 1,
+    "walletPreservationAfterMigration": {
+      "checkedAt": "2026-09-21T13:23:04.267Z",
+      "hostedWallets": 8,
+      "recordsMatchPreMigrationRestore": true,
+      "decryptedAddressesVerified": 8,
+      "keyVersions": [
+        {
+          "encryption_key_version": "v1",
+          "count": 8
+        }
+      ]
+    },
+    "physicalDeviceReadiness": "merchant-iphone-readiness-2026-09-21.json"
+  },
+  "localLogs": {
+    "apiUnit": {
+      "localPath": "/tmp/merchant-repair-unit-final.txt",
+      "sha256": "2441a8f2d361761b83839a92d157fdb6c647d8c19f07be217f4a387761621dab"
+    },
+    "apiIntegration": {
+      "localPath": "/tmp/merchant-repair-integration-final.txt",
+      "sha256": "67c9d585d5e4f590a41f89cdfe523915a8c966879f5d9f6b67a1929112c86279"
+    },
+    "preparedRecovery": {
+      "localPath": "/tmp/merchant-repair-chain-final.txt",
+      "sha256": "897aa68e5cff4d0808bf2404a2d48a7f0d2e3def3639d9d91895c46d3a4cdefb"
+    },
+    "queueLease": {
+      "localPath": "/tmp/merchant-repair-queue-lease-final.txt",
+      "sha256": "291e5b600ebc4e08db65dabead48e3263718dcca871d30faca23291832646da6"
+    },
+    "devnetSandbox": {
+      "localPath": "/tmp/merchant-repair-devnet-final.txt",
+      "sha256": "c487ae70611591c38d95ca423228e9813119090720c04a002c19a422c8f9afb7"
+    },
+    "portalUnit": {
+      "localPath": "/tmp/merchant-repair-portal-tests.txt",
+      "sha256": "6125805cb251732da0d246df1ae0ef0a9375dabd423808d506688c126de93ce7"
+    },
+    "desktopBrowser": {
+      "localPath": "/tmp/merchant-repair-browser.txt",
+      "sha256": "5fd301156cf5e67e1db2aa02d0c92075338be33362bffb43320981e503fd1629"
+    },
+    "assessmentFinanceBrowser": {
+      "localPath": "/tmp/merchant-repair-finance-browser-final.txt",
+      "sha256": "58409364537f8d730ab670a305e2e9874201c7907f42e1c5847d6449b8e94838"
+    },
+    "apiBuild": {
+      "localPath": "/tmp/merchant-repair-build-final.txt",
+      "sha256": "aba8deb5b3b689cfee7e5cb31b168a2ed1f1724edaee2987c1d0378c03d01fb6"
+    },
+    "portalBuild": {
+      "localPath": "/tmp/merchant-repair-portal-build.txt",
+      "sha256": "ce948da36d4909b09137b9c7ea800867904a740fc904ebd3182cad0c99a96f85"
+    },
+    "analyticsBenchmark": {
+      "localPath": "/tmp/merchant-repair-load-final.txt",
+      "sha256": "fb7992d64937bccdb82436d1bc94a5d8977d2b3f1fbf35e4f132a87705dd4b4b"
+    },
+    "recoveryJobStartup": {
+      "localPath": "/tmp/merchant-repair-recovery-worker.txt",
+      "sha256": "e8f5dfd9e4b77ceac4ed3bb4dde57344b5257ba7749f971431a13ee6b0ff32a3"
+    },
+    "analyticsJobStartup": {
+      "localPath": "/tmp/merchant-repair-analytics-worker.txt",
+      "sha256": "218b06830cdc10670f727d1a073ca0175deebfa1e94163c09da54da891699c24"
+    },
+    "physicalDeviceDiscovery": {
+      "localPath": "/tmp/merchant-repair-device-check.txt",
+      "sha256": "52523d0a7c9a48fe5bbce3dcd92bc25e3e8bea86ed8bc0a96f6ad4298c4b0f30"
+    },
+    "iosBundle": {
+      "localPath": "/tmp/merchant-repair-mobile-export-final.txt",
+      "sha256": "3273ff69eb88a2f2de6d99b094af07b91f1f185b7133376aeae3a1ed55b8f8d8"
+    },
+    "apiTypes": {
+      "localPath": "/tmp/merchant-repair-api-types-final.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "mobileTypes": {
+      "localPath": "/tmp/merchant-repair-mobile-types.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "hostedAggregateInventory": {
+      "localPath": "/tmp/merchant-repair-hosted-inventory.json",
+      "sha256": "5344050e7104987e3b6e970a4a371f4094fcb77b1324ac842c335aecb8ebb62b"
+    }
+  },
+  "checks": {
+    "apiProductionBuild": "passed",
+    "portalProductionBuild": "passed",
+    "apiTypes": "passed",
+    "portalTypes": "passed",
+    "mobileTypes": "passed",
+    "iosExpoBundle": "passed",
+    "physicalDevice": "connected; repaired local JavaScript loaded; merchant sign-in and acceptance pending",
+    "gitDiffCheck": "passed",
+    "deploymentShellSyntax": "passed",
+    "privateDatabaseTables": {
+      "passed": true,
+      "protectedTables": 44,
+      "denialChecks": 448,
+      "serverWalletReadCount": 8
+    },
+    "hostedApiReadOnlyRoutes": "9 passed",
+    "hostedPortalBrowserPages": "6 passed",
+    "backgroundJobExecutions": "all 3 passed; scheduled minute executions verified"
+  }
+}

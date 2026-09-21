@@ -1,5 +1,6 @@
 "use client";
 
+import { clearOperationIntents } from '@/lib/client/operation-intent';
 import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@repo/ui/button";
@@ -17,6 +18,7 @@ export function LogoutButton() {
           method: "POST",
           headers: { "X-CSRF-Token": getCsrfToken() },
         });
+        clearOperationIntents();
         router.replace("/sign-in");
         router.refresh();
       }}

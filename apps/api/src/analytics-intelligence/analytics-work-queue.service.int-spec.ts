@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 import {
@@ -164,7 +164,8 @@ describe('analytics work queue (integration)', () => {
     await queue.enqueue(merchantId, 'stock_adjusted', { type: 'product' });
     await queue.enqueue(merchantId, 'import_committed', { type: 'import' });
 
-    const reasons = (await row()).reasons as WorkTrigger[];
+    const result = await db.execute(sql`select reason from merchant_analytics_outbox where merchant_id=${merchantId}::uuid`);
+    const reasons = result.rows as unknown as WorkTrigger[];
     expect(reasons.map((r) => r.reason)).toEqual(
       expect.arrayContaining([
         'cash_sale_recorded',
@@ -245,6 +246,7 @@ describe('analytics work queue (integration)', () => {
       await queue.enqueue(merchantId, 'cash_sale_recorded', { type: 'cash' });
       await queue.claim(10);
       await queue.fail(merchantId, 'first failure');
+      await db.update(schema.merchantAnalyticsWork).set({nextAttemptAt: new Date(0)}).where(eq(schema.merchantAnalyticsWork.merchantId, merchantId));
       await queue.claim(10);
 
       expect((await row()).attempts).toBe(2);
@@ -264,10 +266,65 @@ describe('analytics work queue (integration)', () => {
     });
   });
 
-  it('never throws when the merchant does not exist', async () => {
-    // A failed enqueue must not roll back the sale that triggered it.
+  it('rejects an invalid outbox write so the source transaction can roll back', async () => {
+    // Durable enqueue failures must be observable.
     await expect(
       queue.enqueue(randomUUID(), 'cash_sale_recorded', { type: 'cash' }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow();
   });
+  it('recovers an expired lease and rejects stale completion', async () => {
+    await queue.enqueue(merchantId, 'manual');
+    const first = (await queue.claim(100)).find(w=>w.merchantId===merchantId)!;
+    await db.update(schema.merchantAnalyticsWork).set({leaseUntil:new Date(0)}).where(eq(schema.merchantAnalyticsWork.merchantId, merchantId));
+    const second = (await queue.claim(100)).find(w=>w.merchantId===merchantId)!;
+    expect(second.token).not.toBe(first.token);
+    await queue.complete(merchantId, first); expect(await row()).toBeDefined();
+    await queue.complete(merchantId, second); expect(await row()).toBeUndefined();
+  });
+
+  it('does not let disabled merchants starve enabled work and resumes on enablement', async () => {
+    await clear();
+    await queue.enqueue(otherMerchantId, 'manual');
+    await queue.enqueue(merchantId, 'manual');
+    await queue.applyEligibility(true, [merchantId]);
+    const [work] = await queue.claim(1, [merchantId]);
+    expect(work.merchantId).toBe(merchantId);
+    expect((await row(otherMerchantId))?.status).toBe('deferred');
+    await queue.complete(merchantId, work);
+    await queue.applyEligibility(true, [otherMerchantId]);
+    const [resumed] = await queue.claim(1, [otherMerchantId]);
+    expect(resumed.merchantId).toBe(otherMerchantId);
+    await queue.complete(otherMerchantId, resumed);
+  });
+
+  it('retains disabled work as deferred for enabling later', async () => {
+    await queue.enqueue(merchantId,'manual');
+    const work=(await queue.claim(100)).find(w=>w.merchantId===merchantId)!;
+    await queue.fail(merchantId,'disabled',work,true);
+    expect((await row()).status).toBe('deferred');
+    await queue.enqueue(merchantId,'manual');
+    expect((await row()).status).toBe('pending');
+  });
+
+  it('rolls back the source stock update when its transactional outbox fails', async () => {
+    const [product] = await db.insert(schema.merchantProducts).values({merchantId,name:'Outbox rollback',unitPriceMinor:100n,onHandQuantity:5,reservedQuantity:0}).returning();
+    try {
+      await db.execute(sql.raw(`ALTER TABLE merchant_analytics_outbox ADD CONSTRAINT test_outbox_failure CHECK (merchant_id <> '${merchantId}'::uuid) NOT VALID`));
+      await expect(db.update(schema.merchantProducts).set({onHandQuantity:6}).where(eq(schema.merchantProducts.id,product.id))).rejects.toThrow();
+      const [unchanged]=await db.select().from(schema.merchantProducts).where(eq(schema.merchantProducts.id,product.id));expect(unchanged.onHandQuantity).toBe(5);
+    } finally {
+      await db.execute(sql`ALTER TABLE merchant_analytics_outbox DROP CONSTRAINT IF EXISTS test_outbox_failure`);
+      await db.delete(schema.merchantProducts).where(eq(schema.merchantProducts.id,product.id));
+    }
+  });
+
+  it('queues reservation-only changes in the same commit', async () => {
+    const [product]=await db.insert(schema.merchantProducts).values({merchantId,name:'Reservation source',unitPriceMinor:100n,onHandQuantity:5,reservedQuantity:0}).returning();
+    try {
+      const previous=(await row()).generation;
+      await db.update(schema.merchantProducts).set({reservedQuantity:3}).where(eq(schema.merchantProducts.id,product.id));
+      expect((await row()).generation).toBe(previous+1);
+    } finally {await db.delete(schema.merchantProducts).where(eq(schema.merchantProducts.id,product.id));}
+  });
+
 });

@@ -13,7 +13,8 @@ product_image_bucket="${MCBUSE_PRODUCT_IMAGE_BUCKET:-${project_id}-merchant-prod
 merchant_evidence_bucket="${MCBUSE_MERCHANT_EVIDENCE_BUCKET:-${project_id}-merchant-evidence}"
 environment_file="$repo_root/deploy/cloud-run/api.env.yaml"
 runtime_environment_file="$(mktemp)"
-trap 'rm -f "$runtime_environment_file"' EXIT
+previous_service_file="$(mktemp)"
+trap 'rm -f "$runtime_environment_file" "$previous_service_file"' EXIT
 cp "$environment_file" "$runtime_environment_file"
 printf '\nPRODUCT_IMAGE_BUCKET: "%s"\n' "$product_image_bucket" >>"$runtime_environment_file"
 printf 'MERCHANT_EVIDENCE_BUCKET: "%s"\n' "$merchant_evidence_bucket" >>"$runtime_environment_file"
@@ -40,12 +41,14 @@ required_secrets=(
   JWT_ACCESS_SECRET
   JWT_REFRESH_SECRET
   SOLANA_KEYPAIR_ENCRYPTION_KEY
+  SOLANA_TREASURY_SECRET_KEY
   MOONPAY_PUBLIC_KEY
   MOONPAY_SECRET_KEY
   MOONPAY_WEBHOOK_SECRET
   STRIPE_SECRET_KEY
   STRIPE_WEBHOOK_SECRET
   SMTP_PASSWORD
+  OPS_MONITORING_TOKEN
 )
 
 for secret_name in "${required_secrets[@]}"; do
@@ -54,6 +57,27 @@ for secret_name in "${required_secrets[@]}"; do
     exit 1
   fi
 done
+
+# Preserve every configured wallet key reference and the selected signing version.
+# Reading a service manifest reads references only, never Secret Manager payloads.
+gcloud run services describe "$service" --project="$project_id" --region="$region" --format=json > "$previous_service_file"
+secret_binding="$(python3 - "$previous_service_file" "$runtime_environment_file" <<'PY_KEYS'
+import json,sys
+names=['DATABASE_URL','JWT_ACCESS_SECRET','JWT_REFRESH_SECRET','SOLANA_KEYPAIR_ENCRYPTION_KEY','SOLANA_TREASURY_SECRET_KEY','MOONPAY_PUBLIC_KEY','MOONPAY_SECRET_KEY','MOONPAY_WEBHOOK_SECRET','STRIPE_SECRET_KEY','STRIPE_WEBHOOK_SECRET','SMTP_PASSWORD','OPS_MONITORING_TOKEN']
+bindings={name:f'{name}:latest' for name in names}
+for entry in json.load(open(sys.argv[1]))['spec']['template']['spec']['containers'][0].get('env',[]):
+    name=entry['name']
+    if not name.startswith('SOLANA_KEYPAIR_ENCRYPTION_KEY'): continue
+    secret=entry.get('valueFrom',{}).get('secretKeyRef')
+    if secret:
+        bindings[name]=f"{secret['name']}:{secret['key']}"
+    elif name=='SOLANA_KEYPAIR_ENCRYPTION_KEY_CURRENT':
+        with open(sys.argv[2],'a') as target: target.write(f'\n{name}: {json.dumps(entry["value"])}\n')
+    else:
+        raise SystemExit('Move plaintext wallet encryption keys to Secret Manager before deploying')
+print(','.join(f'{name}={value}' for name,value in bindings.items()))
+PY_KEYS
+)"
 
 revision="$(date -u +%Y%m%dT%H%M%SZ)-$(git -C "$repo_root" rev-parse --short=8 HEAD)"
 image="${region}-docker.pkg.dev/${project_id}/${repository}/api:${revision}"
@@ -89,7 +113,7 @@ gcloud run deploy "$service" \
   --image="$image" \
   --service-account="$service_account_email" \
   --env-vars-file="$runtime_environment_file" \
-  --set-secrets=DATABASE_URL=DATABASE_URL:latest,JWT_ACCESS_SECRET=JWT_ACCESS_SECRET:latest,JWT_REFRESH_SECRET=JWT_REFRESH_SECRET:latest,SOLANA_KEYPAIR_ENCRYPTION_KEY=SOLANA_KEYPAIR_ENCRYPTION_KEY:latest,MOONPAY_PUBLIC_KEY=MOONPAY_PUBLIC_KEY:latest,MOONPAY_SECRET_KEY=MOONPAY_SECRET_KEY:latest,MOONPAY_WEBHOOK_SECRET=MOONPAY_WEBHOOK_SECRET:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,SMTP_PASSWORD=SMTP_PASSWORD:latest \
+  --set-secrets="$secret_binding" \
   --allow-unauthenticated \
   --ingress=all \
   --port=8080 \
@@ -105,5 +129,5 @@ gcloud run deploy "$service" \
 service_url="$(gcloud run services describe "$service" --project="$project_id" --region="$region" --format='value(status.url)')"
 curl -fsS "${service_url}/api/v1/health"
 echo
-echo "Cloud Run API deployed with merchant routes disabled and mock transfers enabled"
+echo "Cloud Run API deployed with sandbox settlement and new money initiation disabled"
 echo "service_url=$service_url"

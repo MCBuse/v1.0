@@ -1,3 +1,4 @@
+import { clearOperationIntents } from "./operation-intent";
 import { getCsrfToken } from "./csrf";
 import { PortalApiError, portalApi } from "./api";
 
@@ -42,6 +43,7 @@ export async function accountsApi<T>(
     message?: string;
   };
   if (response.status === 401 && typeof window !== "undefined") {
+    clearOperationIntents();
     window.location.assign("/sign-in");
   }
   if (!response.ok)

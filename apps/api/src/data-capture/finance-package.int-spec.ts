@@ -81,6 +81,7 @@ describe('finance packages (integration)', () => {
       activity,
       imports,
       config,
+      new MerchantAssessmentService(db, merchants),
     );
     assessments = new MerchantAssessmentService(db, merchants);
 
@@ -321,4 +322,31 @@ describe('finance packages (integration)', () => {
       }
     });
   });
+  it('freezes an older selected assessment after a newer assessment exists', async () => {
+    const older=await assessments.run(merchant.userId, undefined, 'older-result');
+    await merchants.updateConsent(merchant.userId, true);
+    const newer=await assessments.run(merchant.userId, undefined, 'newer-result');
+    const pkg=await finance.createPackage(merchant.userId,7,false,'explicit-older',older.id);
+    expect(pkg.assessment?.id).toBe(older.id);expect(pkg.assessment?.id).not.toBe(newer.id);
+    const preview=await finance.preview(merchant.userId,pkg.id);
+    expect((preview.snapshot as any).assessment).toEqual(older);
+    const zip=await finance.zip(merchant.userId,pkg.id);expect(zip.toString()).toContain(older.id);
+    await expect(finance.createPackage(merchant.userId,7,false,'explicit-older',newer.id)).rejects.toThrow(/different/);
+  });
+
+  it('persists one assessment and one package under concurrent retries', async () => {
+    const results=await Promise.all([assessments.run(merchant.userId,undefined,'concurrent-result'),assessments.run(merchant.userId,undefined,'concurrent-result')]);
+    expect(results[0].id).toBe(results[1].id);
+    const packages=await Promise.all([finance.createPackage(merchant.userId,7,false,'concurrent-package',results[0].id),finance.createPackage(merchant.userId,7,false,'concurrent-package',results[0].id)]);
+    expect(packages[0].id).toBe(packages[1].id);
+  });
+
+  it('does not publish a package when document generation fails', async () => {
+    const saved=await assessments.run(merchant.userId,undefined,'generation-failure-assessment');
+    const spy=jest.spyOn(finance as any,'renderPdf').mockRejectedValueOnce(new Error('generation failed'));
+    try {await expect(finance.createPackage(merchant.userId,7,false,'generation-failure',saved.id)).rejects.toThrow('generation failed');}
+    finally {spy.mockRestore();}
+    const rows=await db.select().from(schema.merchantFinancePackages).where(eq(schema.merchantFinancePackages.idempotencyKey,'generation-failure'));expect(rows).toHaveLength(0);
+  });
+
 });

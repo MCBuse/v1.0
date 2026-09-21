@@ -178,6 +178,9 @@ export class AccountsController {
       chainSignature: operation.chainSignature,
       providerReference: operation.providerRef,
       failureCode: operation.failureCode,
+      refundStatus: operation.refundStatus,
+      nextAttemptAt: operation.nextAttemptAt?.toISOString() ?? null,
+      needsAttention: Date.now() - operation.updatedAt.getTime() > 600_000 && !['finalized', 'failed', 'reversed'].includes(operation.status),
       createdAt: operation.createdAt.toISOString(),
       finalizedAt: operation.finalizedAt?.toISOString() ?? null,
     };

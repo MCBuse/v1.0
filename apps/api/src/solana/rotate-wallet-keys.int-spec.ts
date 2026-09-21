@@ -62,7 +62,7 @@ describe('wallet key rotation (integration)', () => {
 
     // Two wallets sealed with v1, written the way the platform did before
     // versioning existed (no version prefix at all).
-    const rows = [];
+    const rows: (typeof schema.wallets.$inferInsert)[] = [];
     for (const type of ['savings', 'routine']) {
       const keypair = Keypair.generate();
       const sealed = v1Only.encrypt(keypair.secretKey).replace(/^v1:/, '');

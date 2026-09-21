@@ -1,3 +1,4 @@
+import { STOCK_MOVEMENTS } from './stock-movements';
 import {
   BadRequestException,
   ConflictException,
@@ -164,7 +165,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
           status: 'active',
         })
         .returning();
-        await this.recordStockMovement(tx, merchant.merchantId, created[0].id, 'opening_balance', dto.quantity, 0, 'product', created[0].id);
+        await this.recordStockMovement(tx, merchant.merchantId, created[0].id, STOCK_MOVEMENTS.opening, dto.quantity, 0, 'product', created[0].id);
         return created;
       });
       return this.productResponse(rows[0]);
@@ -219,7 +220,9 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
     dto: AdjustMerchantProductStockDto,
   ): Promise<MerchantProduct> {
     const merchant = await this.merchants.requireMerchant(userId);
-    const rows = await this.db
+    if (dto.reason === 'restock' && dto.change <= 0) throw new BadRequestException('Restocking requires a positive quantity');
+    return this.db.transaction(async tx => {
+    const rows = await tx
       .update(schema.merchantProducts)
       .set({
         onHandQuantity: sql`${schema.merchantProducts.onHandQuantity} + ${dto.change}`,
@@ -237,7 +240,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
       )
       .returning();
     if (!rows[0]) {
-      const exists = await this.db
+      const exists = await tx
         .select({ id: schema.merchantProducts.id })
         .from(schema.merchantProducts)
         .where(
@@ -252,12 +255,9 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
         'Stock cannot be reduced below quantities reserved for invoices',
       );
     }
-    await this.db.insert(schema.merchantStockMovements).values({ merchantId: merchant.merchantId, productId, kind: 'manual_adjustment', onHandChange: dto.change, reservedChange: 0, referenceType: 'product', referenceId: productId });
-    await this.analyticsWork.enqueue(merchant.merchantId, 'stock_adjusted', {
-      type: 'merchant_product',
-      id: productId,
-    });
+    await tx.insert(schema.merchantStockMovements).values({ merchantId: merchant.merchantId, productId, kind: dto.reason === 'restock' ? STOCK_MOVEMENTS.restock : STOCK_MOVEMENTS.adjustment, onHandChange: dto.change, reservedChange: 0, referenceType: 'product', referenceId: productId });
     return this.productResponse(rows[0]);
+    });
   }
 
   async setProductImage(

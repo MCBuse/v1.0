@@ -104,7 +104,7 @@ describe('customer to merchant payment (devnet)', () => {
     // payment reconciliation loop, none of which this suite wants, and whose
     // timers keep the process alive after the tests finish.
     const config = new ConfigService();
-    solana = new SolanaService(config);
+    solana = new SolanaService(config, db);
     solana.onModuleInit();
     treasury = new TreasuryService(config, solana);
     treasury.onModuleInit();

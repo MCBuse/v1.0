@@ -10,7 +10,7 @@ import { Box, Text } from '@/components/ui';
 import { takeOnrampWidgetSession } from '@/lib/onramp-widget-cache';
 import type { Theme } from '@/theme';
 
-const REDIRECT_SCHEME = 'mcbuse://';
+const isReturn = (url: string) => url.startsWith('mcbuse://') || /^https:\/\/merchant\.mcbuse\.com\/payment\?(funded|cancelled)=1/.test(url);
 
 export default function TopUpCheckoutScreen() {
   const { colors } = useTheme<Theme>();
@@ -33,7 +33,7 @@ export default function TopUpCheckoutScreen() {
 
   const onShouldStartLoadWithRequest = useCallback(
     (req: { url: string }) => {
-      if (req.url.startsWith(REDIRECT_SCHEME)) {
+      if (isReturn(req.url)) {
         goToStatus();
         return false;
       }
@@ -44,7 +44,7 @@ export default function TopUpCheckoutScreen() {
 
   const onNavChange = useCallback(
     (nav: WebViewNavigation) => {
-      if (nav.url.startsWith(REDIRECT_SCHEME)) goToStatus();
+      if (isReturn(nav.url)) goToStatus();
     },
     [goToStatus],
   );

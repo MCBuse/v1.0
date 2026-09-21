@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PublicKey } from '@solana/web3.js';
 import { ConfigService } from '@nestjs/config';
 import { SolanaService } from '../solana/solana.service';
-import { sendSplTransfer } from '../solana/spl-transfer';
 import { TreasuryService } from '../treasury/treasury.service';
 import {
   FinancialOperationsService,
@@ -42,7 +41,8 @@ export class AccountTransferService {
     userId: string;
     from: AccountName;
     to: AccountName;
-    amountCents: bigint;
+    amountCents?: bigint;
+    amountBaseUnits?: bigint;
     idempotencyKey: string;
     purpose?: TransferPurpose;
     businessDate?: string;
@@ -58,13 +58,14 @@ export class AccountTransferService {
     if (params.from === params.to) {
       throw new BadRequestException('Choose two different accounts');
     }
-    if (params.amountCents <= 0n) {
+    if (params.amountCents !== undefined && params.amountCents <= 0n) {
       throw new BadRequestException('Amount must be positive');
     }
 
     const source = await this.wallets.forUser(params.userId, params.from);
     const destination = await this.wallets.forUser(params.userId, params.to);
-    const amountBaseUnits = usdCentsToUsdcBaseUnits(params.amountCents);
+    const amountBaseUnits = params.amountBaseUnits ?? usdCentsToUsdcBaseUnits(params.amountCents ?? 0n);
+    if (amountBaseUnits <= 0n) throw new BadRequestException('Amount must be positive');
 
     const { operation, replayed } = await this.operations.begin({
       userId: params.userId,
@@ -75,7 +76,7 @@ export class AccountTransferService {
       currency: 'USDC',
       sourceWalletId: source.id,
       destinationWalletId: destination.id,
-      displayAmountMinor: params.amountCents,
+      displayAmountMinor: params.amountCents ?? (amountBaseUnits % 10_000n === 0n ? amountBaseUnits / 10_000n : null),
       displayCurrency: 'USD',
       metadata: {
         from: params.from,
@@ -104,7 +105,7 @@ export class AccountTransferService {
     return {
       operationId: current.id,
       status: current.status,
-      amountCents: params.amountCents.toString(),
+      amountCents: params.amountCents?.toString() ?? (amountBaseUnits / 10_000n).toString(),
       from: params.from,
       to: params.to,
       replayed,
@@ -119,28 +120,7 @@ export class AccountTransferService {
       throw new Error(`Transfer ${operation.id} has no source account`);
     }
 
-    try {
-      await this.ledger.transaction(async (tx) => {
-        await this.ledger.reserve(
-          tx,
-          operation.sourceWalletId!,
-          operation.currency,
-          operation.amountBaseUnits,
-        );
-      });
-    } catch (error) {
-      await this.operations.fail(
-        operation.id,
-        'insufficient_funds',
-        error instanceof Error ? error.message : undefined,
-      );
-      throw error;
-    }
-
-    await this.operations.advance(operation.id, 'reserved', {
-      reservedAt: new Date(),
-      nextAttemptAt: new Date(),
-    });
+    await this.operations.reserveBalance(operation);
   }
 
   /** Signs and broadcasts the wallet-to-wallet transfer. */
@@ -173,7 +153,8 @@ export class AccountTransferService {
       throw new Error('Decrypted key does not match the stored wallet address');
     }
 
-    const result = await sendSplTransfer({
+    const result = await this.solana.sendTransfer({
+      intentKey: `operation:${operation.id}`,
       connection: this.solana.getConnection(),
       owner: keypair,
       // The treasury pays fees and rent so users never need to hold SOL.
@@ -308,7 +289,6 @@ export class AccountTransferService {
     operation: FinancialOperation,
     code: string,
   ): Promise<void> {
-    await this.releaseReservation(operation);
-    await this.operations.fail(operation.id, code);
+    await this.operations.releaseBalanceAndEnd(operation, 'failed', code);
   }
 }

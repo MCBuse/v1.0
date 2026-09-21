@@ -1,3 +1,4 @@
+import { clearOperationIntents } from './operation-intent';
 import { getCsrfToken } from "./csrf";
 
 let csrfRecovery: Promise<unknown> | null = null;
@@ -45,6 +46,7 @@ export async function portalApi<T>(
     message?: string;
   };
   if (response.status === 401 && typeof window !== "undefined") {
+    clearOperationIntents();
     window.location.assign("/sign-in");
   }
   if (!response.ok)

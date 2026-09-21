@@ -6,3 +6,5 @@ export * from './merchant';
 export * from './accounts';
 export * from './general-analytics';
 export * from './sse';
+
+export * from './merchant-assessment';

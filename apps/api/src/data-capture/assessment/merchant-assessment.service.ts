@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -50,8 +51,16 @@ export class MerchantAssessmentService {
   ) {}
 
   /** Runs the model and saves the result. */
-  async run(userId: string, modelId?: string): Promise<SavedAssessment> {
+  async run(userId: string, modelId?: string, idempotencyKey?: string): Promise<SavedAssessment> {
     const merchant = await this.merchants.requireMerchant(userId);
+    const findReplay = async () => {
+      if (!idempotencyKey) return null;
+      const [row] = await this.db.select().from(schema.merchantAssessments).where(and(eq(schema.merchantAssessments.merchantId, merchant.merchantId), eq(schema.merchantAssessments.idempotencyKey, idempotencyKey)));
+      if (row && row.modelId !== (modelId ?? 'readiness-rules-v1')) throw new ConflictException('Assessment key already used with a different model');
+      return row ? this.present(row) : null;
+    };
+    const replay = await findReplay();
+    if (replay) return replay;
     const readiness = await this.merchants.getReadiness(userId);
     const profile = await this.merchants.getMe(userId);
 
@@ -88,6 +97,7 @@ export class MerchantAssessmentService {
       .insert(schema.merchantAssessments)
       .values({
         merchantId: merchant.merchantId,
+        idempotencyKey: idempotencyKey ?? null,
         modelId: result.modelId,
         modelVersion: result.modelVersion,
         evidenceFrom,
@@ -97,8 +107,10 @@ export class MerchantAssessmentService {
         profileSnapshot,
         actorUserId: userId,
       })
+      .onConflictDoNothing()
       .returning();
 
+    if (!saved) return (await findReplay())!;
     return this.present(saved);
   }
 

@@ -47,6 +47,7 @@ interface SeriesPoint {
   averageMinor: string;
   /** True when the period has not finished yet, so the figure will still move. */
   partial: boolean;
+  partialReasons?: string[];
 }
 
 interface Trend<T> {
@@ -115,6 +116,10 @@ function localHour(date: Date, timeZone: string): number {
       hourCycle: 'h23',
     }).format(date),
   );
+}
+
+function localClock(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(date);
 }
 
 /** Whole days between two calendar dates, both expressed as YYYY-MM-DD. */
@@ -266,7 +271,12 @@ export function buildTransactionAnalytics(
         count: bucket.count,
         averageMinor: meanMinor(bucket.amount, bucket.count).toString(),
         // The period is still running if today falls inside it.
-        partial: todayKey >= periodStart && todayKey <= periodEnd,
+        partial: (todayKey >= periodStart && todayKey <= periodEnd) || periodStart < localDateKey(range.from, timezone) || periodEnd > localDateKey(range.to, timezone) || (periodStart === localDateKey(range.from, timezone) && (localClock(range.from, timezone) !== '00:00:00' || range.from.getMilliseconds() !== 0)) || (periodEnd === localDateKey(range.to, timezone) && (localClock(range.to, timezone) !== '23:59:59' || range.to.getMilliseconds() !== 999)),
+        partialReasons: [
+          ...(todayKey >= periodStart && todayKey <= periodEnd ? ['period_running'] : []),
+          ...(periodStart <= localDateKey(range.from, timezone) && (periodStart < localDateKey(range.from, timezone) || (localClock(range.from, timezone) !== '00:00:00' || range.from.getMilliseconds() !== 0)) ? ['range_start'] : []),
+          ...(periodEnd >= localDateKey(range.to, timezone) && (periodEnd > localDateKey(range.to, timezone) || (localClock(range.to, timezone) !== '23:59:59' || range.to.getMilliseconds() !== 999)) ? ['range_end'] : []),
+        ],
       };
     });
 
@@ -311,7 +321,7 @@ export function buildTransactionAnalytics(
   const partialPeriod = series.some((point) => point.partial);
   if (partialPeriod) {
     notes.push(
-      'The most recent period is still in progress, so its figures will continue to change.',
+      'Some periods are still running or clipped by the selected reporting range.',
     );
   }
   if (!baselineAvailable) {

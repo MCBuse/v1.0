@@ -28,6 +28,7 @@ describe('insight freshness', () => {
     // snapshot, whether the last refresh failed, then the active insights.
     const db = { select: jest.fn()
       .mockReturnValueOnce(query([{ merchantId: 'merchant', publicId: 'merchant-public' }]))
+      .mockReturnValueOnce(query([]))
       .mockReturnValueOnce(query([snapshot]))
       .mockReturnValueOnce(query([]))
       .mockReturnValueOnce(insights),
@@ -72,6 +73,7 @@ describe('insight freshness', () => {
     insights.orderBy.mockResolvedValue([]);
     const db = { select: jest.fn()
       .mockReturnValueOnce(query([{ merchantId: 'merchant', publicId: 'merchant-public' }]))
+      .mockReturnValueOnce(query([]))
       .mockReturnValueOnce(query([snapshot]))
       .mockReturnValueOnce(query([{ attempts: 3, lastError: 'engine timed out', lastQueuedAt: failedAt }]))
       .mockReturnValueOnce(insights),
@@ -110,6 +112,7 @@ describe('insight freshness', () => {
     insights.orderBy.mockResolvedValue([]);
     const db = { select: jest.fn()
       .mockReturnValueOnce(query([{ merchantId: 'merchant', publicId: 'merchant-public' }]))
+      .mockReturnValueOnce(query([]))
       .mockReturnValueOnce(query([snapshot]))
       // A queue row with attempts but no error is not a failure.
       .mockReturnValueOnce(query([{ attempts: 1, lastError: null, lastQueuedAt: now }]))

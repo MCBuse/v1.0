@@ -36,7 +36,7 @@ export class AnalyticsOrchestratorService
   ) {}
 
   onModuleInit() {
-    if (this.config.get<string>('MERCHANT_ORCHESTRATION_ENABLED') === 'false') {
+    if (this.config.get<string>('PROCESS_ROLE') !== 'analytics-daemon') {
       this.logger.warn('Analytics orchestration is disabled by configuration');
       return;
     }
@@ -51,19 +51,45 @@ export class AnalyticsOrchestratorService
   /** One pass over the queue. Public so tests can drive it directly. */
   async tick(
     limit = BATCH_SIZE,
-  ): Promise<{ processed: number; failed: number }> {
-    if (this.running) return { processed: 0, failed: 0 };
+  ): Promise<{ processed: number; failed: number; deferred: number }> {
+    if (this.running) return { processed: 0, failed: 0, deferred: 0 };
     this.running = true;
     let processed = 0;
     let failed = 0;
+    let deferred = 0;
 
     try {
-      const claimed = await this.queue.claim(limit);
-      for (const work of claimed) {
+      const enabled =
+        this.config.get<string>('MERCHANT_INTELLIGENCE_ENABLED') === 'true';
+      const allowlist = (
+        this.config.get<string>('MERCHANT_INTELLIGENCE_ALLOWLIST') ?? ''
+      )
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+      deferred += await this.queue.applyEligibility(enabled, allowlist);
+      if (!enabled) return { processed, failed, deferred };
+      for (let index = 0; index < limit; index += 1) {
+        const [work] = await this.queue.claim(1, allowlist);
+        if (!work) break;
+        const heartbeat = setInterval(
+          () => void this.queue.renew(work).catch(() => undefined),
+          30_000,
+        );
         try {
-          await this.insights.runForMerchant(work.merchantId);
+          const result = await this.insights.runForMerchant(work.merchantId);
+          if (!result.processed) {
+            deferred += 1;
+            await this.queue.fail(
+              work.merchantId,
+              result.reason ?? 'deferred',
+              work,
+              true,
+            );
+            continue;
+          }
           // Only clears the row if nothing new arrived while this ran.
-          await this.queue.complete(work.merchantId);
+          await this.queue.complete(work.merchantId, work);
           processed += 1;
         } catch (error) {
           failed += 1;
@@ -72,7 +98,9 @@ export class AnalyticsOrchestratorService
           this.logger.error(
             `Analytics recalculation failed for ${work.merchantId}: ${message}`,
           );
-          await this.queue.fail(work.merchantId, message);
+          await this.queue.fail(work.merchantId, message, work);
+        } finally {
+          clearInterval(heartbeat);
         }
       }
     } catch (error) {
@@ -81,10 +109,11 @@ export class AnalyticsOrchestratorService
           error instanceof Error ? error.message : String(error)
         }`,
       );
+      throw error;
     } finally {
       this.running = false;
     }
 
-    return { processed, failed };
+    return { processed, failed, deferred };
   }
 }

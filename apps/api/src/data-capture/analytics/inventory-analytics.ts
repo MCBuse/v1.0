@@ -46,6 +46,8 @@ export interface InventoryAnalyticsInput {
 }
 
 interface ProductRanking {
+  reservedQuantity: number;
+  availableQuantity: number;
   productId: string;
   name: string;
   unitsSold: number;
@@ -91,6 +93,12 @@ export interface InventoryAnalytics {
     onHandQuantity: number;
     reservedQuantity: number;
     availableQuantity: number;
+  };
+  periodPosition: {
+    openingOnHand: number | null;
+    closingOnHand: number | null;
+    eligible: boolean;
+    reason: string | null;
   };
   valuation: {
     atSellingPriceMinor: string;
@@ -175,10 +183,40 @@ export function buildInventoryAnalytics(
     0n,
   );
 
-  const inRange = (at: Date) => {
-    const key = localDateKey(at, timezone);
-    return key >= fromKey && key <= toKey;
-  };
+  const inRange = (at: Date) => at >= range.from && at <= range.to;
+  const byProduct = new Map<string, StockMovement[]>();
+  const throughEnd = new Map<string, StockMovement[]>();
+  for (const movement of movements) {
+    const own = byProduct.get(movement.productId) ?? [];
+    own.push(movement);
+    byProduct.set(movement.productId, own);
+    if (movement.occurredAt <= range.to) {
+      const prior = throughEnd.get(movement.productId) ?? [];
+      prior.push(movement);
+      throughEnd.set(movement.productId, prior);
+    }
+  }
+  const asOfProducts = products.map((p) => ({
+    ...p,
+    onHandQuantity:
+      p.onHandQuantity -
+      (byProduct.get(p.id) ?? [])
+        .filter((m) => m.occurredAt > range.to)
+        .reduce((sum, m) => sum + m.onHandChange, 0),
+  }));
+  const reconstructions = new Map(
+    asOfProducts.map((p) => [
+      p.id,
+      reconstructClosings(p, throughEnd.get(p.id) ?? [], days, timezone),
+    ]),
+  );
+  const historyReliable = [...reconstructions.values()].every(
+    (result) => result.ok,
+  );
+  const periodClosing = asOfProducts.reduce(
+    (sum, p) => sum + p.onHandQuantity,
+    0,
+  );
 
   // Movements grouped by kind, within the period only.
   const kindTotals = new Map<string, { quantity: number; entries: number }>();
@@ -211,6 +249,8 @@ export function buildInventoryAnalytics(
       unitsSold: units,
       unitsPerDay: dayCount === 0 ? 0 : round(units / dayCount, 4),
       onHandQuantity: p.onHandQuantity,
+      reservedQuantity: p.reservedQuantity,
+      availableQuantity: Math.max(0, p.onHandQuantity - p.reservedQuantity),
       lowStockThreshold: p.lowStockThreshold,
     };
   };
@@ -236,42 +276,50 @@ export function buildInventoryAnalytics(
   const withThreshold = (p: InventoryProduct) => ranking(p);
 
   const atOrBelowMinimum = products
-    .filter((p) => p.onHandQuantity <= p.lowStockThreshold)
+    .filter((p) => p.onHandQuantity - p.reservedQuantity <= p.lowStockThreshold)
     .map(withThreshold)
     .sort((a, b) => a.onHandQuantity - b.onHandQuantity);
 
   const approachingMinimum = products
     .filter(
       (p) =>
-        p.onHandQuantity > p.lowStockThreshold &&
-        p.onHandQuantity <= p.lowStockThreshold + APPROACHING_MARGIN,
+        p.onHandQuantity - p.reservedQuantity > p.lowStockThreshold &&
+        p.onHandQuantity - p.reservedQuantity <=
+          p.lowStockThreshold + APPROACHING_MARGIN,
     )
     .map(withThreshold)
     .sort((a, b) => a.onHandQuantity - b.onHandQuantity);
 
   const currentStockOuts = rankings
-    .filter((r) => r.onHandQuantity <= 0)
+    .filter((r) => r.availableQuantity <= 0)
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  const historicalStockOuts = products
-    .map((p) => stockOutIntervalsFor(p, movements, days, timezone))
+  const historicalStockOuts = asOfProducts
+    .map((p) =>
+      stockOutIntervalsFor(
+        p,
+        throughEnd.get(p.id) ?? [],
+        days,
+        timezone,
+        reconstructions.get(p.id),
+      ),
+    )
     .filter((entry) => !entry.eligible || entry.intervals.length > 0)
-    .sort(
-      (a, b) => b.totalDays - a.totalDays || a.name.localeCompare(b.name),
-    );
+    .sort((a, b) => b.totalDays - a.totalDays || a.name.localeCompare(b.name));
   if (historicalStockOuts.some((entry) => !entry.eligible)) {
     notes.push(
       'Stock-out history is only reconstructed for products whose recorded movements support it.',
     );
   }
 
-  const turnover = products.map((p) =>
+  const turnover = asOfProducts.map((p) =>
     turnoverFor(
       p,
-      movements,
+      throughEnd.get(p.id) ?? [],
       soldByProduct.get(p.id)?.units ?? 0,
       days,
       timezone,
+      reconstructions.get(p.id),
     ),
   );
   if (turnover.some((t) => !t.eligible)) {
@@ -325,6 +373,17 @@ export function buildInventoryAnalytics(
       onHandQuantity,
       reservedQuantity,
       availableQuantity: Math.max(0, onHandQuantity - reservedQuantity),
+    },
+    periodPosition: {
+      openingOnHand: historyReliable
+        ? periodClosing -
+          [...kindTotals.values()].reduce((sum, m) => sum + m.quantity, 0)
+        : null,
+      closingOnHand: historyReliable ? periodClosing : null,
+      eligible: historyReliable,
+      reason: historyReliable
+        ? null
+        : 'Recorded movements do not establish a reliable stock history.',
     },
     valuation: {
       atSellingPriceMinor: valuationMinor.toString(),
@@ -392,6 +451,14 @@ function reconstructClosings(
     };
   }
 
+  if (
+    own.reduce((sum, m) => sum + m.onHandChange, 0) !== product.onHandQuantity
+  ) {
+    return {
+      ok: false,
+      reason: 'Recorded movements do not reconcile with the stock position.',
+    };
+  }
   const changeByDay = new Map<string, number>();
   for (const movement of own) {
     const key = localDateKey(movement.occurredAt, timezone);
@@ -428,14 +495,11 @@ function stockOutIntervalsFor(
   movements: StockMovement[],
   days: string[],
   timezone: string,
+  prepared?: Reconstruction,
 ): HistoricalStockOut {
   const base = { productId: product.id, name: product.name };
-  const reconstruction = reconstructClosings(
-    product,
-    movements,
-    days,
-    timezone,
-  );
+  const reconstruction =
+    prepared ?? reconstructClosings(product, movements, days, timezone);
 
   if (!reconstruction.ok) {
     return {
@@ -494,6 +558,7 @@ function turnoverFor(
   unitsSold: number,
   days: string[],
   timezone: string,
+  prepared?: Reconstruction,
 ): TurnoverEntry {
   const base = {
     productId: product.id,
@@ -501,12 +566,8 @@ function turnoverFor(
     unitsSold,
   };
 
-  const reconstruction = reconstructClosings(
-    product,
-    movements,
-    days,
-    timezone,
-  );
+  const reconstruction =
+    prepared ?? reconstructClosings(product, movements, days, timezone);
   if (!reconstruction.ok) {
     return {
       ...base,

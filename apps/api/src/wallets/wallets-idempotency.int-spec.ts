@@ -1,236 +1,194 @@
+import { ConfigService } from '@nestjs/config';
 import { ConflictException } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 import {
   connectTestDatabase,
   type TestDatabase,
 } from '../database/testing/test-database';
+import {
+  createMerchantFixture,
+  destroyMerchantFixture,
+  type MerchantFixture,
+} from '../database/testing/merchant-fixture';
 import * as schema from '../database/schema';
 import { WalletsService } from './wallets.service';
-import type { SolanaService } from '../solana/solana.service';
-import type { LedgerService } from '../ledger/ledger.service';
+import { FinancialOperationsService } from '../financial-operations/financial-operations.service';
+import { OperationLedgerService } from '../financial-operations/operation-ledger.service';
+import { operationFingerprint } from '../financial-operations/operation-fingerprint';
+import { MoneyAuditService } from '../financial-operations/money-audit.service';
+import { AccountWalletsService } from '../accounts/account-wallets.service';
+import { AccountTransferService } from '../accounts/account-transfer.service';
 
-/**
- * A custodial move between a person's own wallets is still a money movement:
- * a retried request must never move it twice. These run against a real
- * Postgres because the guarantee is the ledger's unique index under
- * concurrency, which no mock can demonstrate.
- */
-describe('WalletsService internal transfer idempotency (integration)', () => {
+describe('legacy transfer compatibility through durable operations', () => {
   let db: TestDatabase;
   let pool: Pool;
+  let merchant: MerchantFixture;
   let service: WalletsService;
-  let userId: string;
-  let savingsWalletId: string;
-  let routineWalletId: string;
-
-  const START = 10_000_000n; // 10 USDC in base units
-
-  async function resetBalances() {
-    await db.delete(schema.ledgerEntries).where(
-      inArray(schema.ledgerEntries.debitWalletId, [
-        savingsWalletId,
-        routineWalletId,
-      ]),
-    );
-    await db
-      .update(schema.balances)
-      .set({ available: START })
-      .where(eq(schema.balances.walletId, savingsWalletId));
-    await db
-      .update(schema.balances)
-      .set({ available: 0n })
-      .where(eq(schema.balances.walletId, routineWalletId));
-  }
-
-  async function available(walletId: string): Promise<bigint> {
-    const [row] = await db
-      .select({ available: schema.balances.available })
-      .from(schema.balances)
-      .where(
-        and(
-          eq(schema.balances.walletId, walletId),
-          eq(schema.balances.currency, 'USDC'),
-        ),
-      )
-      .limit(1);
-    return row.available;
-  }
-
-  async function ledgerCount(): Promise<number> {
-    const rows = await db
-      .select({ id: schema.ledgerEntries.id })
-      .from(schema.ledgerEntries)
-      .where(eq(schema.ledgerEntries.debitWalletId, savingsWalletId));
-    return rows.length;
-  }
-
-  beforeAll(async () => {
-    const connection = await connectTestDatabase();
-    db = connection.db;
-    pool = connection.pool;
-    service = new WalletsService(
-      db,
-      // internalTransfer touches neither: it is a database-only movement
-      // between two custodial wallets.
-      null as unknown as SolanaService,
-      null as unknown as LedgerService,
-    );
-
-    const suffix = randomUUID().slice(0, 8);
-    const [user] = await db
-      .insert(schema.users)
-      .values({
-        email: `wallet-idem-${suffix}@mcbuse.test`,
-        passwordHash: 'integration-test-not-a-real-hash',
-        firstName: 'Wallet',
-        lastName: 'Idempotency',
-        username: `walletidem${suffix}`,
-      })
-      .returning({ id: schema.users.id });
-    userId = user.id;
-
-    const wallets = await db
-      .insert(schema.wallets)
-      .values([
-        {
-          userId,
-          type: 'savings',
-          solanaPubkey: `idem-holding-${suffix}`,
-          encryptedKeypair: 'v1:00:00:00',
-          encryptionKeyVersion: 'v1',
-        },
-        {
-          userId,
-          type: 'routine',
-          solanaPubkey: `idem-routine-${suffix}`,
-          encryptedKeypair: 'v1:00:00:00',
-          encryptionKeyVersion: 'v1',
-        },
-      ])
-      .returning({ id: schema.wallets.id, type: schema.wallets.type });
-    savingsWalletId = wallets.find((w) => w.type === 'savings')!.id;
-    routineWalletId = wallets.find((w) => w.type === 'routine')!.id;
-
-    await db.insert(schema.balances).values([
-      { walletId: savingsWalletId, currency: 'USDC', available: START },
-      { walletId: savingsWalletId, currency: 'EURC' },
-      { walletId: routineWalletId, currency: 'USDC' },
-      { walletId: routineWalletId, currency: 'EURC' },
-    ]);
-  });
-
-  beforeEach(resetBalances);
-
-  afterAll(async () => {
-    await db
-      .delete(schema.ledgerEntries)
-      .where(
-        inArray(schema.ledgerEntries.debitWalletId, [
-          savingsWalletId,
-          routineWalletId,
-        ]),
-      );
-    await db
-      .delete(schema.balances)
-      .where(
-        inArray(schema.balances.walletId, [savingsWalletId, routineWalletId]),
-      );
-    await db
-      .delete(schema.wallets)
-      .where(
-        inArray(schema.wallets.id, [savingsWalletId, routineWalletId]),
-      );
-    await db.delete(schema.users).where(eq(schema.users.id, userId));
-    await pool.end();
-  });
-
+  let operations: FinancialOperationsService;
+  let transfers: AccountTransferService;
   const move = (amount: string) => ({
     fromWalletType: 'savings',
     toWalletType: 'routine',
-    amount,
     currency: 'USDC',
+    amount,
   });
-
-  it('moves the money once when the same key is retried', async () => {
-    const key = randomUUID();
-
-    const first = await service.internalTransfer(userId, move('2500000'), key);
-    const second = await service.internalTransfer(userId, move('2500000'), key);
-
-    expect(first.replayed).toBe(false);
-    expect(second.replayed).toBe(true);
-    expect(second.amount).toBe('2500000');
-    expect(await available(savingsWalletId)).toBe(START - 2_500_000n);
-    expect(await available(routineWalletId)).toBe(2_500_000n);
-    expect(await ledgerCount()).toBe(1);
+  beforeAll(async () => {
+    ({ db, pool } = await connectTestDatabase());
+    operations = new FinancialOperationsService(db);
+    transfers = new AccountTransferService(
+      null as never,
+      new ConfigService(),
+      null as never,
+      operations,
+      new OperationLedgerService(db),
+      new AccountWalletsService(db),
+      new MoneyAuditService(db),
+    );
+    service = new WalletsService(db, null as never, null as never, transfers);
   });
-
-  it('refuses the same key carrying different inputs', async () => {
+  beforeEach(async () => {
+    merchant = await createMerchantFixture(db, 'Legacy');
+    await db
+      .update(schema.balances)
+      .set({ available: 10000000n })
+      .where(
+        and(
+          eq(schema.balances.walletId, merchant.holdingWalletId),
+          eq(schema.balances.currency, 'USDC'),
+        ),
+      );
+  });
+  afterEach(async () => {
+    await db
+      .delete(schema.auditLogs)
+      .where(eq(schema.auditLogs.userId, merchant.userId));
+    await destroyMerchantFixture(db, merchant);
+  });
+  afterAll(async () => pool.end());
+  async function pending(amount: string, key: string) {
+    try {
+      await service.internalTransfer(merchant.userId, move(amount), key);
+      throw Error('False success');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ConflictException);
+      const body = (e as ConflictException).getResponse() as {
+        code: string;
+        operationId: string;
+      };
+      expect(body.code).toBe('TRANSFER_PENDING');
+      return body.operationId;
+    }
+  }
+  it('preserves fractional cents and returns success only after finality', async () => {
     const key = randomUUID();
-    await service.internalTransfer(userId, move('1000000'), key);
-
+    const id = await pending('1000001', key);
+    const op = await operations.require(id);
+    expect(op.amountBaseUnits).toBe(1000001n);
+    expect(op.displayAmountMinor).toBeNull();
+    await operations.advance(id, 'chain_submitted', {
+      chainSignature: 'test-signature',
+    });
+    await operations.advance(id, 'chain_confirmed', {
+      chainStatus: 'finalized',
+    });
+    await transfers.finalize(await operations.require(id));
+    const response = await service.internalTransfer(
+      merchant.userId,
+      move('1000001'),
+      key,
+    );
+    expect(response.amount).toBe('1000001');
+    expect(response.status).toBe('finalized');
+    const [balance] = await db
+      .select()
+      .from(schema.balances)
+      .where(
+        and(
+          eq(schema.balances.walletId, merchant.routineWalletId),
+          eq(schema.balances.currency, 'USDC'),
+        ),
+      );
+    expect(balance.available).toBe(1000001n);
+  });
+  it('coalesces concurrent identical requests into one reservation', async () => {
+    const key = randomUUID();
+    const ids = await Promise.all(
+      Array.from({ length: 4 }, () => pending('3000000', key)),
+    );
+    expect(new Set(ids).size).toBe(1);
+    const [balance] = await db
+      .select()
+      .from(schema.balances)
+      .where(
+        and(
+          eq(schema.balances.walletId, merchant.holdingWalletId),
+          eq(schema.balances.currency, 'USDC'),
+        ),
+      );
+    expect(balance.available).toBe(7000000n);
+    expect(balance.pending).toBe(3000000n);
+  });
+  it('rejects changed inputs under the same key', async () => {
+    const key = randomUUID();
+    await pending('1000000', key);
     await expect(
-      service.internalTransfer(userId, move('9000000'), key),
+      service.internalTransfer(merchant.userId, move('2000000'), key),
     ).rejects.toBeInstanceOf(ConflictException);
-
-    // The refusal must not have moved anything.
-    expect(await available(savingsWalletId)).toBe(START - 1_000_000n);
-    expect(await ledgerCount()).toBe(1);
   });
-
-  it('treats a different direction under the same key as a different request', async () => {
-    const key = randomUUID();
-    await service.internalTransfer(userId, move('1000000'), key);
-
+  it('rejects EURC without a ledger fallback', async () => {
     await expect(
       service.internalTransfer(
-        userId,
-        {
-          fromWalletType: 'routine',
-          toWalletType: 'savings',
-          amount: '1000000',
-          currency: 'USDC',
-        },
-        key,
+        merchant.userId,
+        { ...move('1'), currency: 'EURC' },
+        randomUUID(),
       ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toThrow(/USDC/);
   });
-
-  it('leaves exactly one transfer when four identical requests race', async () => {
+  it('does not execute a historical ledger-only transfer again', async () => {
     const key = randomUUID();
-
-    const outcomes = await Promise.allSettled(
-      Array.from({ length: 4 }, () =>
-        service.internalTransfer(userId, move('3000000'), key),
-      ),
-    );
-
-    const fulfilled = outcomes.filter((o) => o.status === 'fulfilled');
-    expect(fulfilled).toHaveLength(4);
-    expect(await ledgerCount()).toBe(1);
-    expect(await available(savingsWalletId)).toBe(START - 3_000_000n);
-    expect(await available(routineWalletId)).toBe(3_000_000n);
+    const idempotencyKey = `wallet-transfer:${merchant.userId}:${key}`;
+    const fingerprint = operationFingerprint({
+      userId: merchant.userId,
+      from: 'savings',
+      to: 'routine',
+      amount: 1000000n,
+      currency: 'USDC',
+    });
+    await db
+      .insert(schema.ledgerEntries)
+      .values({
+        debitWalletId: merchant.holdingWalletId,
+        creditWalletId: merchant.routineWalletId,
+        amount: 1000000n,
+        currency: 'USDC',
+        type: 'internal',
+        status: 'completed',
+        idempotencyKey,
+        metadata: JSON.stringify({ fingerprint }),
+      });
+    await expect(
+      service.internalTransfer(merchant.userId, move('1000000'), key),
+    ).rejects.toMatchObject({
+      response: { code: 'LEGACY_TRANSFER_RECONCILIATION_REQUIRED' },
+    });
+    expect(
+      await operations.findByKey(merchant.userId, idempotencyKey),
+    ).toBeNull();
   });
-
-  it('still lets two genuinely separate transfers through', async () => {
-    await service.internalTransfer(userId, move('1000000'), randomUUID());
-    await service.internalTransfer(userId, move('1000000'), randomUUID());
-
-    expect(await ledgerCount()).toBe(2);
-    expect(await available(routineWalletId)).toBe(2_000_000n);
-  });
-
-  it('namespaces the stored key per user, so keys cannot collide between people', async () => {
-    const key = 'shared-key-across-people';
-    await service.internalTransfer(userId, move('1000000'), key);
-
-    const stored = await db
-      .select({ key: schema.ledgerEntries.idempotencyKey })
-      .from(schema.ledgerEntries)
-      .where(eq(schema.ledgerEntries.debitWalletId, savingsWalletId));
-
-    expect(stored[0].key).toBe(`wallet-transfer:${userId}:${key}`);
+  it('keeps integer units beyond floating point precision exact', async () => {
+    const amount = 9007199254740993n;
+    await db
+      .update(schema.balances)
+      .set({ available: amount })
+      .where(
+        and(
+          eq(schema.balances.walletId, merchant.holdingWalletId),
+          eq(schema.balances.currency, 'USDC'),
+        ),
+      );
+    const id = await pending(amount.toString(), randomUUID());
+    expect((await operations.require(id)).amountBaseUnits).toBe(amount);
   });
 });

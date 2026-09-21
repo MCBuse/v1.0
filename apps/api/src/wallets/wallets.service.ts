@@ -1,12 +1,15 @@
+import { AccountTransferService } from '../accounts/account-transfer.service';
 import {
   Injectable,
+  Optional,
+  ConflictException,
   Inject,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, inArray, sql, gte } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { SolanaService } from '../solana/solana.service';
@@ -19,17 +22,13 @@ import {
 
 const CURRENCIES = ['USDC', 'EURC'] as const;
 
-/** Postgres unique-violation. Two racing requests with one key produce exactly this. */
-function isUniqueViolation(error: unknown): boolean {
-  return (error as { code?: string } | null)?.code === '23505';
-}
-
 @Injectable()
 export class WalletsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly solanaService: SolanaService,
     private readonly ledgerService: LedgerService,
+    @Optional() private readonly accountTransfers?: AccountTransferService,
   ) {}
 
   /** Create savings + routine wallets with zero balances for a new user. */
@@ -87,7 +86,12 @@ export class WalletsService {
         createdAt: schema.wallets.createdAt,
       })
       .from(schema.wallets)
-      .where(and(eq(schema.wallets.userId, userId), eq(schema.wallets.isActive, true)));
+      .where(
+        and(
+          eq(schema.wallets.userId, userId),
+          eq(schema.wallets.isActive, true),
+        ),
+      );
 
     if (walletRows.length === 0) return {};
 
@@ -105,7 +109,12 @@ export class WalletsService {
       balancesByWallet.set(bal.walletId, bucket);
     }
 
-    const result: Record<string, typeof walletRows[0] & { balances: { currency: string; available: string; pending: string }[] }> = {};
+    const result: Record<
+      string,
+      (typeof walletRows)[0] & {
+        balances: { currency: string; available: string; pending: string }[];
+      }
+    > = {};
     for (const wallet of walletRows) {
       const walletBalances = balancesByWallet.get(wallet.id) ?? [];
       result[wallet.type] = {
@@ -142,105 +151,63 @@ export class WalletsService {
     };
   }
 
-  /** Internal Savings ↔ Routine transfer. Both wallets are custodial — no on-chain tx. */
+  /** Legacy wire shape; settlement is shared with the account API. */
   async internalTransfer(
     userId: string,
     dto: InternalTransferDto,
     clientIdempotencyKey: string,
   ) {
-    if (dto.fromWalletType === dto.toWalletType) {
-      throw new BadRequestException('Source and destination wallets must differ');
-    }
-
-    const amount = BigInt(dto.amount);
-    if (amount <= 0n) throw new BadRequestException('Amount must be positive');
-
-    const from = await this.getWalletForUser(userId, dto.fromWalletType);
-    const to = await this.getWalletForUser(userId, dto.toWalletType);
-    const currency = dto.currency.toUpperCase();
-
-    // The key is namespaced per user so one person's key can never collide with
-    // another's on the ledger's global unique index.
+    if (dto.currency !== 'USDC')
+      throw new BadRequestException('Only USDC settlement is supported');
     const idempotencyKey = `wallet-transfer:${userId}:${clientIdempotencyKey}`;
-    const fingerprint = operationFingerprint({
-      userId,
-      from: dto.fromWalletType,
-      to: dto.toWalletType,
-      amount,
-      currency,
-    });
-
-    const replay = await this.findInternalTransfer(idempotencyKey);
-    if (replay) {
-      assertIdempotentReuse(replay.fingerprint, fingerprint, 'wallet transfer');
-      return this.presentInternalTransfer(replay, dto, currency, idempotencyKey);
-    }
-
-    try {
-      await this.db.transaction(async (tx) => {
-        // Atomic conditional deduct: only succeeds if available >= amount (no race)
-        const srcUpdated = await tx
-          .update(schema.balances)
-          .set({ available: sql`${schema.balances.available} - ${amount}` })
-          .where(
-            and(
-              eq(schema.balances.walletId, from.id),
-              eq(schema.balances.currency, currency),
-              gte(schema.balances.available, amount),
-            ),
-          )
-          .returning({ id: schema.balances.id });
-
-        if (srcUpdated.length === 0) {
-          throw new BadRequestException('Insufficient balance');
-        }
-
-        // Credit destination — verify the balance row exists (affected exactly 1 row)
-        const dstUpdated = await tx
-          .update(schema.balances)
-          .set({ available: sql`${schema.balances.available} + ${amount}` })
-          .where(
-            and(
-              eq(schema.balances.walletId, to.id),
-              eq(schema.balances.currency, currency),
-            ),
-          )
-          .returning({ id: schema.balances.id });
-
-        if (dstUpdated.length !== 1) {
-          throw new BadRequestException('Invalid destination wallet or currency');
-        }
-
-        // Inserting the ledger entry inside the same transaction is what makes
-        // the key authoritative: a duplicate key aborts the balance moves too.
-        await tx.insert(schema.ledgerEntries).values({
-          debitWalletId: from.id,
-          creditWalletId: to.id,
-          amount,
-          currency,
-          type: 'internal',
-          status: 'completed',
-          idempotencyKey,
-          metadata: JSON.stringify({ initiatedBy: userId, fingerprint }),
-        });
+    const legacy = await this.findInternalTransfer(idempotencyKey);
+    if (legacy) {
+      assertIdempotentReuse(
+        legacy.fingerprint,
+        operationFingerprint({
+          userId,
+          from: dto.fromWalletType,
+          to: dto.toWalletType,
+          amount: BigInt(dto.amount),
+          currency: dto.currency,
+        }),
+        'wallet transfer',
+      );
+      // Historical ledger-only execution must never become a fresh chain movement.
+      throw new ConflictException({
+        code: 'LEGACY_TRANSFER_RECONCILIATION_REQUIRED',
+        message:
+          'This historical transfer is already recorded and requires settlement reconciliation.',
       });
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-      // Another request carrying the same key committed first. Its entry is the
-      // outcome; ours rolled back whole, so no money moved twice.
-      const winner = await this.findInternalTransfer(idempotencyKey);
-      if (!winner) throw error;
-      assertIdempotentReuse(winner.fingerprint, fingerprint, 'wallet transfer');
-      return this.presentInternalTransfer(winner, dto, currency, idempotencyKey);
     }
-
+    if (!this.accountTransfers)
+      throw new Error('Account settlement is unavailable');
+    const result = await this.accountTransfers.startTransfer({
+      userId,
+      from: dto.fromWalletType === 'savings' ? 'holding' : 'routine',
+      to: dto.toWalletType === 'savings' ? 'holding' : 'routine',
+      amountBaseUnits: BigInt(dto.amount),
+      idempotencyKey,
+    });
+    if (result.status !== 'finalized')
+      throw new ConflictException({
+        code:
+          result.status === 'failed' ? 'TRANSFER_FAILED' : 'TRANSFER_PENDING',
+        message:
+          result.status === 'failed'
+            ? 'Transfer failed'
+            : 'Transfer is settling',
+        operationId: result.operationId,
+      });
     return {
       from: dto.fromWalletType,
       to: dto.toWalletType,
-      currency,
       amount: dto.amount,
+      currency: dto.currency,
       idempotencyKey,
-      replayed: false,
+      replayed: result.replayed,
+      operationId: result.operationId,
+      status: result.status,
     };
   }
 
@@ -266,22 +233,6 @@ export class WalletsService {
       fingerprint = null;
     }
     return { ...rows[0], fingerprint };
-  }
-
-  private presentInternalTransfer(
-    stored: { amount: bigint; currency: string },
-    dto: InternalTransferDto,
-    currency: string,
-    idempotencyKey: string,
-  ) {
-    return {
-      from: dto.fromWalletType,
-      to: dto.toWalletType,
-      currency,
-      amount: stored.amount.toString(),
-      idempotencyKey,
-      replayed: true,
-    };
   }
 
   private async getWalletForUser(userId: string, walletType: string) {

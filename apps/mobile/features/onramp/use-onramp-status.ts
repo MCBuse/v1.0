@@ -4,6 +4,7 @@ import type { OnrampTransactionStatus } from './session-models';
 
 const TERMINAL = new Set<OnrampTransactionStatus['status']>([
   'completed',
+  'refunded',
   'failed',
   'cancelled',
   'expired',

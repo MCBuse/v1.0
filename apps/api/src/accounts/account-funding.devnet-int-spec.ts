@@ -50,7 +50,7 @@ describe('account funding settlement on devnet', () => {
     pool = connection.pool;
 
     const config = new ConfigService();
-    solana = new SolanaService(config);
+    solana = new SolanaService(config, db);
     solana.onModuleInit();
     treasury = new TreasuryService(config, solana);
     treasury.onModuleInit();
@@ -59,7 +59,10 @@ describe('account funding settlement on devnet', () => {
     const ledger = new OperationLedgerService(db);
     const wallets = new AccountWalletsService(db);
     funding = new AccountFundingService(
-      new StripeClient(config),
+      { stripe: { checkout: { sessions: { retrieve: async (id: string) => {
+        const op = (await operations.findByProviderRef(id))!;
+        return { id, metadata: { operationId: op.id, userId: op.userId, walletId: op.destinationWalletId }, amount_total: Number(op.displayAmountMinor), currency: 'usd', livemode: false, status: 'complete', payment_status: 'unpaid' };
+      } } } } } as unknown as StripeClient,
       config,
       treasury,
       operations,
@@ -338,6 +341,7 @@ describe('account funding settlement on devnet', () => {
       eventType: 'polled',
       paymentStatus: 'no_payment_required',
     });
-    expect(await countEvents()).toBe(before + 2);
+    // The event payload is not authoritative: the retrieved session is still unpaid.
+    expect(await countEvents()).toBe(before + 1);
   }, 60_000);
 });

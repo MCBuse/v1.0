@@ -101,6 +101,7 @@ describe('cross-merchant access (integration)', () => {
       activity,
       imports,
       config,
+      new MerchantAssessmentService(db, merchants),
     );
     assessments = new MerchantAssessmentService(db, merchants);
 

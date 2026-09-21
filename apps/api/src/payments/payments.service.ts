@@ -56,6 +56,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
+    if (this.config.get<string>('PROCESS_ROLE') !== 'operations-daemon') return;
     setTimeout(() => void this.reconcileSubmittedMerchantPayments(), 5_000);
     this.reconciliationInterval = setInterval(
       () => void this.reconcileSubmittedMerchantPayments(),
@@ -74,6 +75,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       dto.nonce,
     );
     if (duplicate) return duplicate;
+    if (process.env.MONEY_INITIATION_ENABLED === 'false') throw new BadRequestException('New money movements are temporarily disabled');
 
     const resolved = await this.paymentRequestsService.resolveForExecution(
       dto.nonce,
@@ -332,6 +334,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     } = params;
     if (!merchantPaymentRequest)
       await this.assertAvailableBalance(payerWallet.id, currency, amount);
+    if (process.env.MONEY_INITIATION_ENABLED === 'false') throw new BadRequestException('New money movements are temporarily disabled');
     const transferResult = await this.transferProvider.execute({
       payerWalletId: payerWallet.id,
       payerPubkey: payerWallet.solanaPubkey,
@@ -607,11 +610,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
     // Mark the merchant's derived figures stale. The recalculation itself is
     // deliberately left to the background worker, so no customer waits on it.
-    await this.analyticsWork.enqueue(
-      request.merchantId,
-      'digital_sale_finalized',
-      { type: 'payment_request', id: request.id },
-    );
+    // Analytics outbox is written by the source-table trigger in the same transaction.
   }
 
   private merchantEvidenceEnvironment(): 'live' | 'test' | 'synthetic' {
@@ -868,17 +867,23 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       .select({
         status: schema.merchantPaymentAttempts.status,
         submittedSignature: schema.merchantPaymentAttempts.submittedSignature,
+        payerUserId: schema.merchantPaymentAttempts.payerUserId,
+        idempotencyKey: schema.merchantPaymentAttempts.idempotencyKey,
       })
       .from(schema.merchantPaymentAttempts)
       .where(
         eq(schema.merchantPaymentAttempts.paymentRequestId, paymentRequestId),
       )
       .limit(1);
-    if (rows[0]?.status === 'processing' && !rows[0].submittedSignature)
+    if (rows[0]?.status === 'processing' && !rows[0].submittedSignature) {
+      const payer = await this.getRoutineWalletForUser(rows[0].payerUserId);
+      const [prepared] = await this.db.select().from(schema.chainAttempts).where(eq(schema.chainAttempts.intentKey, `payment:${payer.id}:${rows[0].idempotencyKey}`));
+      if (prepared) return; // Recovery will attach the durable prepared attempt.
       await this.markMerchantPaymentFailed(paymentRequestId);
+    }
   }
 
-  private async reconcileSubmittedMerchantPayments() {
+  async reconcileSubmittedMerchantPayments() {
     try {
       const rows = await this.db
         .select({
@@ -906,6 +911,13 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         const recoveryExpired =
           recoveryStartedAt.getTime() < Date.now() - RECOVERY_TIMEOUT_MS;
         if (!row.attempt.submittedSignature) {
+          const payer = await this.getRoutineWalletForUser(row.attempt.payerUserId);
+          const [prepared] = await this.db.select().from(schema.chainAttempts).where(eq(schema.chainAttempts.intentKey, `payment:${payer.id}:${row.attempt.idempotencyKey}`));
+          if (prepared) {
+            await this.db.update(schema.merchantPaymentAttempts).set({ status: 'submitted', submittedSignature: prepared.signature, submittedAt: prepared.createdAt, updatedAt: new Date() }).where(eq(schema.merchantPaymentAttempts.id, row.attempt.id));
+            // Next pass recovers the same bytes; no replacement is signed.
+            continue;
+          }
           if (recoveryExpired)
             await this.markMerchantPaymentFailed(row.request.id);
           continue;

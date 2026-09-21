@@ -62,7 +62,7 @@ describe('account withdrawal on devnet and Stripe sandbox', () => {
     pool = connection.pool;
 
     const config = new ConfigService();
-    solana = new SolanaService(config);
+    solana = new SolanaService(config, db);
     solana.onModuleInit();
     treasury = new TreasuryService(config, solana);
     treasury.onModuleInit();

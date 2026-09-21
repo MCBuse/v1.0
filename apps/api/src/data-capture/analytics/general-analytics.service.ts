@@ -1,6 +1,6 @@
 import type { GeneralAnalyticsResponse as SharedGeneralAnalyticsResponse } from '@repo/shared';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gte, isNotNull, lte } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, lte, lt } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../../database/database.provider';
 import * as schema from '../../database/schema';
@@ -143,7 +143,7 @@ export class GeneralAnalyticsService {
             eq(schema.merchantTransactions.merchantId, merchant.merchantId),
             eq(schema.merchantTransactions.status, 'finalized'),
             gte(schema.merchantTransactions.occurredAt, previousFrom),
-            lte(schema.merchantTransactions.occurredAt, previousTo),
+            lt(schema.merchantTransactions.occurredAt, previousTo),
           ),
         ),
       this.db
@@ -157,7 +157,7 @@ export class GeneralAnalyticsService {
             eq(schema.merchantCashSales.merchantId, merchant.merchantId),
             eq(schema.merchantCashSales.status, 'recorded'),
             gte(schema.merchantCashSales.occurredAt, previousFrom),
-            lte(schema.merchantCashSales.occurredAt, previousTo),
+            lt(schema.merchantCashSales.occurredAt, previousTo),
           ),
         ),
       this.db

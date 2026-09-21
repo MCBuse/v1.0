@@ -2,6 +2,7 @@
 
 import type {
   AccountCard,
+  AccountOperationsPage,
   AccountsSummary,
   PayoutCapability,
 } from "@repo/shared";
@@ -27,6 +28,8 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { portalApi } from "@/lib/client/api";
+import { operationIntent, finishOperationIntent } from "@/lib/client/operation-intent";
 import { accountsApi, accountsFetcher } from "@/lib/client/accounts-api";
 import { euroInputToMinor } from "@/lib/client/money-input";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
@@ -69,6 +72,7 @@ type FlowKind = "funding" | "transfer" | "withdrawal" | null;
  */
 export function AccountCards() {
   const summary = usePortalResource<AccountsSummary>("", 15_000, accountsFetcher);
+  const operations = usePortalResource<AccountOperationsPage>("operations", 5000, accountsFetcher);
   const [flow, setFlow] = useState<FlowKind>(null);
   const [custodyOpen, setCustodyOpen] = useState(false);
 
@@ -139,6 +143,15 @@ export function AccountCards() {
         ))}
       </div>
 
+      <Card><CardHeader><h2 className="font-semibold">Money movement status</h2></CardHeader><CardContent>
+        {operations.error ? <p role="alert">{operations.error.message}</p> : null}
+        {operations.data?.operations.slice(0, 15).map(op => <div key={op.id} className="border-b py-3 text-sm">
+          <p>{op.kind.replaceAll('_', ' ')} · {op.amountCents ? money(op.amountCents) : '—'}</p>
+          <p>{op.status === 'reversed' ? 'Refund / return completed' : op.status === 'compensating' ? `Refund / return ${op.refundStatus ?? 'pending'}` : op.status.replaceAll('_', ' ')}</p>
+          {op.needsAttention ? <p className="text-amber-800">Recovery needs attention. Reference: {op.id}</p> : null}
+          {op.nextAttemptAt ? <p className="text-slate-500">Next check: {when(op.nextAttemptAt)}</p> : null}
+        </div>)}
+      </CardContent></Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <h2 className="font-semibold">Today</h2>
@@ -368,6 +381,7 @@ function MoneyFlowDrawer({
   const [direction, setDirection] = useState<"holding-routine" | "routine-holding">(
     "holding-routine",
   );
+  const [fundingMethod, setFundingMethod] = useState<"card" | "bank">("card");
   const [destinationId, setDestinationId] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -391,14 +405,16 @@ function MoneyFlowDrawer({
     try {
       // One key per submission attempt: a retry after a network error replays
       // the original request rather than moving the money twice.
-      const idempotencyKey = crypto.randomUUID();
+      const profile = await portalApi<{ id: string }>('me');
+      const intentKind = `money-${kind}`;
+      const idempotencyKey = operationIntent(profile.id, intentKind, { amountCents, direction, destinationId, fundingMethod });
       if (kind === "funding") {
         const result = await accountsApi<{ checkoutUrl: string | null }>(
           "funding",
           {
             method: "POST",
             headers: { "Idempotency-Key": idempotencyKey },
-            body: JSON.stringify({ method: "card", amountCents }),
+            body: JSON.stringify({ method: fundingMethod, amountCents }),
           },
         );
         if (result.checkoutUrl) {
@@ -427,6 +443,7 @@ function MoneyFlowDrawer({
           body: JSON.stringify({ destinationId, amountCents }),
         });
       }
+      finishOperationIntent(profile.id, intentKind);
       setAmount("");
       onDone();
     } catch (reason) {
@@ -450,6 +467,7 @@ function MoneyFlowDrawer({
           <DrawerDescription>{copy.description}</DrawerDescription>
         </DrawerHeader>
         <div className="grid gap-4 px-4 pb-4">
+          {kind === 'funding' ? <Field><FieldLabel>Payment method</FieldLabel><select value={fundingMethod} onChange={e => setFundingMethod(e.target.value as 'card' | 'bank')} className="rounded border p-2"><option value="card">Card</option><option value="bank">Bank account</option></select></Field> : null}
           <Field>
             <FieldLabel htmlFor="account-amount">Amount</FieldLabel>
             <Input

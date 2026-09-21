@@ -126,6 +126,7 @@ export function MerchantInsightsPanel({
           failed.
         </Alert>
       ) : null}
+      {data.backlog ? <p className="text-sm text-amber-800">Refresh {data.backlog.status} · queued for {data.backlog.ageSeconds}s{data.backlog.reason ? ` · ${data.backlog.reason}` : ''}</p> : null}
       {data.lastFailure ? (
         <Alert className="border-red-200 bg-red-50 text-red-800">
           <p className="font-semibold">

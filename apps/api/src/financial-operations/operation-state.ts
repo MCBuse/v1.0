@@ -143,7 +143,9 @@ export function canTransition(
   // completed reversal. Letting it be declared "failed" here would leave the
   // reservation stranded with nothing left to return it.
   if (from === 'compensating') return to === 'reversed';
-  if (to === 'failed') return !movesValueIrreversibly(from);
+  const collectedFunding = (kind === 'funding_card' || kind === 'funding_bank') && ['collection_settled', 'chain_submitted', 'chain_confirmed'].includes(from);
+  if (to === 'failed') return !collectedFunding && !movesValueIrreversibly(from);
+  if (to === 'compensating' && collectedFunding) return from !== 'chain_confirmed';
   if (to === 'compensating') return movesValueIrreversibly(from);
   if (to === 'reversed') return false;
   return nextStatus(kind, from) === to;

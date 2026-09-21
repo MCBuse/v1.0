@@ -1,5 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { Inject, Injectable } from '@nestjs/common';
+import { sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
@@ -11,179 +11,143 @@ export type WorkReason =
   | 'stock_adjusted'
   | 'import_committed'
   | 'manual';
-
 export interface WorkTrigger {
   reason: WorkReason;
   sourceType: string;
   sourceId: string | null;
   at: string;
 }
+export interface ClaimedAnalyticsWork {
+  merchantId: string;
+  lastQueuedAt: Date;
+  attempts: number;
+  generation: number;
+  token: string;
+}
 
-/** How many reasons to keep per pending row before dropping the oldest. */
-const MAX_RETAINED_REASONS = 20;
-
-/**
- * The queue behind "a sale or stock change eventually refreshes the insight".
- *
- * One row per merchant, so a busy hour coalesces into a single unit of work
- * rather than a backlog. Enqueuing happens inside the caller's transaction
- * where possible, so work is only queued if the change it describes actually
- * committed.
- */
 @Injectable()
 export class AnalyticsWorkQueueService {
-  private readonly logger = new Logger(AnalyticsWorkQueueService.name);
-
+  private claims = new Map<string, ClaimedAnalyticsWork>();
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  /**
-   * Records that a merchant's derived figures are stale.
-   *
-   * Never throws: failing to queue a recalculation must not roll back the sale
-   * that caused it. A missed enqueue costs freshness, not money, and the next
-   * change or the scheduled sweep picks it up.
-   */
+  /** Source mutations use database triggers in their own transaction. Manual refresh uses this entrypoint. */
   async enqueue(
     merchantId: string,
     reason: WorkReason,
     source: { type: string; id?: string | null } = { type: 'unknown' },
   ): Promise<void> {
-    const trigger: WorkTrigger = {
-      reason,
-      sourceType: source.type,
-      sourceId: source.id ?? null,
-      at: new Date().toISOString(),
-    };
-
-    try {
-      await this.db.execute(sql`
-        INSERT INTO merchant_analytics_work
-          (merchant_id, status, reasons, first_queued_at, last_queued_at)
-        VALUES (
-          ${merchantId}::uuid,
-          'pending',
-          ${JSON.stringify([trigger])}::jsonb,
-          now(),
-          now()
-        )
-        ON CONFLICT (merchant_id) DO UPDATE SET
-          status = 'pending',
-          last_queued_at = now(),
-          reasons = (
-            SELECT jsonb_agg(value)
-            FROM (
-              SELECT value
-              FROM jsonb_array_elements(
-                merchant_analytics_work.reasons || ${JSON.stringify([trigger])}::jsonb
-              ) WITH ORDINALITY AS t(value, ord)
-              ORDER BY ord DESC
-              LIMIT ${MAX_RETAINED_REASONS}
-            ) recent
-          )
-      `);
-    } catch (error) {
-      this.logger.warn(
-        `Could not queue analytics work for ${merchantId}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
+    await this.db.execute(
+      sql`select enqueue_merchant_analytics(${merchantId}::uuid,${reason},${source.type},${source.id ?? null})`,
+    );
   }
 
-  /** Claims up to `limit` merchants, marking them in progress. */
+  private allowed(allowlist: string[]) {
+    return allowlist.length === 0
+      ? sql`true`
+      : sql`(${sql.join(
+          allowlist.map((id) => sql`m.id::text=${id} OR m.public_id=${id}`),
+          sql` OR `,
+        )})`;
+  }
+
+  /** Disabled backlogs stay stale but cannot consume every slot ahead of the pilot. */
+  async applyEligibility(
+    enabled: boolean,
+    allowlist: string[],
+  ): Promise<number> {
+    const eligible = sql`${enabled} AND m.is_active AND ${this.allowed(allowlist)}`;
+    const result = await this.db.execute(sql`
+      UPDATE merchant_analytics_work w SET status='deferred',last_error='disabled',next_attempt_at=NULL,lease_until=NULL,lease_token=NULL,claimed_at=NULL
+      FROM merchants m WHERE m.id=w.merchant_id AND NOT (${eligible})
+        AND (w.lease_until IS NULL OR w.lease_until<=now()) AND (w.status<>'deferred' OR w.last_error<>'disabled')
+      RETURNING w.merchant_id`);
+    await this.db.execute(sql`
+      UPDATE merchant_analytics_work w SET status='pending',last_error=NULL,next_attempt_at=now(),lease_until=NULL,lease_token=NULL,claimed_at=NULL
+      FROM merchants m WHERE m.id=w.merchant_id AND (${eligible}) AND w.status='deferred'
+        AND w.last_error IN ('disabled','not_in_allowlist') AND (w.lease_until IS NULL OR w.lease_until<=now())`);
+    return result.rows.length;
+  }
+
   async claim(
     limit = 10,
-  ): Promise<
-    Array<{ merchantId: string; lastQueuedAt: Date; attempts: number }>
-  > {
-    const pending = await this.db
-      .select()
-      .from(schema.merchantAnalyticsWork)
-      .where(eq(schema.merchantAnalyticsWork.status, 'pending'))
-      .orderBy(asc(schema.merchantAnalyticsWork.lastQueuedAt))
-      .limit(limit);
-
-    const claimed: Array<{
-      merchantId: string;
-      lastQueuedAt: Date;
-      attempts: number;
-    }> = [];
-
-    for (const row of pending) {
-      // The status guard makes the claim atomic between competing workers.
-      const updated = await this.db
-        .update(schema.merchantAnalyticsWork)
-        .set({
-          status: 'processing',
-          claimedAt: new Date(),
-          attempts: row.attempts + 1,
-        })
-        .where(
-          sql`${schema.merchantAnalyticsWork.merchantId} = ${row.merchantId}::uuid
-              AND ${schema.merchantAnalyticsWork.status} = 'pending'`,
-        )
-        .returning({ merchantId: schema.merchantAnalyticsWork.merchantId });
-
-      if (updated.length === 1) {
-        claimed.push({
-          merchantId: row.merchantId,
-          lastQueuedAt: row.lastQueuedAt,
-          attempts: row.attempts + 1,
-        });
-      }
-    }
-
-    return claimed;
+    allowlist?: string[],
+  ): Promise<ClaimedAnalyticsWork[]> {
+    const eligible =
+      allowlist === undefined
+        ? sql`true`
+        : sql`EXISTS (SELECT 1 FROM merchants m WHERE m.id=merchant_id AND m.is_active AND ${this.allowed(allowlist)})`;
+    const result = await this.db.execute(sql`
+      WITH due AS (
+        SELECT merchant_id FROM merchant_analytics_work
+        WHERE (lease_until IS NULL OR lease_until <= now()) AND (next_attempt_at IS NULL OR next_attempt_at <= now()) AND ${eligible}
+        ORDER BY first_queued_at LIMIT ${limit} FOR UPDATE SKIP LOCKED
+      )
+      UPDATE merchant_analytics_work w SET status='processing', lease_token=gen_random_uuid(), lease_until=now()+interval '120 seconds',
+        claimed_at=now(), claimed_generation=generation, attempts=attempts+1
+      FROM due WHERE w.merchant_id=due.merchant_id
+      RETURNING w.merchant_id AS "merchantId", w.last_queued_at AS "lastQueuedAt", w.attempts, w.claimed_generation AS generation, w.lease_token AS token`);
+    const rows = result.rows as unknown as ClaimedAnalyticsWork[];
+    for (const row of rows) this.claims.set(row.merchantId, row);
+    return rows;
   }
 
-  /**
-   * Clears completed work — but only if nothing new arrived while it ran.
-   *
-   * The status itself carries that answer: claiming sets `processing`, and
-   * any enqueue sets `pending` again. So deleting only a row still marked
-   * `processing` keeps work that landed mid-calculation, with no timestamp
-   * comparison to get wrong. Postgres keeps microseconds where a JavaScript
-   * Date keeps milliseconds, and that difference silently broke the first
-   * version of this.
-   */
-  async complete(merchantId: string): Promise<void> {
-    await this.db
-      .delete(schema.merchantAnalyticsWork)
-      .where(
-        and(
-          eq(schema.merchantAnalyticsWork.merchantId, merchantId),
-          eq(schema.merchantAnalyticsWork.status, 'processing'),
-        ),
+  async renew(work: ClaimedAnalyticsWork) {
+    await this.db.execute(
+      sql`UPDATE merchant_analytics_work SET lease_until=now()+interval '120 seconds' WHERE merchant_id=${work.merchantId}::uuid AND lease_token=${work.token}::uuid`,
+    );
+  }
+
+  async complete(
+    merchantId: string,
+    work = this.claims.get(merchantId),
+  ): Promise<void> {
+    if (!work) return;
+    await this.db.transaction(async (tx) => {
+      const locked = await tx.execute(
+        sql`SELECT generation FROM merchant_analytics_work WHERE merchant_id=${merchantId}::uuid AND lease_token=${work.token}::uuid FOR UPDATE`,
       );
+      if (!locked.rows.length) return;
+      await tx.execute(
+        sql`DELETE FROM merchant_analytics_outbox WHERE merchant_id=${merchantId}::uuid AND generation<=${work.generation}`,
+      );
+      if (String(locked.rows[0].generation) === String(work.generation)) {
+        await tx.execute(
+          sql`DELETE FROM merchant_analytics_work WHERE merchant_id=${merchantId}::uuid`,
+        );
+      } else {
+        await tx.execute(
+          sql`UPDATE merchant_analytics_work SET status='pending',lease_until=NULL,lease_token=NULL,claimed_at=NULL,last_error=NULL WHERE merchant_id=${merchantId}::uuid`,
+        );
+      }
+    });
+    this.claims.delete(merchantId);
   }
 
-  async fail(merchantId: string, message: string): Promise<void> {
-    await this.db
-      .update(schema.merchantAnalyticsWork)
-      .set({
-        status: 'pending',
-        claimedAt: null,
-        lastError: message.slice(0, 2000),
-      })
-      .where(eq(schema.merchantAnalyticsWork.merchantId, merchantId));
+  async fail(
+    merchantId: string,
+    message: string,
+    work = this.claims.get(merchantId),
+    deferred = false,
+  ): Promise<void> {
+    if (!work) return;
+    await this.db.execute(
+      sql`UPDATE merchant_analytics_work SET status=${deferred ? 'deferred' : 'pending'},lease_token=NULL,lease_until=NULL,claimed_at=NULL,last_error=${message.slice(0, 2000)},next_attempt_at=now()+interval '60 seconds' WHERE merchant_id=${merchantId}::uuid AND lease_token=${work.token}::uuid`,
+    );
+    this.claims.delete(merchantId);
   }
 
-  /** Queue depth and age, for the freshness and backlog reporting. */
-  async backlog(): Promise<{
-    pending: number;
-    processing: number;
-    oldestQueuedAt: string | null;
-  }> {
+  async backlog() {
     const rows = await this.db.select().from(schema.merchantAnalyticsWork);
     const oldest = rows
-      .map((row) => row.firstQueuedAt)
+      .map((r) => r.firstQueuedAt)
       .sort((a, b) => a.getTime() - b.getTime())[0];
     return {
-      pending: rows.filter((row) => row.status === 'pending').length,
-      processing: rows.filter((row) => row.status === 'processing').length,
-      oldestQueuedAt: oldest ? oldest.toISOString() : null,
+      pending: rows.filter((r) => r.status === 'pending').length,
+      processing: rows.filter((r) => r.status === 'processing').length,
+      deferred: rows.filter((r) => r.status === 'deferred').length,
+      oldestQueuedAt: oldest?.toISOString() ?? null,
     };
   }
 }

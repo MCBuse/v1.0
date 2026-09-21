@@ -235,12 +235,12 @@ export function InventoryView() {
     }
   }
 
-  async function adjust(product: MerchantProduct, change: number) {
+  async function adjust(product: MerchantProduct, change: number, reason: 'adjustment' | 'restock' = 'adjustment') {
     setPageError("");
     try {
       await portalApi<MerchantProduct>(
         `me/products/${product.id}/stock-adjustments`,
-        { method: "POST", body: JSON.stringify({ change }) },
+        { method: "POST", body: JSON.stringify({ change, reason }) },
       );
       window.dispatchEvent(new Event("merchant:refresh"));
       await resource.refresh();
@@ -424,6 +424,7 @@ export function InventoryView() {
                     >
                       <Plus aria-hidden="true" />
                     </Button>
+                    <Button variant="secondary" onClick={() => void adjust(product, 1, 'restock')}>Restock +1</Button>
                     <Button
                       variant="ghost"
                       size="sm"

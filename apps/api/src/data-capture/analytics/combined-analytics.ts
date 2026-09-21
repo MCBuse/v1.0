@@ -1,3 +1,4 @@
+import { STOCK_MOVEMENTS } from '../stock-movements';
 /**
  * Combined Analytics: the four analyses the proposal names, each as a plain
  * explanation backed by the figures it was derived from.
@@ -115,9 +116,11 @@ function salesVersusStock(
   const byKind = (kind: string) =>
     inventory.movementsByKind.find((m) => m.kind === kind)?.quantity ?? 0;
 
-  const restocked = byKind('restock');
-  const adjusted = byKind('adjustment');
-  const closingStock = inventory.position.onHandQuantity;
+  const restocked = byKind(STOCK_MOVEMENTS.restock);
+  const adjusted = byKind(STOCK_MOVEMENTS.adjustment) + byKind('adjustment');
+  const imported = byKind(STOCK_MOVEMENTS.imported);
+  const closingStock = inventory.periodPosition?.closingOnHand;
+  if (closingStock == null || !inventory.periodPosition?.eligible) return { id: 'sales_versus_stock', title: 'Sales against stock', explanation: 'The stock history cannot establish opening and closing quantities for this period.', figures: [], reliable: false, caveats: [...caveats, inventory.periodPosition?.reason ?? 'Insufficient stock history'] };
 
   // Net movement recorded in the period, so opening stock follows from the
   // closing position rather than being assumed.
@@ -125,7 +128,7 @@ function salesVersusStock(
     (sum, entry) => sum + entry.quantity,
     0,
   );
-  const openingStock = closingStock - netStockChange;
+  const openingStock = inventory.periodPosition.openingOnHand!;
 
   const revenueMinor = transactions.totals.salesMinor;
 
@@ -155,6 +158,7 @@ function salesVersusStock(
       figure('closingStock', 'Closing stock', closingStock, 'units'),
       figure('restocked', 'Restocked', restocked, 'units'),
       figure('adjusted', 'Adjustments', adjusted, 'units'),
+      figure('imported', 'Imported stock changes', imported, 'units'),
       figure('netStockChange', 'Net stock change', netStockChange, 'units'),
     ],
     reliable: true,
@@ -351,7 +355,7 @@ function velocityVersusAvailability(
 
   // Cover is counted down to the threshold, not to zero: hitting zero is
   // already too late to reorder.
-  const usable = Math.max(0, leader.onHandQuantity - threshold);
+  const usable = Math.max(0, leader.availableQuantity - threshold);
   const daysOfCover = Math.round((usable / leader.unitsPerDay) * 100) / 100;
 
   const guidance =
@@ -363,7 +367,7 @@ function velocityVersusAvailability(
 
   const explanation =
     `${leader.name} sold ${leader.unitsSold} units, about ${leader.unitsPerDay} a day. ` +
-    `There are ${leader.onHandQuantity} on hand against a reorder level of ${threshold}. ` +
+    `There are ${leader.availableQuantity} available against a reorder level of ${threshold}. ` +
     guidance;
 
   return {
@@ -374,7 +378,7 @@ function velocityVersusAvailability(
       figure('productName', 'Product', leader.name, 'text'),
       figure('unitsSold', 'Units sold', leader.unitsSold, 'units'),
       figure('unitsPerDay', 'Units per day', leader.unitsPerDay, 'units'),
-      figure('availableQuantity', 'On hand', leader.onHandQuantity, 'units'),
+      figure('availableQuantity', 'Available', leader.availableQuantity, 'units'),
       figure('lowStockThreshold', 'Reorder level', threshold, 'units'),
       figure('daysOfCoverRemaining', 'Days of cover', daysOfCover, 'days'),
     ],

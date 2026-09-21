@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-09-21T13:36:39.817237+00:00",
+  "device": {
+    "model": "iPhone 14 Pro Max",
+    "osVersion": "26.0",
+    "physical": true,
+    "connection": "wired",
+    "paired": true,
+    "developerMode": "enabled"
+  },
+  "application": {
+    "bundleIdentifier": "com.f-o-nyarko.mcbuse.dev",
+    "version": "1.0.0",
+    "nativeBuild": "1",
+    "existingDevelopmentClient": true,
+    "newNativeInstallation": false,
+    "expoCloudBuildOrUpdate": false,
+    "localMetroPort": 8081,
+    "apiBaseUrl": "https://mcbuse-api-332810840225.europe-west1.run.app/api/v1",
+    "workingTreeCodeBundled": true,
+    "observedScreen": "onboarding",
+    "merchantSignIn": "awaiting user"
+  },
+  "evidence": {
+    "screenshot": "/private/tmp/mcbuse-iphone-initial.png",
+    "screenshotSha256": "b8b90f25c453fe4a8e53a3fe9959934d5b2c098df79afb2b8174da09dcccc52a",
+    "metroLog": "/tmp/mcbuse-iphone-metro.txt"
+  },
+  "acceptance": {
+    "deviceConnectionPrerequisite": "passed",
+    "mobileAuthentication": "pending",
+    "qrTiming": "not measured",
+    "moneyFlows": "not tested",
+    "expoDeployment": "held per user instruction"
+  }
+}

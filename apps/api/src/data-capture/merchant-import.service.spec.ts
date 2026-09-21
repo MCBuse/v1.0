@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { MerchantImportService } from './merchant-import.service';
 
 describe('MerchantImportService column mapping', () => {
-  const service = new MerchantImportService({} as never, {} as never) as any;
+  const service = new MerchantImportService({} as never, {} as never, {} as never) as any;
 
   it('maps a nonstandard inventory export before validating it', () => {
     const rows = [{ item_title: 'Coffee', supplier_code: 'SKU-1', price_cents: '250', quantity_available: '7', exported_at: '2026-09-17T08:00:00Z' }];

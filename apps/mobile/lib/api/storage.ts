@@ -29,6 +29,7 @@ export const tokenStorage = {
     await Promise.all([
       SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+      SecureStore.deleteItemAsync('mcbuse.money.intents'),
     ]);
   },
 };

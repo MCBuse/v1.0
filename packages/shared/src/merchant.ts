@@ -343,6 +343,7 @@ export type MerchantInsight = {
 };
 
 export type MerchantInsightsResponse = {
+  backlog?: { status: string; ageSeconds: number; attempts: number; reason: string | null } | null;
   status: "ready" | "updating" | "disabled";
   calculationVersion: string;
   generatedAt: string | null;

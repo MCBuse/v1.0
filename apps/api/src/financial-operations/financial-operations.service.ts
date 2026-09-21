@@ -4,7 +4,9 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { and, asc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
@@ -51,6 +53,9 @@ export interface BeginOperationParams {
 export interface OperationPatch {
   providerRef?: string | null;
   providerStatus?: string | null;
+  paymentIntentId?: string | null;
+  refundId?: string | null;
+  refundStatus?: string | null;
   providerDestinationId?: string | null;
   providerAccountId?: string | null;
   chainSignature?: string | null;
@@ -81,6 +86,7 @@ export class FinancialOperationsService {
 
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
+    @Optional() private readonly config?: ConfigService,
   ) {}
 
   /**
@@ -121,6 +127,14 @@ export class FinancialOperationsService {
       return { operation: existing, replayed: true };
     }
 
+    if (this.config?.get<string>('FINANCIAL_MODE') === 'mock')
+      throw new BadRequestException(
+        'Account settlement requires sandbox financial mode',
+      );
+    if (process.env.MONEY_INITIATION_ENABLED === 'false')
+      throw new BadRequestException(
+        'New money movements are temporarily disabled',
+      );
     try {
       return await this.db.transaction(async (tx) => {
         const [operation] = await tx
@@ -359,7 +373,6 @@ export class FinancialOperationsService {
       .set({
         claimedUntil: new Date(now.getTime() + leaseMs),
         claimedBy: workerId,
-        updatedAt: now,
         // `attempts` deliberately untouched: taking a lease is not an attempt
         // at the provider. `deferNextAttempt` is what counts retries.
       })
@@ -397,6 +410,183 @@ export class FinancialOperationsService {
     );
   }
 
+  async reserveBalance(operation: FinancialOperation): Promise<void> {
+    const insufficient = await this.db.transaction(async (tx) => {
+      const [changed] = await tx
+        .update(schema.financialOperations)
+        .set({
+          status: 'reserved',
+          reservedAt: new Date(),
+          nextAttemptAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.financialOperations.id, operation.id),
+            eq(schema.financialOperations.status, 'created'),
+          ),
+        )
+        .returning();
+      if (!changed) return;
+      const rows = await tx
+        .update(schema.balances)
+        .set({
+          available: sql`${schema.balances.available} - ${operation.amountBaseUnits}`,
+          pending: sql`${schema.balances.pending} + ${operation.amountBaseUnits}`,
+        })
+        .where(
+          and(
+            eq(schema.balances.walletId, operation.sourceWalletId!),
+            eq(schema.balances.currency, operation.currency),
+            sql`${schema.balances.available} >= ${operation.amountBaseUnits}`,
+          ),
+        )
+        .returning();
+      if (rows.length !== 1) {
+        await tx
+          .update(schema.financialOperations)
+          .set({
+            status: 'failed',
+            reservedAt: null,
+            nextAttemptAt: null,
+            failureCode: 'insufficient_balance',
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.financialOperations.id, operation.id));
+        await this.appendEvent(tx, operation.id, {
+          eventType: 'failed',
+          fromStatus: 'created',
+          toStatus: 'failed',
+          detail: { failureCode: 'insufficient_balance' },
+        });
+        return true;
+      }
+      await this.appendEvent(tx, operation.id, {
+        eventType: 'reserved',
+        fromStatus: 'created',
+        toStatus: 'reserved',
+        detail: {},
+      });
+    });
+    // Commit the refusal before returning the error, so recovery cannot later
+    // execute a request the merchant was told had been rejected.
+    if (insufficient)
+      throw new BadRequestException('Insufficient available balance');
+  }
+
+  /** Reservation release and terminal status share one commit, including retries. */
+  async releaseBalanceAndEnd(
+    operation: FinancialOperation,
+    status: 'failed' | 'reversed',
+    reason: string,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const current = (
+        await tx
+          .select()
+          .from(schema.financialOperations)
+          .where(eq(schema.financialOperations.id, operation.id))
+          .for('update')
+      )[0];
+      if (!current || current.status === status) return;
+      if (
+        !canTransition(
+          current.kind as OperationKind,
+          current.status as OperationStatus,
+          status,
+        )
+      )
+        throw new BadRequestException('Invalid reservation release state');
+      const rows = await tx
+        .update(schema.balances)
+        .set({
+          available: sql`${schema.balances.available} + ${current.amountBaseUnits}`,
+          pending: sql`${schema.balances.pending} - ${current.amountBaseUnits}`,
+        })
+        .where(
+          and(
+            eq(schema.balances.walletId, current.sourceWalletId!),
+            eq(schema.balances.currency, current.currency),
+            sql`${schema.balances.pending} >= ${current.amountBaseUnits}`,
+          ),
+        )
+        .returning();
+      if (rows.length !== 1) throw new Error('Reserved balance is unavailable');
+      await tx
+        .update(schema.financialOperations)
+        .set({
+          status,
+          failureCode: reason,
+          nextAttemptAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.financialOperations.id, current.id));
+      await this.appendEvent(tx, current.id, {
+        eventType: status,
+        fromStatus: current.status,
+        toStatus: status,
+        detail: { reason },
+      });
+    });
+  }
+
+  async patchMetadata(id: string, patch: Record<string, unknown>) {
+    await this.db
+      .update(schema.financialOperations)
+      .set({
+        metadata: sql`coalesce(${schema.financialOperations.metadata}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
+      })
+      .where(eq(schema.financialOperations.id, id));
+  }
+
+  async patchProvider(
+    id: string,
+    patch: Pick<
+      OperationPatch,
+      | 'paymentIntentId'
+      | 'refundId'
+      | 'refundStatus'
+      | 'providerRef'
+      | 'providerStatus'
+    >,
+  ) {
+    await this.db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(schema.financialOperations)
+        .where(eq(schema.financialOperations.id, id))
+        .for('update');
+      if (!current) throw new NotFoundException('Operation not found');
+      const changed = Object.entries(patch).some(
+        ([key, value]) =>
+          value !== undefined &&
+          current[key as keyof FinancialOperation] !== value,
+      );
+      if (!changed) return;
+      await tx
+        .update(schema.financialOperations)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(eq(schema.financialOperations.id, id));
+      await this.appendEvent(tx, id, {
+        eventType: 'provider_updated',
+        fromStatus: current.status,
+        toStatus: current.status,
+        detail: patch,
+      });
+    });
+  }
+
+  async renew(id: string, worker: string, leaseMs: number) {
+    await this.db
+      .update(schema.financialOperations)
+      .set({ claimedUntil: new Date(Date.now() + leaseMs) })
+      .where(
+        and(
+          eq(schema.financialOperations.id, id),
+          eq(schema.financialOperations.claimedBy, worker),
+        ),
+      );
+  }
+
   /** Records the provider's latest status without touching the lifecycle. */
   async updateProviderStatus(
     operationId: string,
@@ -415,7 +605,6 @@ export class FinancialOperationsService {
       .set({
         attempts: sql`${schema.financialOperations.attempts} + 1`,
         nextAttemptAt: new Date(Date.now() + delayMs),
-        updatedAt: new Date(),
       })
       .where(eq(schema.financialOperations.id, operationId));
   }
@@ -440,7 +629,7 @@ export class FinancialOperationsService {
       .limit(limit);
   }
 
-  private async findByKey(
+  async findByKey(
     userId: string,
     idempotencyKey: string,
   ): Promise<FinancialOperation | null> {

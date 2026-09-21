@@ -1,3 +1,4 @@
+import { sendSplTransfer } from '../../solana/spl-transfer';
 import { getAccount, getMint } from '@solana/spl-token';
 import { Keypair, Transaction } from '@solana/web3.js';
 import bs58 from 'bs58';
@@ -51,6 +52,7 @@ function setup({
 
   const solana = {
     getConnection: jest.fn(() => connection),
+    sendTransfer: sendSplTransfer,
     decryptKeypair: jest.fn(() => payer),
   } as unknown as SolanaService;
 

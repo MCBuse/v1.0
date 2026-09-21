@@ -8,8 +8,6 @@ import {
 } from '@solana/web3.js';
 import { SolanaService } from '../solana/solana.service';
 import {
-  sendSplTransfer,
-  signatureStatus,
   type SplTransferResult,
 } from '../solana/spl-transfer';
 import {
@@ -135,12 +133,14 @@ export class TreasuryService implements OnModuleInit {
     destinationPubkey: string,
     amountBaseUnits: bigint,
     hooks: {
+      intentKey?: string;
       onSignaturePrepared?: (signature: string) => Promise<void>;
       onSubmitted?: (signature: string) => Promise<void>;
     } = {},
   ): Promise<SplTransferResult> {
     const keypair = this.requireKeypair();
-    return sendSplTransfer({
+    return this.solana.sendTransfer({
+      intentKey: hooks.intentKey,
       connection: this.solana.getConnection(),
       owner: keypair,
       mint: this.mint,
@@ -152,7 +152,7 @@ export class TreasuryService implements OnModuleInit {
   }
 
   async statusOf(signature: string) {
-    return signatureStatus(this.solana.getConnection(), signature);
+    return this.solana.recoverTransfer(signature);
   }
 
   /**

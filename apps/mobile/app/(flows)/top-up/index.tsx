@@ -30,6 +30,7 @@ export default function TopUpScreen() {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState<'card' | 'bank'>('card');
   const [fiat, setFiat] = useState<FiatCurrency>('USD');
   const { mutateAsync: createSession, isPending } = useOnrampSession();
 
@@ -64,6 +65,7 @@ export default function TopUpScreen() {
     try {
       const session = await createSession({
         provider: 'stripe',
+        method,
         fiatAmount: numeric.toFixed(2),
         fiatCurrency: fiat,
       });
@@ -96,13 +98,13 @@ export default function TopUpScreen() {
           <Box gap="xs">
             <Text variant="h3">Add Money</Text>
             <Text variant="label" color="textTertiary">
-              Top up your Holding Account with a card
+              Top up your Holding Account
             </Text>
           </Box>
         </Box>
 
         <Box flexDirection="row" gap="s" paddingHorizontal="2xl" marginBottom="l">
-          {(['USD', 'EUR'] as FiatCurrency[]).map((f) => (
+          {(['USD'] as FiatCurrency[]).map((f) => (
             <Pressable
               key={f}
               onPress={() => setFiat(f)}
@@ -124,6 +126,10 @@ export default function TopUpScreen() {
           ))}
         </Box>
 
+        <Box flexDirection="row" gap="s" paddingHorizontal="2xl">
+          <Button label="Card" variant={method === 'card' ? 'primary' : 'secondary'} onPress={() => setMethod('card')} />
+          <Button label="Bank" variant={method === 'bank' ? 'primary' : 'secondary'} onPress={() => setMethod('bank')} />
+        </Box>
         <Pressable
           onPress={() => inputRef.current?.focus()}
           style={styles.amountWrap}
@@ -203,7 +209,7 @@ export default function TopUpScreen() {
           <Box flexDirection="row" alignItems="center" gap="xs" marginTop="xs">
             <Bank size={12} color={colors.textTertiary} variant="Linear" />
             <Text variant="label" color="textTertiary">
-              Card payment · secured by your bank
+              {method === 'card' ? 'Card payment' : 'Bank payment'} · secured by your bank
             </Text>
           </Box>
         </Box>
@@ -212,7 +218,7 @@ export default function TopUpScreen() {
 
         <Box paddingHorizontal="2xl" paddingBottom="m" paddingTop="m">
           <Button
-            label={isPending ? 'Starting checkout…' : 'Continue with card'}
+            label={isPending ? 'Starting checkout…' : `Continue with ${method}`}
             onPress={handleContinue}
             disabled={!hasAmount || isPending}
             loading={isPending}

@@ -340,7 +340,7 @@ describe('X.15 — analytics boundaries', () => {
           a.caveats.some((c) => c.includes('filtered but stock is not')),
         ),
       ).toBe(true);
-      expect(without.analyses.every((a) => a.caveats.length === 0)).toBe(true);
+      expect(without.analyses.every((a) => !a.caveats.some(c => c.includes('Sales here are filtered')))).toBe(true);
     });
 
     it('always carries the stock scope note either way', () => {

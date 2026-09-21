@@ -30,6 +30,7 @@ export type AnalyticsSeriesPoint = {
   averageMinor: string;
   /** True while the period is still running, so the figure will keep moving. */
   partial: boolean;
+  partialReasons?: string[];
 };
 
 export type AnalyticsTrend<T> = {
@@ -92,6 +93,8 @@ export type TransactionAnalytics = {
 };
 
 export type ProductRanking = {
+  reservedQuantity: number;
+  availableQuantity: number;
   productId: string;
   name: string;
   unitsSold: number;
@@ -135,6 +138,7 @@ export type InventoryAnalytics = {
     reservedQuantity: number;
     availableQuantity: number;
   };
+  periodPosition: { openingOnHand: number | null; closingOnHand: number | null; eligible: boolean; reason: string | null };
   valuation: {
     atSellingPriceMinor: string;
     basis: "current_selling_price";

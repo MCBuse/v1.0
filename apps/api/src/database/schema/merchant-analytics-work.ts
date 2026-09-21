@@ -1,5 +1,6 @@
 import {
   integer,
+  bigint,
   jsonb,
   pgTable,
   text,
@@ -33,6 +34,11 @@ export const merchantAnalyticsWork = pgTable('merchant_analytics_work', {
     .notNull()
     .defaultNow(),
   claimedAt: timestamp('claimed_at', { withTimezone: true }),
+  generation: bigint('generation', { mode: 'number' }).notNull().default(1),
+  claimedGeneration: bigint('claimed_generation', { mode: 'number' }),
+  leaseToken: uuid('lease_token'),
+  leaseUntil: timestamp('lease_until', { withTimezone: true }),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
   attempts: integer('attempts').notNull().default(0),
   lastError: text('last_error'),
 });

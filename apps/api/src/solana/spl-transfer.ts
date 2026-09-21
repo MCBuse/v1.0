@@ -17,8 +17,17 @@ import bs58 from 'bs58';
 
 const logger = new Logger('SplTransfer');
 
+export interface PreparedTransfer {
+  signature: string;
+  signedTransaction: string;
+  blockhash: string;
+  lastValidBlockHeight: number;
+}
+
 export interface SplTransferParams {
   connection: Connection;
+  /** Stable identity for recovering a crash before the caller saved the signature. */
+  intentKey?: string;
   /** Signs as the token owner. */
   owner: Keypair;
   /** Pays network fees and any account rent. Defaults to the owner. */
@@ -26,6 +35,7 @@ export interface SplTransferParams {
   mint: PublicKey;
   destinationOwner: PublicKey;
   amount: bigint;
+  persistPrepared?: (attempt: PreparedTransfer) => Promise<void>;
   /** Called with the signature before broadcast, so recovery can find it. */
   onSignaturePrepared?: (signature: string) => Promise<void>;
   /** Called immediately after a successful broadcast. */
@@ -59,6 +69,7 @@ export async function sendSplTransfer(
 
   let preparedSignature: string | null = null;
   let broadcastAttempted = false;
+  let persisted = false;
 
   try {
     const mintInfo = await getMint(connection, mint);
@@ -110,6 +121,12 @@ export async function sendSplTransfer(
       throw new Error('Signed transaction did not contain a signature');
     }
     preparedSignature = bs58.encode(signatureBytes);
+    await params.persistPrepared?.({
+      signature: preparedSignature,
+      signedTransaction: transaction.serialize().toString('base64'),
+      ...latestBlockhash,
+    });
+    persisted = Boolean(params.persistPrepared);
     await onSignaturePrepared?.(preparedSignature);
 
     broadcastAttempted = true;
@@ -134,11 +151,11 @@ export async function sendSplTransfer(
   } catch (error) {
     logger.error(
       'SPL transfer failed',
-      error instanceof Error ? error.stack : String(error),
+      error instanceof Error ? error.name : 'UnknownError',
     );
     // A broadcast whose outcome we never saw stays pending. Reporting it as
     // failed here would invite a second transfer for the same operation.
-    if (broadcastAttempted && preparedSignature) {
+    if ((broadcastAttempted || persisted) && preparedSignature) {
       const status = await signatureStatus(connection, preparedSignature).catch(
         () => 'pending' as const,
       );
@@ -159,7 +176,7 @@ export async function signatureStatus(
   });
   const status = response.value[0];
   if (!status) return 'pending';
-  if (status.err) return 'failed';
+  if (status.err) return status.confirmationStatus === 'finalized' ? 'failed' : 'pending';
   return status.confirmationStatus === 'finalized' ? 'finalized' : 'pending';
 }
 

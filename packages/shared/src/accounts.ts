@@ -71,6 +71,9 @@ export type AccountOperation = {
   chainSignature: string | null;
   providerReference: string | null;
   failureCode: string | null;
+  refundStatus: string | null;
+  nextAttemptAt: string | null;
+  needsAttention: boolean;
   createdAt: string;
   finalizedAt: string | null;
 };

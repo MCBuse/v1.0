@@ -14,6 +14,8 @@ export const transferInput = z.object({
 export type TransferInput = z.infer<typeof transferInput>;
 
 export const transferResponse = z.object({
+  operationId: z.string(),
+  status: z.string(),
   from:           z.string(),
   to:             z.string(),
   currency:       z.string(),

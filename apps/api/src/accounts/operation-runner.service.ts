@@ -52,7 +52,7 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    if (this.config.get<string>('OPERATION_RUNNER_ENABLED') === 'false') {
+    if (this.config.get<string>('PROCESS_ROLE') !== 'operations-daemon') {
       this.logger.warn(
         'Operation recovery runner is disabled by configuration',
       );
@@ -74,6 +74,7 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
     try {
       const due = await this.operations.due(limit);
       for (const operation of due) {
+        if (Date.now() - operation.updatedAt.getTime() >= 600_000) this.logger.warn(`Financial recovery needs attention: ${operation.id} (${operation.status})`);
         try {
           if (await this.stepExclusively(operation)) handled += 1;
         } catch (error) {
@@ -83,7 +84,7 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
             }`,
           );
           // Back off rather than spinning on the same failure.
-          await this.operations.deferNextAttempt(operation.id, 60_000);
+          await this.operations.deferNextAttempt(operation.id, Math.min(300_000, 15_000 * 2 ** Math.min(operation.attempts, 5)));
         }
       }
     } finally {
@@ -107,10 +108,12 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
     );
     if (!claimed) return false;
 
+    const heartbeat = setInterval(() => void this.operations.renew(operation.id, this.workerId, CLAIM_LEASE_MS).catch(() => undefined), 30_000);
     try {
       await this.step(claimed);
       return true;
     } finally {
+      clearInterval(heartbeat);
       await this.operations
         .release(operation.id, this.workerId)
         .catch(() => undefined);
@@ -135,7 +138,7 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
       case 'finalize':
         return this.finalize(operation);
       case 'complete_compensation':
-        return this.withdrawals.completeCompensation(operation);
+        return operation.kind.startsWith('funding_') ? this.funding.refundFunding(operation) : this.withdrawals.completeCompensation(operation);
       case 'none':
         return;
     }
@@ -154,8 +157,7 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
     ) {
       return this.withdrawals.reserve(operation);
     }
-    // A funding operation with no Checkout session was never usable.
-    await this.operations.fail(operation.id, 'never_started');
+    await this.funding.ensureCheckout(operation);
   }
 
   private async submitChain(operation: FinancialOperation): Promise<void> {
@@ -207,7 +209,7 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
       ) {
         await this.releaseReservationAndFail(operation);
       } else {
-        await this.operations.fail(operation.id, 'chain_transfer_failed');
+        await this.operations.beginCompensation(operation.id, 'chain_transfer_failed');
       }
       return;
     }
@@ -243,14 +245,6 @@ export class OperationRunnerService implements OnModuleInit, OnModuleDestroy {
   private async releaseReservationAndFail(
     operation: FinancialOperation,
   ): Promise<void> {
-    if (
-      operation.kind === 'withdrawal_bank' ||
-      operation.kind === 'withdrawal_card'
-    ) {
-      await this.withdrawals.releaseReservation(operation);
-    } else {
-      await this.transfers.releaseReservation(operation);
-    }
-    await this.operations.fail(operation.id, 'chain_transfer_failed');
+    await this.operations.releaseBalanceAndEnd(operation, 'failed', 'chain_transfer_failed');
   }
 }

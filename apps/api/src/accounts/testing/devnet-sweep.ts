@@ -33,7 +33,7 @@ export async function sweepBackToTreasury(
       const balance = await solana.getTokenBalance(address, mintAddress);
       if (balance <= 0n) continue;
 
-      const result = await sendSplTransfer({
+      const result = await solana.sendTransfer({
         connection: solana.getConnection(),
         owner: keypair,
         feePayer: treasury.feePayer(),

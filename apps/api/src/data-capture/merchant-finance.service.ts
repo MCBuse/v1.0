@@ -1,13 +1,15 @@
+import { MerchantAssessmentService, type SavedAssessment } from './assessment/merchant-assessment.service';
 import {
   BadRequestException,
   ConflictException,
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import PDFDocument from 'pdfkit';
 import archiver = require('archiver');
 import nodemailer = require('nodemailer');
@@ -29,21 +31,21 @@ export class MerchantFinanceService {
     private readonly activity: MerchantActivityService,
     private readonly imports: MerchantImportService,
     private readonly config: ConfigService,
+    @Optional() private readonly assessments?: MerchantAssessmentService,
   ) {}
   async createPackage(
     userId: string,
     periodDays = 30,
     demonstrationData = false,
     idempotencyKey = '',
+    assessmentId?: string,
   ) {
     if (![7, 30, 90].includes(periodDays))
       throw new BadRequestException('Period must be 7, 30 or 90 days');
     if (!idempotencyKey)
       throw new BadRequestException('Idempotency-Key is required');
     const merchant = await this.merchants.requireMerchant(userId);
-    const inputFingerprint = createHash('sha256')
-      .update(JSON.stringify({ periodDays, demonstrationData }))
-      .digest('hex');
+    const fingerprintFor = (id: string | null) => createHash('sha256').update(JSON.stringify({ periodDays, demonstrationData, assessmentId: id })).digest('hex');
     const existing = (
       await this.db
         .select()
@@ -57,17 +59,21 @@ export class MerchantFinanceService {
         .limit(1)
     )[0];
     if (existing) {
-      if (existing.inputFingerprint === inputFingerprint)
+      const saved = (existing.snapshot as { assessment?: SavedAssessment }).assessment;
+      if (existing.inputFingerprint === fingerprintFor(assessmentId ?? saved?.id ?? null))
         return this.packageResponse(existing);
       throw new ConflictException(
         'This Idempotency-Key was already used with different package input',
       );
     }
+    if (!this.assessments) throw new ServiceUnavailableException('Assessment service is unavailable');
+    const assessment = assessmentId ? await this.assessments.require(userId, assessmentId) : ((await this.assessments.latest(userId)) ?? await this.assessments.run(userId, undefined, `package:${createHash('sha256').update(idempotencyKey).digest('hex')}`));
+    const inputFingerprint = fingerprintFor(assessment.id);
     const to = new Date();
     const from = new Date(to.getTime() - periodDays * 86_400_000);
     const [
       analytics,
-      readiness,
+      currentReadiness,
       reconciliation,
       activityPage,
       digitalItems,
@@ -138,7 +144,8 @@ export class MerchantFinanceService {
       revenue: product.totalSales,
       availableQuantity: null,
     }));
-    const evidenceIncomplete = readiness.stage !== 'evidence_ready';
+    const readiness = { stage: assessment.stage, disclaimer: assessment.disclaimer, missingRequirements: assessment.missingRequirements };
+    const evidenceIncomplete = assessment.stage !== 'evidence_ready';
     const sales = activityPage;
     const saleItems = [
       ...digitalItems.map((item) => ({ ...item, source: 'mcbuse_payment' })),
@@ -146,6 +153,8 @@ export class MerchantFinanceService {
     ];
     const snapshot = {
       businessName: merchant.businessName,
+      assessment,
+      assessmentBinding: 'verified',
       generatedAt: to.toISOString(),
       demonstrationData,
       evidenceIncomplete,
@@ -173,42 +182,27 @@ export class MerchantFinanceService {
         'Payout reconciliation is limited to imported settlement records with explicit references.',
       ],
     };
-    const row = (
-      await this.db
-        .insert(schema.merchantFinancePackages)
-        .values({
-          merchantId: merchant.merchantId,
-          modelVersion: 'readiness-rules-v1',
-          periodFrom: from,
-          periodTo: to,
-          snapshot,
-          actorUserId: userId,
-          idempotencyKey,
-          inputFingerprint,
-        })
-        .returning()
-    )[0];
-    const pdf = await this.renderPdf(snapshot, row.id);
-    const zip = await this.buildZip(snapshot, row.id, pdf);
-    if (pdf.byteLength > 10 * 1024 * 1024 || zip.byteLength > 10 * 1024 * 1024)
-      throw new BadRequestException(
-        'Package artifact exceeds 10 MB; choose a shorter reporting period',
-      );
-    await this.db.insert(schema.merchantFinancePackageArtifacts).values([
-      {
-        packageId: row.id,
-        kind: 'pdf',
-        content: pdf,
-        byteSize: pdf.byteLength,
-      },
-      {
-        packageId: row.id,
-        kind: 'zip',
-        content: zip,
-        byteSize: zip.byteLength,
-      },
-    ]);
-    return this.packageResponse(row);
+    if (!snapshot.exportIntegrity.reconciles) throw new ConflictException('Source records changed during generation; retry this package');
+    const id = randomUUID();
+    const pdf = await this.renderPdf(snapshot, id);
+    const zip = await this.buildZip(snapshot, id, pdf);
+    if (pdf.byteLength + zip.byteLength > 10 * 1024 * 1024) throw new BadRequestException('Package exceeds 10 MB; choose a shorter period');
+    return this.db.transaction(async tx => {
+      const [row] = await tx.insert(schema.merchantFinancePackages).values({ id, merchantId: merchant.merchantId, modelVersion: assessment.modelVersion,
+        periodFrom: from, periodTo: to, snapshot, actorUserId: userId, idempotencyKey, inputFingerprint,
+      }).onConflictDoNothing().returning();
+      if (!row) {
+        const [winner] = await tx.select().from(schema.merchantFinancePackages).where(and(eq(schema.merchantFinancePackages.merchantId, merchant.merchantId), eq(schema.merchantFinancePackages.idempotencyKey, idempotencyKey)));
+        if (!winner || winner.inputFingerprint !== inputFingerprint) throw new ConflictException('Package key already used with different input');
+        return this.packageResponse(winner);
+      }
+      await tx.insert(schema.merchantFinancePackageAssessments).values({ packageId: id, assessmentId: assessment.id });
+      await tx.insert(schema.merchantFinancePackageArtifacts).values([
+        { packageId: id, kind: 'pdf', content: pdf, byteSize: pdf.byteLength },
+        { packageId: id, kind: 'zip', content: zip, byteSize: zip.byteLength },
+      ]);
+      return this.packageResponse(row);
+    });
   }
   async getPackage(userId: string, id: string) {
     const row = await this.packageRow(userId, id);
@@ -307,8 +301,14 @@ export class MerchantFinanceService {
           inputFingerprint,
           status: 'sending',
         })
+        .onConflictDoNothing()
         .returning()
     )[0];
+    if (!attempt) {
+      const [winner] = await this.db.select().from(schema.merchantFinanceEmailAttempts).where(and(eq(schema.merchantFinanceEmailAttempts.merchantId, merchant.merchantId), eq(schema.merchantFinanceEmailAttempts.idempotencyKey, idempotencyKey)));
+      if (!winner || winner.inputFingerprint !== inputFingerprint) throw new ConflictException('Email key already used with different input');
+      return { id: winner.id, status: winner.status };
+    }
     const host = this.config.get<string>('SMTP_HOST');
     const from = this.config.get<string>('SMTP_FROM');
     const user = this.config.get<string>('SMTP_USER');
@@ -518,6 +518,7 @@ export class MerchantFinanceService {
       stream.on('end', () => resolve(Buffer.concat(chunks)));
       archive.on('error', reject);
       archive.pipe(stream);
+      archive.append(JSON.stringify(snapshot, null, 2), { name: 'snapshot.json' });
       archive.append(pdf, { name: `mcbuse-evidence-${id}.pdf` });
       archive.append(
         this.csv(
@@ -693,6 +694,8 @@ export class MerchantFinanceService {
         label: `${days}-day reporting window`,
       },
       snapshot: row.snapshot,
+      assessment: (row.snapshot as { assessment?: SavedAssessment }).assessment ?? null,
+      assessmentBinding: (row.snapshot as { assessment?: SavedAssessment }).assessment ? 'verified' : 'legacy_unverified',
       createdAt: row.createdAt.toISOString(),
     };
   }
@@ -896,6 +899,19 @@ export class MerchantFinanceService {
             ? 'The exported detail reconciles to the totals above.'
             : `The exported detail does not reconcile to the totals above: ${snapshot.exportIntegrity.discrepancy}.`,
         );
+      }
+      if (snapshot.assessment) {
+        document.moveDown().fontSize(14).text('Saved assessment');
+        document.fontSize(10).text(`ID: ${snapshot.assessment.id}`);
+        document.text(`Model: ${snapshot.assessment.modelId} / ${snapshot.assessment.modelVersion}`);
+        document.text(`Assessed: ${snapshot.assessment.createdAt}`);
+        document.text(`Assessment evidence window: ${snapshot.assessment.evidenceWindow.from} to ${snapshot.assessment.evidenceWindow.to}`);
+        document.text(`Passed requirements: ${snapshot.assessment.passedRequirements.join(', ') || 'None'}`);
+        document.text(`Missing requirements: ${snapshot.assessment.missingRequirements.join(', ') || 'None'}`);
+        document.text(`Reliability: ${JSON.stringify(snapshot.assessment.reliability)}`);
+        document.text(`Source coverage: ${JSON.stringify(snapshot.assessment.sourceCoverage)}`);
+        document.text(`Business profile and consent: ${JSON.stringify(snapshot.assessment.businessProfile)}`);
+        snapshot.assessment.limitations.forEach((item: string) => document.text(item));
       }
       document.moveDown().fontSize(14).text('Evidence readiness');
       document

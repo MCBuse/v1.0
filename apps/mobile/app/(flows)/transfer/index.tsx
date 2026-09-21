@@ -1,3 +1,6 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { transferRepository } from '@/features/transfer/repository';
+import { finishMoneyIntent } from '@/lib/api/money-intent';
 import { useTheme } from '@shopify/restyle';
 import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
@@ -26,7 +29,11 @@ export default function TransferScreen() {
   const [amount, setAmount]     = useState('0');
   const [currency, setCurrency] = useState<StableCurrency>('USDC');
   const [fromWalletType, setFromWalletType] = useState<AccountType>('savings');
-  const [succeeded, setSucceeded] = useState(false);
+  const [operationId, setOperationId] = useState<string | null>(null);
+  const client = useQueryClient();
+  const operation = useQuery({ queryKey: ['account-operation', operationId], enabled: !!operationId, queryFn: () => transferRepository.operation(operationId!), refetchInterval: q => ['finalized', 'failed', 'reversed'].includes(q.state.data?.status ?? '') ? false : 3000 });
+  const succeeded = operation.data?.status === 'finalized';
+  useEffect(() => { if (succeeded) { void client.invalidateQueries({ queryKey: ['wallets'] }); void client.invalidateQueries({ queryKey: ['transactions'] }); } }, [succeeded, client]);
   const toWalletType: AccountType = fromWalletType === 'savings' ? 'routine' : 'savings';
 
   const transfer = useInternalTransfer();
@@ -47,7 +54,7 @@ export default function TransferScreen() {
     }
     attemptKey.current ??= randomUUID();
     try {
-      await transfer.mutateAsync({
+      const result = await transfer.mutateAsync({
         fromWalletType,
         toWalletType,
         amount:         baseUnits,
@@ -55,7 +62,7 @@ export default function TransferScreen() {
         idempotencyKey: attemptKey.current,
       });
       attemptKey.current = null;
-      setSucceeded(true);
+      setOperationId(result.operationId);
     } catch (err: any) {
       Alert.alert('Transfer Failed', err?.message ?? 'Something went wrong. Please try again.');
     }
@@ -84,16 +91,27 @@ export default function TransferScreen() {
             </Text>
           </Box>
           <Box style={{ width: '100%' }} gap="m">
-            <Button label="Done" variant="primary" onPress={() => router.back()} />
+            <Button label="Done" variant="primary" onPress={() => { void finishMoneyIntent('transfer'); router.back(); }} />
             <Button
               label="Transfer More"
               variant="secondary"
-              onPress={() => { setSucceeded(false); setAmount('0'); }}
+              onPress={async () => { await finishMoneyIntent('transfer'); setOperationId(null); setAmount('0'); }}
             />
           </Box>
         </Box>
       </View>
     );
+  }
+
+  if (operationId) {
+    const failed = operation.data?.status === 'failed' || operation.data?.status === 'reversed';
+    return <Box flex={1} backgroundColor="bgPrimary" padding="2xl" justifyContent="center" gap="l">
+      <Text variant="h2">{failed ? 'Transfer failed' : 'Transfer pending'}</Text>
+      <Text variant="body">{operation.error?.message ?? (failed ? 'The transfer did not complete. Your account balance shows the authoritative result.' : 'Your transfer is being confirmed. You can leave this screen and check account activity.')}</Text>
+      <Text variant="caption">Reference: {operationId}</Text>
+      <Button label="Check status" onPress={() => { void operation.refetch(); }} />
+      <Button label="Done" onPress={async () => { if (failed) await finishMoneyIntent('transfer'); router.back(); }} />
+    </Box>;
   }
 
   // ── Amount entry ───────────────────────────────────────────────────────────
@@ -121,7 +139,7 @@ export default function TransferScreen() {
 
       {/* Currency selector */}
       <Box flexDirection="row" gap="s" paddingHorizontal="2xl" marginBottom="m">
-        {(['USDC', 'EURC'] as StableCurrency[]).map((c) => (
+        {(['USDC'] as StableCurrency[]).map((c) => (
           <Pressable
             key={c}
             onPress={() => setCurrency(c)}

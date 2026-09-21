@@ -279,7 +279,7 @@ function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
             Sales by {t.range.grouping}
           </h3>
           {t.labels.partialPeriod ? (
-            <Badge tone="warning">Latest period still running</Badge>
+            <Badge tone="warning">Partial reporting periods</Badge>
           ) : null}
         </CardHeader>
         <CardContent>
@@ -294,7 +294,7 @@ function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
                 euros(point.amountMinor),
                 String(point.count),
                 euros(point.averageMinor),
-                point.partial ? "Still running" : "Complete",
+                point.partial ? (point.partialReasons?.includes("range_start") || point.partialReasons?.includes("range_end") ? "Clipped by selected range" : "Still running") : "Complete",
               ],
             }))}
           />
@@ -412,7 +412,7 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
 
       <Card>
         <CardContent className="grid gap-4 py-5 sm:grid-cols-4">
-          <Stat label="On hand" value={String(v.position.onHandQuantity)} />
+          <Stat label="Current on hand" value={String(v.position.onHandQuantity)} />
           <Stat label="Reserved" value={String(v.position.reservedQuantity)} />
           <Stat label="Available" value={String(v.position.availableQuantity)} />
           <Stat
@@ -423,6 +423,9 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
         </CardContent>
       </Card>
 
+      <Card><CardHeader><h3 className="font-semibold">Selected-period stock position</h3></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">
+        {v.periodPosition?.eligible ? <><Stat label="Opening on hand" value={String(v.periodPosition.openingOnHand)} /><Stat label="Closing on hand" value={String(v.periodPosition.closingOnHand)} /></> : <p>{v.periodPosition?.reason ?? 'Reliable stock history is unavailable for this period.'}</p>}
+      </CardContent></Card>
       <Card>
         <CardHeader>
           <h3 className="font-semibold">Products</h3>
@@ -544,7 +547,7 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
               title="At or below minimum"
               items={v.atOrBelowMinimum.map(
                 (entry) =>
-                  `${entry.name}: ${entry.onHandQuantity} on hand, reorder at ${entry.lowStockThreshold}`,
+                  `${entry.name}: ${entry.availableQuantity} available (${entry.onHandQuantity} on hand, ${entry.reservedQuantity} reserved), reorder at ${entry.lowStockThreshold}`,
               )}
               empty="Nothing is at its minimum."
             />
@@ -552,7 +555,7 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
               title="Approaching minimum"
               items={v.approachingMinimum.map(
                 (entry) =>
-                  `${entry.name}: ${entry.onHandQuantity} on hand, reorder at ${entry.lowStockThreshold}`,
+                  `${entry.name}: ${entry.availableQuantity} available (${entry.onHandQuantity} on hand, ${entry.reservedQuantity} reserved), reorder at ${entry.lowStockThreshold}`,
               )}
               empty="Nothing is close to its minimum."
             />

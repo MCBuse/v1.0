@@ -269,6 +269,11 @@ const KNOWN_PLACEHOLDER_SECRETS = [
 ];
 
 export function validate(config: Record<string, unknown>) {
+  // Preserve the legacy alias while normalizing all runtime consumers.
+  config = {
+    ...config,
+    SOLANA_NETWORK: config.SOLANA_NETWORK ?? config.SOLANA_CLUSTER,
+  };
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,
   });
@@ -320,9 +325,16 @@ export function validate(config: Record<string, unknown>) {
     }
   }
 
-  // Devnet credentials must not be reachable from production, and production
-  // credentials must not be reachable from anywhere else.
-  assertEnvironmentSeparation(config as Parameters<typeof assertEnvironmentSeparation>[0]);
+  // Financial mode is independent of application runtime.
+  assertEnvironmentSeparation(
+    config as Parameters<typeof assertEnvironmentSeparation>[0],
+  );
 
+  // Expose the effective mode to every provider boundary, including local mock runtimes.
+  Object.assign(validatedConfig, {
+    FINANCIAL_MODE:
+      config.FINANCIAL_MODE ??
+      (config.TRANSFER_PROVIDER === 'solana' ? 'sandbox' : 'mock'),
+  });
   return validatedConfig;
 }

@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { PublicKey } from '@solana/web3.js';
 import { SolanaService } from '../../solana/solana.service';
-import { sendSplTransfer } from '../../solana/spl-transfer';
 import { TreasuryService } from '../../treasury/treasury.service';
 import type {
   TransferProvider,
@@ -44,7 +43,7 @@ export class SolanaTransferProvider implements TransferProvider {
   ) {}
 
   async execute(params: TransferParams): Promise<TransferResult> {
-    const mintAddress = DEVNET_MINTS[params.currency];
+    const mintAddress = params.currency === 'USDC' ? DEVNET_MINTS.USDC : undefined;
     if (!mintAddress) {
       throw new InternalServerErrorException(
         `No mint address for currency: ${params.currency}`,
@@ -77,7 +76,8 @@ export class SolanaTransferProvider implements TransferProvider {
         `${params.payerPubkey.slice(0, 8)}… → ${params.payeePubkey.slice(0, 8)}…`,
     );
 
-    const result = await sendSplTransfer({
+    const result = await this.solanaService.sendTransfer({
+      intentKey: `payment:${params.payerWalletId}:${params.idempotencyKey}`,
       connection: this.solanaService.getConnection(),
       owner: payerKeypair,
       feePayer,
@@ -97,14 +97,6 @@ export class SolanaTransferProvider implements TransferProvider {
   async getStatus(
     txSignature: string,
   ): Promise<'finalized' | 'pending' | 'failed'> {
-    const response = await this.solanaService
-      .getConnection()
-      .getSignatureStatuses([txSignature], {
-        searchTransactionHistory: true,
-      });
-    const status = response.value[0];
-    if (!status) return 'pending';
-    if (status.err) return 'failed';
-    return status.confirmationStatus === 'finalized' ? 'finalized' : 'pending';
+    return this.solanaService.recoverTransfer(txSignature);
   }
 }

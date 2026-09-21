@@ -8,7 +8,6 @@ import { ConfigService } from '@nestjs/config';
 import { PublicKey } from '@solana/web3.js';
 import Stripe from 'stripe';
 import { SolanaService } from '../solana/solana.service';
-import { sendSplTransfer } from '../solana/spl-transfer';
 import { StripeClient } from '../stripe/stripe.client';
 import { TreasuryService } from '../treasury/treasury.service';
 import {
@@ -148,27 +147,7 @@ export class AccountWithdrawalService {
   async reserve(stale: FinancialOperation): Promise<void> {
     const operation = await this.operations.require(stale.id);
     if (operation.status !== 'created') return;
-    try {
-      await this.ledger.transaction(async (tx) => {
-        await this.ledger.reserve(
-          tx,
-          operation.sourceWalletId!,
-          operation.currency,
-          operation.amountBaseUnits,
-        );
-      });
-    } catch (error) {
-      await this.operations.fail(
-        operation.id,
-        'insufficient_funds',
-        error instanceof Error ? error.message : undefined,
-      );
-      throw error;
-    }
-    await this.operations.advance(operation.id, 'reserved', {
-      reservedAt: new Date(),
-      nextAttemptAt: new Date(),
-    });
+    await this.operations.reserveBalance(operation);
   }
 
   /** Returns the tokens to the treasury before any fiat is promised. */
@@ -193,7 +172,8 @@ export class AccountWithdrawalService {
       throw new Error('Decrypted key does not match the stored wallet address');
     }
 
-    const result = await sendSplTransfer({
+    const result = await this.solana.sendTransfer({
+      intentKey: `operation:${operation.id}`,
       connection: this.solana.getConnection(),
       owner: keypair,
       feePayer: this.treasury.feePayer(),
@@ -229,15 +209,7 @@ export class AccountWithdrawalService {
     if (result.status === 'failed') {
       const current = await this.operations.require(operation.id);
       if (current.status === 'chain_submitted') {
-        await this.ledger.transaction(async (tx) => {
-          await this.ledger.releaseReservation(
-            tx,
-            operation.sourceWalletId!,
-            operation.currency,
-            operation.amountBaseUnits,
-          );
-        });
-        await this.operations.fail(operation.id, 'token_return_failed');
+        await this.operations.releaseBalanceAndEnd(operation, 'failed', 'token_return_failed');
       }
       return;
     }
@@ -468,11 +440,16 @@ export class AccountWithdrawalService {
     const walletAddress = await this.wallets.addressOf(
       operation.sourceWalletId!,
     );
-    const result = await this.treasury.sendUsdcTo(
+    const previousSignature = (operation.metadata as { compensationSignature?: string } | null)?.compensationSignature;
+    const previousStatus = previousSignature ? await this.treasury.statusOf(previousSignature) : null;
+    if (previousStatus === 'pending') { await this.operations.deferNextAttempt(operation.id, 30_000); return; }
+    const result = previousStatus === 'finalized' ? { status: 'completed', signature: previousSignature! } : await this.treasury.sendUsdcTo(
       walletAddress,
       operation.amountBaseUnits,
       {
+        intentKey: `compensation:${operation.id}:${previousSignature ?? "initial"}`,
         onSignaturePrepared: async (signature) => {
+          await this.operations.patchMetadata(operation.id, { compensationSignature: signature });
           await this.operations.note(operation.id, 'compensation_prepared', {
             signature,
           });
@@ -500,18 +477,7 @@ export class AccountWithdrawalService {
       return;
     }
 
-    await this.ledger.transaction(async (tx) => {
-      await this.ledger.releaseReservation(
-        tx,
-        operation.sourceWalletId!,
-        operation.currency,
-        operation.amountBaseUnits,
-      );
-    });
-
-    await this.operations.completeCompensation(operation.id, {
-      returnedSignature: result.signature,
-    });
+    await this.operations.releaseBalanceAndEnd(operation, 'reversed', 'payout_failed_compensated');
 
     this.logger.log(
       `Withdrawal ${operation.id} reversed; ${operation.amountBaseUnits} base units returned`,

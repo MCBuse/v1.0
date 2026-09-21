@@ -1,7 +1,6 @@
 /**
- * K.11 — devnet credentials must never be reachable from a production
- * environment, and production credentials must never be reachable from a
- * developer's machine.
+ * Runtime optimization and financial environment are separate: hosted production
+ * runtime uses sandbox financial credentials. Live money is disabled this release.
  *
  * The checks are deliberately about *pairs* of settings rather than single
  * values. Stage 1 of the merchant plan found a hosted API running
@@ -10,13 +9,14 @@
  */
 
 export const DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
-export const MAINNET_USDC_MINT =
-  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+export const MAINNET_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 export type SolanaCluster = 'mainnet-beta' | 'devnet' | 'testnet' | 'unknown';
 
 export interface SeparationInput {
   NODE_ENV?: string;
+  FINANCIAL_MODE?: string;
+  SOLANA_NETWORK?: string;
   SOLANA_RPC_URL?: string;
   SOLANA_CLUSTER?: string;
   SOLANA_USDC_MINT?: string;
@@ -50,66 +50,45 @@ export function environmentSeparationProblems(
   config: SeparationInput,
 ): string[] {
   const problems: string[] = [];
-  const isProduction = config.NODE_ENV === 'production';
-  const actualCluster = clusterOfRpcUrl(config.SOLANA_RPC_URL);
-  const stripeKey = config.STRIPE_SECRET_KEY ?? '';
-  const isStripeLive = stripeKey.startsWith('sk_live_');
-  const isStripeTest = stripeKey.startsWith('sk_test_');
-
-  // A declared cluster that disagrees with the endpoint is the state in which
-  // someone reads the config and believes the wrong thing.
+  const mode =
+    config.FINANCIAL_MODE ??
+    (config.TRANSFER_PROVIDER === 'solana' ? 'sandbox' : 'mock');
+  const actual = clusterOfRpcUrl(config.SOLANA_RPC_URL);
+  const network = config.SOLANA_NETWORK ?? config.SOLANA_CLUSTER;
+  const key = config.STRIPE_SECRET_KEY ?? '';
+  if (!['mock', 'sandbox', 'live'].includes(mode))
+    problems.push('Invalid FINANCIAL_MODE');
+  if (mode === 'live')
+    problems.push('Live financial operations are not enabled in this release');
   if (
+    config.SOLANA_NETWORK &&
     config.SOLANA_CLUSTER &&
-    actualCluster !== 'unknown' &&
-    config.SOLANA_CLUSTER !== actualCluster
-  ) {
-    problems.push(
-      `SOLANA_CLUSTER says "${config.SOLANA_CLUSTER}" but SOLANA_RPC_URL points at ${actualCluster}`,
-    );
+    config.SOLANA_NETWORK !== config.SOLANA_CLUSTER
+  )
+    problems.push('SOLANA_NETWORK and legacy SOLANA_CLUSTER disagree');
+  if (network && actual !== 'unknown' && network !== actual)
+    problems.push('SOLANA_NETWORK disagrees with SOLANA_RPC_URL');
+  if (
+    key.startsWith('sk_live_') ||
+    actual === 'mainnet-beta' ||
+    network === 'mainnet-beta' ||
+    config.SOLANA_USDC_MINT === MAINNET_USDC_MINT
+  )
+    problems.push('Live credentials and mainnet are forbidden in this release');
+  if (mode === 'sandbox') {
+    if (config.TRANSFER_PROVIDER !== 'solana')
+      problems.push('Sandbox requires TRANSFER_PROVIDER=solana');
+    if ((actual !== 'devnet' && network !== 'devnet') || actual === 'testnet')
+      problems.push('Sandbox requires a devnet RPC/network');
+    if (config.SOLANA_USDC_MINT !== DEVNET_USDC_MINT)
+      problems.push('Sandbox requires the devnet USDC mint');
+    if (!key.startsWith('sk_test_'))
+      problems.push('Sandbox requires a Stripe test key');
   }
-
-  if (isProduction) {
-    if (actualCluster === 'devnet' || actualCluster === 'testnet') {
-      problems.push(
-        `production must not use a ${actualCluster} RPC endpoint (SOLANA_RPC_URL)`,
-      );
-    }
-    if (config.SOLANA_USDC_MINT === DEVNET_USDC_MINT) {
-      problems.push(
-        'production must not use the devnet USDC mint (SOLANA_USDC_MINT)',
-      );
-    }
-    if (isStripeTest) {
-      problems.push(
-        'production must not use a Stripe test key (STRIPE_SECRET_KEY)',
-      );
-    }
-    if ((config.TRANSFER_PROVIDER ?? 'mock') === 'mock') {
-      problems.push(
-        'production must not run TRANSFER_PROVIDER=mock: no tokens would move while every surface reported success',
-      );
-    }
-    return problems;
-  }
-
-  // Outside production, the risk runs the other way: a developer's machine
-  // holding credentials that can move real money.
-  if (isStripeLive) {
-    problems.push(
-      `a live Stripe key (STRIPE_SECRET_KEY) must not be used outside production (NODE_ENV=${config.NODE_ENV ?? 'unset'})`,
-    );
-  }
-  if (actualCluster === 'mainnet-beta') {
-    problems.push(
-      `a mainnet RPC endpoint (SOLANA_RPC_URL) must not be used outside production (NODE_ENV=${config.NODE_ENV ?? 'unset'})`,
-    );
-  }
-  if (config.SOLANA_USDC_MINT === MAINNET_USDC_MINT) {
-    problems.push(
-      'the mainnet USDC mint (SOLANA_USDC_MINT) must not be used outside production',
-    );
-  }
-
+  if (mode === 'mock' && config.TRANSFER_PROVIDER === 'solana')
+    problems.push('Mock mode must not submit chain transfers');
+  if (config.NODE_ENV === 'production' && !config.FINANCIAL_MODE)
+    problems.push('Hosted runtime requires explicit FINANCIAL_MODE');
   return problems;
 }
 

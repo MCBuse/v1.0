@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   Injectable,
@@ -17,11 +18,6 @@ import { usdCentsToUsdcBaseUnits } from '../financial-operations/operation-money
 import { AccountWalletsService } from './account-wallets.service';
 
 export type FundingMethod = 'card' | 'bank';
-
-const STRIPE_PAYMENT_METHOD: Record<FundingMethod, string> = {
-  card: 'card',
-  bank: 'us_bank_account',
-};
 
 const OPERATION_KIND: Record<FundingMethod, 'funding_card' | 'funding_bank'> = {
   card: 'funding_card',
@@ -76,33 +72,18 @@ export class AccountFundingService {
     method: FundingMethod;
     replayed: boolean;
   }> {
-    if (params.amountCents <= 0n) {
+    if (params.amountCents <= 0n || params.amountCents > BigInt(Number.MAX_SAFE_INTEGER)) {
       throw new BadRequestException('Amount must be positive');
     }
 
     const holding = await this.wallets.forUser(params.userId, 'holding');
     const amountBaseUnits = usdCentsToUsdcBaseUnits(params.amountCents);
 
-    // Refuse up front when the treasury cannot deliver the tokens. Taking a
-    // test payment we cannot back would be exactly the simulated success the
-    // plan forbids.
-    const readiness = await this.treasury.readiness(amountBaseUnits);
-    if (!readiness.configured || !readiness.canPayFees || !readiness.canCover) {
-      await this.audit.authorization({
-        userId: params.userId,
-        operationKind: OPERATION_KIND[params.method],
-        decision: 'refused',
-        subjectType: 'wallet',
-        subjectId: holding.id,
-        reason: 'treasury_cannot_deliver',
-        amountBaseUnits,
-        currency: 'USDC',
-      });
-      throw new ServiceUnavailableException(
-        `Funding is unavailable: ${readiness.problems.join('; ')}`,
-      );
+    const prior = await this.operations.findByKey(params.userId, params.idempotencyKey);
+    if (!prior) {
+      const readiness = await this.treasury.readiness(amountBaseUnits);
+      if (!readiness.configured || !readiness.canPayFees || !readiness.canCover) throw new ServiceUnavailableException('Funding is temporarily unavailable');
     }
-
     const { operation, replayed } = await this.operations.begin({
       userId: params.userId,
       kind: OPERATION_KIND[params.method],
@@ -113,39 +94,42 @@ export class AccountFundingService {
       displayAmountMinor: params.amountCents,
       displayCurrency: 'USD',
       provider: 'stripe',
-      metadata: { method: params.method },
+      metadata: { method: params.method, paymentConfiguration: this.config.get<string>(params.method === 'card' ? 'STRIPE_CARD_PAYMENT_CONFIGURATION' : 'STRIPE_BANK_PAYMENT_CONFIGURATION'), successUrl: params.successUrl ?? this.config.get<string>('STRIPE_CHECKOUT_SUCCESS_URL') ?? 'https://merchant.mcbuse.com/payment?funded=1', cancelUrl: params.cancelUrl ?? this.config.get<string>('STRIPE_CHECKOUT_CANCEL_URL') ?? 'https://merchant.mcbuse.com/payment?cancelled=1' },
     });
 
-    if (replayed) {
-      return {
-        operationId: operation.id,
-        status: operation.status,
-        checkoutUrl:
-          (operation.metadata as { checkoutUrl?: string } | null)
-            ?.checkoutUrl ?? null,
-        amountCents: params.amountCents.toString(),
-        method: params.method,
-        replayed: true,
-      };
+    if (!replayed) await this.audit.authorization({ userId: params.userId, operationKind: operation.kind, decision: 'granted', subjectType: 'wallet', subjectId: holding.id, operationId: operation.id, amountBaseUnits, currency: 'USDC' });
+    // Only the lease owner may create/recover the provider session.
+    const worker = `checkout:${randomUUID()}`;
+    const claimed = await this.operations.claim(operation.id, worker, 120_000);
+    if (claimed) {
+      const heartbeat = setInterval(() => void this.operations.renew(operation.id, worker, 120_000).catch(() => undefined), 30_000);
+      try { await this.ensureCheckout(claimed); }
+      finally { clearInterval(heartbeat); await this.operations.release(operation.id, worker); }
     }
+    const current = await this.operations.require(operation.id);
+    return {
+      operationId: current.id, status: current.status,
+      checkoutUrl: (current.metadata as { checkoutUrl?: string } | null)?.checkoutUrl ?? null,
+      amountCents: params.amountCents.toString(), method: params.method, replayed,
+    };
+  }
 
-    await this.audit.authorization({
-      userId: params.userId,
-      operationKind: operation.kind,
-      decision: 'granted',
-      subjectType: 'wallet',
-      subjectId: holding.id,
-      operationId: operation.id,
-      amountBaseUnits,
-      currency: 'USDC',
-    });
-
+  async ensureCheckout(operation: FinancialOperation): Promise<void> {
+    if (operation.status !== 'created') return;
+    const metadata = operation.metadata as { method: FundingMethod; paymentConfiguration?: string; successUrl: string; cancelUrl: string };
+    // Stripe can prune idempotency results after 24h. Never guess whether an old create succeeded.
+    if (Date.now() - operation.createdAt.getTime() >= 23 * 60 * 60 * 1000) {
+      await this.operations.note(operation.id, 'operator_attention', { reason: 'checkout_recovery_window_expired' });
+      await this.operations.deferNextAttempt(operation.id, 300_000);
+      return;
+    }
+    const params = { method: metadata.method, userId: operation.userId, amountCents: operation.displayAmountMinor!, successUrl: metadata.successUrl, cancelUrl: metadata.cancelUrl };
+    const holding = { id: operation.destinationWalletId! };
+    if (!metadata.paymentConfiguration) throw new ServiceUnavailableException('Funding payment configuration is unavailable');
     const session = await this.stripe.checkout.sessions.create(
       {
         mode: 'payment',
-        payment_method_types: [STRIPE_PAYMENT_METHOD[params.method]] as Array<
-          'card' | 'us_bank_account'
-        >,
+        payment_method_configuration: metadata.paymentConfiguration,
         success_url:
           params.successUrl ??
           this.config.get<string>('STRIPE_CHECKOUT_SUCCESS_URL') ??
@@ -182,22 +166,15 @@ export class AccountFundingService {
         providerRef: session.id,
         providerStatus: session.status ?? 'open',
         metadata: {
+          ...(operation.metadata as Record<string, unknown>),
           method: params.method,
           checkoutUrl: session.url,
-          paymentMethod: STRIPE_PAYMENT_METHOD[params.method],
+          paymentMethod: params.method === 'card' ? 'card' : 'us_bank_account',
         },
       },
       { checkoutSessionId: session.id },
     );
 
-    return {
-      operationId: operation.id,
-      status: 'collection_pending',
-      checkoutUrl: session.url,
-      amountCents: params.amountCents.toString(),
-      method: params.method,
-      replayed: false,
-    };
   }
 
   /**
@@ -210,10 +187,23 @@ export class AccountFundingService {
     eventType: string;
     paymentStatus: string | null;
   }): Promise<{ handled: boolean; operationId?: string }> {
-    const operation = await this.operations.findByProviderRef(params.sessionId);
+    const session = await this.stripe.checkout.sessions.retrieve(params.sessionId);
+    let operation = await this.operations.findByProviderRef(params.sessionId);
+    if (!operation && session.metadata?.operationId) {
+      operation = await this.operations.require(session.metadata.operationId);
+    }
     if (!operation) return { handled: false };
-
-    if (params.eventType === 'checkout.session.async_payment_failed') {
+    if (!['funding_card', 'funding_bank'].includes(operation.kind) || session.metadata?.operationId !== operation.id || session.metadata?.userId !== operation.userId || session.metadata?.walletId !== operation.destinationWalletId || session.amount_total !== Number(operation.displayAmountMinor) || session.currency !== 'usd' || session.livemode)
+      throw new BadRequestException('Checkout does not match the sandbox funding operation');
+    if (operation.providerRef && operation.providerRef !== session.id) throw new BadRequestException('Checkout reference mismatch');
+    if (operation.status === 'created') {
+      await this.operations.advance(operation.id, 'collection_pending', { providerRef: session.id, metadata: { ...(operation.metadata as Record<string, unknown>), checkoutUrl: session.url } });
+      operation = await this.operations.require(operation.id);
+    }
+    const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+    if (paymentIntentId) await this.operations.patchProvider(operation.id, { paymentIntentId });
+    params.paymentStatus = session.payment_status;
+    if (params.eventType === 'checkout.session.async_payment_failed' && session.payment_status !== 'paid') {
       if (operation.status === 'collection_pending') {
         await this.operations.fail(
           operation.id,
@@ -224,7 +214,7 @@ export class AccountFundingService {
       return { handled: true, operationId: operation.id };
     }
 
-    if (params.eventType === 'checkout.session.expired') {
+    if (params.eventType === 'checkout.session.expired' && session.status === 'expired' && session.payment_status !== 'paid') {
       if (operation.status === 'collection_pending') {
         await this.operations.fail(operation.id, 'collection_expired');
       }
@@ -288,6 +278,7 @@ export class AccountFundingService {
       destination,
       operation.amountBaseUnits,
       {
+        intentKey: `operation:${operation.id}`,
         // Persist the signature before the transaction is broadcast, so an
         // interrupted process looks it up instead of sending a second one.
         onSignaturePrepared: async (signature) => {
@@ -326,11 +317,9 @@ export class AccountFundingService {
     if (result.status === 'failed') {
       const current = await this.operations.require(operation.id);
       if (current.status === 'chain_submitted') {
-        await this.operations.fail(
-          operation.id,
-          'treasury_transfer_failed',
-          'The treasury transfer did not reach the chain',
-        );
+        await this.operations.beginCompensation(operation.id, 'treasury_transfer_failed');
+      } else {
+        await this.operations.deferNextAttempt(operation.id, Math.min(300_000, 15_000 * 2 ** Math.min(operation.attempts, 5)));
       }
       return;
     }
@@ -397,6 +386,44 @@ export class AccountFundingService {
     this.logger.log(
       `Funding ${operation.id} finalized: ${operation.amountBaseUnits} base units credited`,
     );
+  }
+
+  async refundFunding(stale: FinancialOperation): Promise<void> {
+    const operation = await this.operations.require(stale.id);
+    if (operation.status !== 'compensating') return;
+    if (!operation.paymentIntentId) {
+      await this.pollCollection(operation);
+      await this.operations.deferNextAttempt(operation.id, 30_000);
+      return;
+    }
+    // A compensation is legal only after definitive non-delivery. Recheck the saved signature.
+    if (operation.chainSignature && await this.treasury.statusOf(operation.chainSignature) !== 'failed') {
+      await this.operations.note(operation.id, 'operator_attention', { reason: 'refund_waiting_for_chain_resolution' });
+      await this.operations.deferNextAttempt(operation.id, 60_000);
+      return;
+    }
+    const intent = await this.stripe.paymentIntents.retrieve(operation.paymentIntentId, { expand: ['latest_charge'] });
+    const charge = intent.latest_charge;
+    if (!charge || typeof charge === 'string') throw new Error('Original charge unavailable');
+    if (charge.disputed) {
+      await this.operations.patchProvider(operation.id, { refundStatus: 'disputed' });
+      await this.operations.deferNextAttempt(operation.id, 300_000);
+      return;
+    }
+    let refund: Awaited<ReturnType<typeof this.stripe.refunds.list>>['data'][number] | null = operation.refundId ? await this.stripe.refunds.retrieve(operation.refundId) : null;
+    if (!refund) {
+      const existing = await this.stripe.refunds.list({ payment_intent: intent.id, limit: 100 });
+      refund = existing.data.find(r => r.metadata?.operationId === operation.id) ?? null;
+      if (!refund && (existing.data.length || charge.amount_refunded > 0)) {
+        await this.operations.patchProvider(operation.id, { refundStatus: 'requires_reconciliation' });
+        await this.operations.deferNextAttempt(operation.id, 300_000);
+        return;
+      }
+      refund ??= await this.stripe.refunds.create({ payment_intent: intent.id, amount: Number(operation.displayAmountMinor), metadata: { operationId: operation.id } }, { idempotencyKey: `funding-refund:${operation.id}` });
+    }
+    await this.operations.patchProvider(operation.id, { refundId: refund.id, refundStatus: refund.status ?? 'pending' });
+    if (refund.status === 'succeeded') await this.operations.completeCompensation(operation.id, { refundId: refund.id, reason: 'funding_refunded' });
+    else await this.operations.deferNextAttempt(operation.id, 60_000);
   }
 
   /** Re-reads a pending Checkout session when a webhook never arrived. */

@@ -461,8 +461,10 @@ export class MerchantController {
   runAssessment(
     @CurrentUser() user: { id: string },
     @Body() body: { modelId?: string } = {},
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.assessments.run(user.id, body?.modelId);
+    if (!idempotencyKey?.trim() || idempotencyKey.length > 128) throw new BadRequestException('A valid Idempotency-Key is required');
+    return this.assessments.run(user.id, body?.modelId, idempotencyKey);
   }
 
   @Get('assessments')
@@ -612,24 +614,8 @@ export class MerchantController {
     @Body() dto: CreateMerchantFinancePackageDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const created = await this.finance.createPackage(
-      user.id,
-      dto.periodDays ?? 30,
-      dto.demonstrationData ?? false,
-      idempotencyKey ?? '',
-    );
+    return this.finance.createPackage(user.id, dto.periodDays ?? 30, dto.demonstrationData ?? false, idempotencyKey ?? '', dto.assessmentId);
 
-    // A package reports an assessment, so it is tied to the exact saved one.
-    // If the merchant named a specific assessment we use it; otherwise the
-    // latest saved run, and if there is none we run one now so the package is
-    // never citing a result that was never recorded.
-    const assessment = dto.assessmentId
-      ? await this.assessments.require(user.id, dto.assessmentId)
-      : ((await this.assessments.latest(user.id)) ??
-        (await this.assessments.run(user.id)));
-    await this.assessments.linkToPackage(created.id, assessment.id);
-
-    return { ...created, assessment };
   }
 
   @Get('finance-packages')
@@ -688,10 +674,11 @@ export class MerchantController {
   async downloadFinancePdf(
     @CurrentUser() user: { id: string },
     @Param('id', ParseUUIDPipe) id: string,
+    @Query('preview') preview?: string,
   ) {
     return new StreamableFile(await this.finance.pdf(user.id, id), {
       type: 'application/pdf',
-      disposition: `attachment; filename="mcbuse-evidence-${id}.pdf"`,
+      disposition: `${preview === 'true' ? 'inline' : 'attachment'}; filename="mcbuse-evidence-${id}.pdf"`,
     });
   }
 

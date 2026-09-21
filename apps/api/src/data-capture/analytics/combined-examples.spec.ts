@@ -154,7 +154,7 @@ describe('X.16 — the combined analyses', () => {
       const result = analysis(
         combine({
           sales: [sale('2026-09-02T10:00:00+02:00', 2500n)],
-          products: [product({ id: 'a' })],
+          products: [product({ id: 'a', onHandQuantity: 14 })],
           movements: [
             movement('01', 10, 'opening_balance'),
             movement('05', 6, 'restock'),

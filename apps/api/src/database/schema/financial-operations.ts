@@ -55,6 +55,9 @@ export const financialOperations = pgTable(
     provider: varchar('provider', { length: 32 }),
     providerRef: varchar('provider_ref', { length: 255 }),
     providerStatus: varchar('provider_status', { length: 64 }),
+    paymentIntentId: varchar('payment_intent_id', { length: 255 }),
+    refundId: varchar('refund_id', { length: 255 }),
+    refundStatus: varchar('refund_status', { length: 64 }),
     providerDestinationId: varchar('provider_destination_id', { length: 255 }),
     providerAccountId: varchar('provider_account_id', { length: 255 }),
 
@@ -188,3 +191,16 @@ export const providerWebhookEvents = pgTable(
     ),
   ],
 );
+
+/** Signed bytes are private recovery material; never serialize these rows publicly. */
+export const chainAttempts = pgTable('chain_attempts', {
+  signature: varchar('signature', { length: 128 }).primaryKey(),
+  intentKey: text('intent_key').unique(),
+  inputFingerprint: text('input_fingerprint'),
+  signedTransaction: text('signed_transaction').notNull(),
+  blockhash: varchar('blockhash', { length: 128 }).notNull(),
+  lastValidBlockHeight: bigint('last_valid_block_height', { mode: 'number' }).notNull(),
+  network: varchar('network', { length: 24 }).notNull(),
+  status: varchar('status', { length: 24 }).notNull().default('prepared'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

@@ -23,7 +23,7 @@ function sale(
 
 const RANGE = {
   from: new Date('2026-09-01T00:00:00+02:00'),
-  to: new Date('2026-09-07T23:59:59+02:00'),
+  to: new Date('2026-09-07T23:59:59.999+02:00'),
 };
 
 function build(
@@ -170,7 +170,7 @@ describe('transaction analytics', () => {
         previousSales: [],
         range: {
           from: new Date('2026-09-01T00:00:00+02:00'),
-          to: new Date('2026-09-14T23:59:59+02:00'),
+          to: new Date('2026-09-14T23:59:59.999+02:00'),
         },
         timezone: TIMEZONE,
         grouping: 'week',
@@ -194,7 +194,7 @@ describe('transaction analytics', () => {
         previousSales: [],
         range: {
           from: new Date('2026-09-01T00:00:00+02:00'),
-          to: new Date('2026-09-06T23:59:59+02:00'),
+          to: new Date('2026-09-06T23:59:59.999+02:00'),
         },
         timezone: TIMEZONE,
         grouping: 'week',
@@ -213,7 +213,7 @@ describe('transaction analytics', () => {
         previousSales: [],
         range: {
           from: new Date('2026-08-01T00:00:00+02:00'),
-          to: new Date('2026-09-30T23:59:59+02:00'),
+          to: new Date('2026-09-30T23:59:59.999+02:00'),
         },
         timezone: TIMEZONE,
         grouping: 'month',
@@ -231,7 +231,7 @@ describe('transaction analytics', () => {
         previousSales: [],
         range: {
           from: new Date('2026-06-01T00:00:00+02:00'),
-          to: new Date('2026-09-07T23:59:59+02:00'),
+          to: new Date('2026-09-07T23:59:59.999+02:00'),
         },
         timezone: TIMEZONE,
         grouping: 'day',

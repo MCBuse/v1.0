@@ -1,4 +1,20 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { DRIZZLE } from '../database/database.provider';
+import * as schema from '../database/schema';
+import {
+  sendSplTransfer,
+  type SplTransferParams,
+  signatureStatus,
+} from './spl-transfer';
+import {
+  Injectable,
+  OnModuleInit,
+  Logger,
+  Inject,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Keypair, Connection, PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddressSync } from '@solana/spl-token';
@@ -10,7 +26,159 @@ export class SolanaService implements OnModuleInit {
   private keys!: WalletKeyRegistry;
   private connection!: Connection;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Optional()
+    @Inject(DRIZZLE)
+    private readonly db?: NodePgDatabase<typeof schema>,
+  ) {}
+
+  async sendTransfer(params: SplTransferParams) {
+    if (this.config.get<string>('FINANCIAL_MODE') === 'mock')
+      throw new Error('Chain transfers are disabled in mock financial mode');
+    if (!this.db) throw new Error('Durable chain storage is unavailable');
+    const inputFingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          owner: params.owner.publicKey.toBase58(),
+          destination: params.destinationOwner.toBase58(),
+          mint: params.mint.toBase58(),
+          amount: params.amount.toString(),
+          feePayer: (params.feePayer ?? params.owner).publicKey.toBase58(),
+        }),
+      )
+      .digest('hex');
+    if (params.intentKey) {
+      const [existing] = await this.db
+        .select()
+        .from(schema.chainAttempts)
+        .where(eq(schema.chainAttempts.intentKey, params.intentKey));
+      if (existing) {
+        if (existing.inputFingerprint !== inputFingerprint)
+          throw new Error(
+            'Chain intent was reused with different transfer inputs',
+          );
+        await params.onSignaturePrepared?.(existing.signature);
+        const status = await this.recoverTransfer(existing.signature);
+        return {
+          signature: existing.signature,
+          status: status === 'finalized' ? ('completed' as const) : status,
+        };
+      }
+    }
+    const result = await sendSplTransfer({
+      ...params,
+      onSubmitted: async (signature) => {
+        await this.db!.update(schema.chainAttempts)
+          .set({ status: 'submitted' })
+          .where(eq(schema.chainAttempts.signature, signature));
+        await params.onSubmitted?.(signature);
+      },
+      persistPrepared: async (attempt) => {
+        await this.db!.insert(schema.chainAttempts).values({
+          ...attempt,
+          intentKey: params.intentKey,
+          inputFingerprint,
+          network:
+            this.config.get<string>('SOLANA_NETWORK') ??
+            this.config.get<string>('SOLANA_CLUSTER') ??
+            'devnet',
+        });
+      },
+    });
+    if (result.status === 'failed' && params.intentKey) {
+      const [saved] = await this.db
+        .select()
+        .from(schema.chainAttempts)
+        .where(eq(schema.chainAttempts.intentKey, params.intentKey));
+      // A lease overlap may lose the unique insert while the winner broadcasts.
+      // Never release the reservation merely because this sender lost that race.
+      if (saved) {
+        if (saved.inputFingerprint !== inputFingerprint)
+          throw new Error(
+            'Chain intent was reused with different transfer inputs',
+          );
+        return { signature: saved.signature, status: 'pending' as const };
+      }
+    }
+    return result;
+  }
+
+  async recoverTransfer(
+    signature: string,
+  ): Promise<'finalized' | 'pending' | 'failed'> {
+    const connection = this.getConnection();
+    const attempt = this.db
+      ? (
+          await this.db
+            .select()
+            .from(schema.chainAttempts)
+            .where(eq(schema.chainAttempts.signature, signature))
+        )[0]
+      : undefined;
+    const network =
+      this.config.get<string>('SOLANA_NETWORK') ??
+      this.config.get<string>('SOLANA_CLUSTER') ??
+      'devnet';
+    if (attempt && attempt.network !== network)
+      throw new Error('Chain attempt belongs to another network');
+    const status = await signatureStatus(connection, signature);
+    if (status !== 'pending') {
+      if (this.db)
+        await this.db
+          .update(schema.chainAttempts)
+          .set({ status })
+          .where(eq(schema.chainAttempts.signature, signature));
+      return status;
+    }
+    if (!this.db) return 'pending';
+    if (!attempt) return 'pending'; // Old attempts require reconciliation, never a fresh send.
+    const height = await connection.getBlockHeight('finalized');
+    if (height > attempt.lastValidBlockHeight) {
+      // Query after observing finalized expiry; a merely confirmed transaction stays pending.
+      const lookup = await connection.getSignatureStatuses([signature], {
+        searchTransactionHistory: true,
+      });
+      const seen = lookup.value[0];
+      if (seen)
+        return seen.confirmationStatus === 'finalized'
+          ? seen.err
+            ? 'failed'
+            : 'finalized'
+          : 'pending';
+      const transaction = await connection.getTransaction(signature, {
+        commitment: 'finalized',
+        maxSupportedTransactionVersion: 0,
+      });
+      if (transaction)
+        return !transaction.meta
+          ? 'pending'
+          : transaction.meta.err
+            ? 'failed'
+            : 'finalized';
+      // A missing signature is not proof of non-delivery if this RPC has pruned
+      // the relevant history. Keep the operation pending in that case.
+      const firstSlot = await connection.getFirstAvailableBlock();
+      const firstTime = await connection.getBlockTime(firstSlot);
+      if (
+        firstTime === null ||
+        firstTime * 1000 > attempt.createdAt.getTime() - 300_000
+      )
+        return 'pending';
+      await this.db
+        .update(schema.chainAttempts)
+        .set({ status: 'expired' })
+        .where(eq(schema.chainAttempts.signature, signature));
+      return 'failed';
+    }
+    if (this.config.get<string>('FINANCIAL_MODE') === 'mock')
+      throw new Error('Chain rebroadcast is disabled in mock financial mode');
+    await connection.sendRawTransaction(
+      Buffer.from(attempt.signedTransaction, 'base64'),
+      { preflightCommitment: 'confirmed' },
+    );
+    return 'pending';
+  }
 
   onModuleInit() {
     this.keys = new WalletKeyRegistry((name) => this.config.get<string>(name));

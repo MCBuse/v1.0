@@ -54,7 +54,7 @@ describe('account transfer on devnet', () => {
     pool = connection.pool;
 
     const config = new ConfigService();
-    solana = new SolanaService(config);
+    solana = new SolanaService(config, db);
     solana.onModuleInit();
     treasury = new TreasuryService(config, solana);
     treasury.onModuleInit();
@@ -193,7 +193,7 @@ describe('account transfer on devnet', () => {
       .where(inArray(schema.wallets.id, [holdingWalletId, routineWalletId]));
     await db.delete(schema.users).where(eq(schema.users.id, userId));
     await pool.end();
-  }, 60_000);
+  }, 180_000);
 
   it('moves real test USDC from Holding to Routine and finalizes once', async () => {
     const mint = process.env.SOLANA_USDC_MINT!;

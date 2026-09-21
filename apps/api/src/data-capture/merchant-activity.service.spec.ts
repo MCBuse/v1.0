@@ -1,7 +1,7 @@
 import { MerchantActivityService } from './merchant-activity.service';
 
 describe('MerchantActivityService cash-sale idempotency fingerprint', () => {
-  const service = Object.create(MerchantActivityService.prototype) as MerchantActivityService & {
+  const service = Object.create(MerchantActivityService.prototype) as {
     cashSaleFingerprint: (input: unknown, occurredAt: Date) => string;
   };
   const occurredAt = new Date('2026-09-17T10:00:00.000Z');

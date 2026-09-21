@@ -25,6 +25,7 @@ export class OffRampService {
   ) {}
 
   async withdraw(userId: string, dto: InitiateOffRampDto) {
+    if (process.env.MONEY_INITIATION_ENABLED === 'false') throw new BadRequestException('New money movements are temporarily disabled');
     const amount = BigInt(dto.amount);
     if (amount <= 0n) throw new BadRequestException('Amount must be positive');
 

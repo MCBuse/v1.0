@@ -68,6 +68,12 @@ describe('failure paths (integration)', () => {
     }),
   } as unknown as TreasuryService;
 
+  let providerPaymentStatus = 'unpaid';
+  let providerSessionStatus = 'complete';
+  const stripeStub = { stripe: { checkout: { sessions: { retrieve: async (id: string) => {
+    const op = await operations.findByProviderRef(id);
+    return { id, metadata: { operationId: op!.id, userId: op!.userId, walletId: op!.destinationWalletId }, amount_total: Number(op!.displayAmountMinor), currency: 'usd', livemode: false, payment_status: providerPaymentStatus, status: providerSessionStatus, payment_intent: 'pi_test' };
+  } } } } } as unknown as StripeClient;
   beforeAll(async () => {
     const connection = await connectTestDatabase();
     db = connection.db;
@@ -80,7 +86,7 @@ describe('failure paths (integration)', () => {
     const audit = new MoneyAuditService(db);
 
     funding = new AccountFundingService(
-      null as unknown as StripeClient,
+      stripeStub,
       config,
       treasury,
       operations,
@@ -226,6 +232,7 @@ describe('failure paths (integration)', () => {
   }
 
   beforeEach(async () => {
+    providerPaymentStatus = 'unpaid'; providerSessionStatus = 'complete';
     chainStatus = 'completed';
     submissions = [];
     await clearOperations();
@@ -322,6 +329,29 @@ describe('failure paths (integration)', () => {
       .orderBy(schema.financialOperationEvents.sequence);
   }
 
+  it('refuses new account operations in mock mode while preserving replay access', async () => {
+    const key = randomUUID();
+    const params = { userId, kind: 'internal_transfer' as const, idempotencyKey: key, amountBaseUnits: 1n, currency: 'USDC', sourceWalletId: holdingWalletId, destinationWalletId: routineWalletId };
+    const mockOperations = new FinancialOperationsService(db, new ConfigService({ FINANCIAL_MODE: 'mock' }));
+    await expect(mockOperations.begin(params)).rejects.toThrow('requires sandbox financial mode');
+    expect(await operations.findByKey(userId, key)).toBeNull();
+    const original = await operations.begin(params);
+    expect((await mockOperations.begin(params)).operation.id).toBe(original.operation.id);
+  });
+
+  it('never resurrects a rejected transfer when a later deposit arrives', async () => {
+    const key = randomUUID();
+    await expect(transfers.startTransfer({ userId, from: 'holding', to: 'routine', amountCents: 2_000n, idempotencyKey: key })).rejects.toThrow('Insufficient available balance');
+    const rejected = await operations.findByKey(userId, key);
+    expect(rejected?.status).toBe('failed');
+    expect(rejected?.failureCode).toBe('insufficient_balance');
+    await db.update(schema.balances).set({ available: START * 3n }).where(and(eq(schema.balances.walletId, holdingWalletId), eq(schema.balances.currency, 'USDC')));
+    await runner.tick(100);
+    expect((await operations.require(rejected!.id)).status).toBe('failed');
+    expect(submissions).toEqual([]);
+    expect((await balanceOf(holdingWalletId)).available).toBe(START * 3n);
+  });
+
   // ── X.6 — Stripe delayed success ────────────────────────────────────────
   describe('X.6 — a bank debit that succeeds later', () => {
     it('does not treat a completed Checkout session as settled money', async () => {
@@ -347,6 +377,7 @@ describe('failure paths (integration)', () => {
         eventType: 'checkout.session.completed',
         paymentStatus: 'unpaid',
       });
+      providerPaymentStatus = 'paid';
       await funding.applyCheckoutEvent({
         sessionId,
         eventType: 'checkout.session.async_payment_succeeded',
@@ -423,6 +454,7 @@ describe('failure paths (integration)', () => {
 
     it('fails an expired session without inventing an outcome', async () => {
       const { operation, sessionId } = await beginFunding(5_000_000n);
+      providerSessionStatus = 'expired';
       await funding.applyCheckoutEvent({
         sessionId,
         eventType: 'checkout.session.expired',
@@ -442,6 +474,7 @@ describe('failure paths (integration)', () => {
         paymentStatus: 'unpaid',
       });
 
+      providerPaymentStatus = 'paid';
       await funding.applyCheckoutEvent({
         sessionId,
         eventType: 'checkout.session.async_payment_succeeded',

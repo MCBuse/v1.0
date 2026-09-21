@@ -15,7 +15,7 @@ export type CreateOnrampSessionResponse = z.infer<typeof createOnrampSessionResp
 export const onrampTransactionStatusSchema = z.object({
   id: z.string().uuid(),
   provider: z.string(),
-  status: z.enum(['pending', 'processing', 'completed', 'failed', 'cancelled', 'expired']),
+  status: z.enum(['pending', 'processing', 'completed', 'failed', 'cancelled', 'expired', 'refunded', 'refund_pending', 'refund_action_required']),
   fiatAmount: z.string().nullable(),
   fiatCurrency: z.string(),
   cryptoAmount: z.string().nullable(),
@@ -38,6 +38,7 @@ export type OnrampTransactionList = z.infer<typeof onrampTransactionListSchema>;
 
 export type CreateOnrampSessionInput = {
   provider?: OnrampProvider;
+  method?: 'card' | 'bank';
   fiatAmount: string;
   fiatCurrency: 'USD' | 'EUR';
 };

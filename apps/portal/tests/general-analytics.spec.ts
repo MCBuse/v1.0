@@ -61,7 +61,7 @@ test("T.13 — a running period is labelled rather than presented as final", asy
   test.skip(testInfo.project.name !== "desktop", "one proof is enough");
 
   await page.goto("/analytics/general");
-  await expect(page.getByText("Latest period still running")).toBeVisible();
+  await expect(page.getByText("Partial reporting periods")).toBeVisible();
   await expect(
     page.getByText("will continue to change", { exact: false }),
   ).toBeVisible();
