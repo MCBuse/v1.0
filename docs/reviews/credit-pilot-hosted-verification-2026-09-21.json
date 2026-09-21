@@ -1,0 +1,163 @@
+{
+  "verifiedAt": "2026-09-21T15:25:11.110663+00:00",
+  "project": "mcbuse-hackathon-2026-fno",
+  "region": "europe-west1",
+  "staffWorkspace": "https://merchant.mcbuse.com/staff/credit-assessments",
+  "services": {
+    "api": {
+      "revision": "mcbuse-api-00043-wic",
+      "image": "europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/api:credit-20260921-r1",
+      "traffic": [
+        {
+          "latestRevision": true,
+          "percent": 100,
+          "revisionName": "mcbuse-api-00043-wic"
+        }
+      ],
+      "ready": "True"
+    },
+    "portal": {
+      "revision": "mcbuse-portal-00030-4hz",
+      "image": "europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/portal:credit-20260921-r2",
+      "traffic": [
+        {
+          "latestRevision": true,
+          "percent": 100,
+          "revisionName": "mcbuse-portal-00030-4hz"
+        }
+      ],
+      "ready": "True"
+    },
+    "scoring": {
+      "revision": "mcbuse-credit-scoring-00001-jbl",
+      "image": "europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/credit-scoring:credit-20260921-r1",
+      "traffic": [
+        {
+          "latestRevision": true,
+          "percent": 100,
+          "revisionName": "mcbuse-credit-scoring-00001-jbl"
+        }
+      ],
+      "ready": "True"
+    }
+  },
+  "migration": {
+    "execution": "mcbuse-api-migrate-lg8wf",
+    "result": "success",
+    "appliedMigrationCount": 34,
+    "added": "0033_credit_assessment_pilot",
+    "backup": "backups/credit-pilot-2026-09-21/database.dump",
+    "backupSha256": "62e03070317794749f7e2ab2e825bf6dfaefe7a2c8326859a77344d0655b0723"
+  },
+  "builds": {
+    "api": "3440f875-24a9-4207-8f33-5f5160135ab2",
+    "scoring": "218a05be-28a6-45a9-81c5-fa8574dd55c3",
+    "portalInitial": "c900ca78-57f7-406a-84dc-70c8c8d3f678",
+    "portalMobileFix": "2a14818b-6a03-4cfa-9ef2-7f7c6f3f217d"
+  },
+  "source": {
+    "method": "Frozen local source uploaded to Cloud Build; includes reviewed working-tree changes",
+    "initialManifestSha256": "ad1a39179737fe7cbf71644fefa0c551b3cf3098696d12debbbb45a4543f0828",
+    "portalFinalManifestSha256": "91313c792babcd7c22563b791fb8c18398d07a8372f21f012b8f310aaafca913"
+  },
+  "privateService": {
+    "anonymousHealthStatus": 403,
+    "invokerMembers": [
+      "serviceAccount:mcbuse-api@mcbuse-hackathon-2026-fno.iam.gserviceaccount.com"
+    ],
+    "secretVersion": "CREDIT_SCORING_TOKEN:1",
+    "minimumInstances": 0,
+    "maximumInstances": 2,
+    "liveApiToPythonInvocation": "passed"
+  },
+  "existingApiAndPortalSettingsPreserved": true,
+  "apiAcceptance": {
+    "apiRevision": "mcbuse-api-00043-wic",
+    "health": 200,
+    "unauthenticatedStaff": 401,
+    "staffOnlyLogin": true,
+    "privateModelMetadata": 200,
+    "syntheticAssessment": "d24254c4-695c-49ea-9809-aa70f15359ec",
+    "modelVersion": "george-html-2026.09.1",
+    "experimentalCredit": {
+      "scale": "300-850",
+      "disclaimer": "Experimental: synthetic training data; not validated against real repayment/default outcomes. Not a lending decision.",
+      "creditGrade": "Acceptable",
+      "creditScore": 658,
+      "experimental": true,
+      "overlayBreakdown": {
+        "capture_quality": 12,
+        "finalized_payments": 4.23982869379015,
+        "verified_sales_eur": 0.32415712960098975,
+        "business_age_months": 12
+      },
+      "statisticalScore": 629,
+      "policyOverlayPoints": 28.563985823391143,
+      "probabilityOfDefault": 0.14411187850825433
+    },
+    "financialProfile": {
+      "scale": "0-100",
+      "score": 56.1308605442177,
+      "breakdown": {
+        "cv_txn_value": 39,
+        "active_day_ratio": 91,
+        "finalized_payments": 45,
+        "verified_sales_eur": 9,
+        "business_age_months": 100,
+        "estimated_margin_pct": 66,
+        "existing_debt_to_sales": 52,
+        "revenue_trend_slope_pct": 43
+      }
+    },
+    "missingMarginReturnsNull": true,
+    "idempotentReplay": true,
+    "syntheticOnlyHistory": true,
+    "nonEnrolledMerchantDenied": true,
+    "revokedStaffDenied": true,
+    "eligibleRealMerchants": 0
+  },
+  "browserAcceptance": {
+    "origin": "https://merchant.mcbuse.com",
+    "staffOnlySignIn": true,
+    "liveSyntheticScore": 658,
+    "missingMarginUnavailable": true,
+    "sourceProvenanceVisible": true,
+    "csrfDenied": true,
+    "staffOnlyRefresh": true,
+    "mobileNoOverflow": true,
+    "signOut": true,
+    "unauthenticatedHistoryDenied": true,
+    "backend": "Live NestJS API and private Cloud Run Python service; no mock routes"
+  },
+  "mobileFix": {
+    "description": "Wrap populated history labels and constrain staff workspace grid/select widths",
+    "localMobileBrowserChecksPassed": 5,
+    "liveMobileBrowserCheck": "passed"
+  },
+  "analystProvisioning": {
+    "requestedAccounts": 6,
+    "grantedRegisteredAccounts": 2,
+    "unregisteredAccountsPending": 4,
+    "newRealAccountsCreated": 0
+  },
+  "cleanup": {
+    "syntheticAccountDisabled": true,
+    "syntheticPermissionRevoked": true,
+    "activeSessions": 0,
+    "syntheticHistoryRetained": true,
+    "credentialsRemoved": true
+  },
+  "limits": [
+    "No real merchants enrolled and no merchant consent granted by the operator.",
+    "Real-merchant financial-profile and experimental scores remain unavailable until sufficient verified required inputs exist.",
+    "Predictive validation against real repayment/default outcomes remains outstanding."
+  ],
+  "otherObservedTraffic": [
+    {
+      "route": "/api/v1/accounts/funding",
+      "status": 503,
+      "timestamp": "2026-09-21T15:18:45.903429Z",
+      "note": "Outside credit pilot verification; existing funding configuration was preserved."
+    }
+  ]
+}

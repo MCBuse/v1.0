@@ -41,7 +41,9 @@ Historical capture-quality trend and payment retry success are unavailable becau
 
 ## Rollout and rollback
 
-Local verification results and their limits are recorded in [the pilot verification report](reviews/credit-pilot-local-verification-2026-09-21.json). Browser checks use a fixture API; separate integration checks exercise NestJS, the real Python service and an isolated database. Production deployment and live Cloud Run authentication have not been performed.
+Initial local verification results and their limits are recorded in [the local pilot verification report](reviews/credit-pilot-local-verification-2026-09-21.json). Those browser checks use a fixture API; separate integration checks exercise NestJS, the real Python service and an isolated database.
+
+The pilot was deployed on 21 September 2026 and verified through the [live staff workspace](https://merchant.mcbuse.com/staff/credit-assessments). The [hosted verification report](reviews/credit-pilot-hosted-verification-2026-09-21.json) records the migration, image builds, serving revisions, private service authentication and browser checks against the real backend. Two requested registered accounts received analyst access; four unregistered addresses remain pending. No real merchants were enrolled. The temporary verification account was disabled and its sessions revoked; synthetic assessment history and audit records were retained.
 
 Local validation precedes deployment. Release order: database migration; private scoring service; API with matching token/audience; portal; explicitly provisioned analysts and enrolled merchants. Verify unauthenticated service calls fail, staff-only sign-in works, a synthetic assessment succeeds, and merchants cannot retrieve staff results through any history/export route. Observe scoring-service errors/latency and audit records; do not log raw input snapshots or tokens.
 

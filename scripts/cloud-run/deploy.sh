@@ -67,6 +67,15 @@ names=['DATABASE_URL','JWT_ACCESS_SECRET','JWT_REFRESH_SECRET','SOLANA_KEYPAIR_E
 bindings={name:f'{name}:latest' for name in names}
 for entry in json.load(open(sys.argv[1]))['spec']['template']['spec']['containers'][0].get('env',[]):
     name=entry['name']
+    if name in {'CREDIT_SCORING_URL', 'CREDIT_SCORING_AUDIENCE'}:
+        with open(sys.argv[2],'a') as target: target.write(f'\n{name}: {json.dumps(entry["value"])}\n')
+        continue
+    if name == 'CREDIT_SCORING_TOKEN':
+        secret=entry.get('valueFrom',{}).get('secretKeyRef')
+        if not secret:
+            raise SystemExit('Move the credit scoring token to Secret Manager before deploying')
+        bindings[name]=f"{secret['name']}:{secret['key']}"
+        continue
     if not name.startswith('SOLANA_KEYPAIR_ENCRYPTION_KEY'): continue
     secret=entry.get('valueFrom',{}).get('secretKeyRef')
     if secret:

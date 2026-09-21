@@ -104,7 +104,7 @@ export function StaffCreditWorkspace() {
   }
   const previous = history.find((r) => r.id === comparison);
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 grid-cols-1 gap-6">
       <div>
         <p className="text-sm text-blue-700">Internal pilot</p>
         <h1 className="mt-1 text-3xl font-semibold">Credit assessments</h1>
@@ -116,7 +116,7 @@ export function StaffCreditWorkspace() {
         </p>
       </div>
       {error ? <Alert>{error}</Alert> : null}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <h2 className="font-semibold">Run an assessment</h2>
         </CardHeader>
@@ -156,7 +156,7 @@ export function StaffCreditWorkspace() {
         </CardContent>
       </Card>
       {selected ? (
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <div>
               <h2 className="font-semibold">
@@ -164,12 +164,12 @@ export function StaffCreditWorkspace() {
                   ? "Synthetic demonstration"
                   : "Merchant assessment"}
               </h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 break-all text-xs text-slate-500">
                 {selected.id} · {new Date(selected.createdAt).toLocaleString()}
               </p>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-6">
+          <CardContent className="grid min-w-0 grid-cols-1 gap-6">
             <CreditResult credit={selected.result} />
             {selected.result.experimentalCredit ? (
               <div className="rounded-xl border border-amber-300 bg-amber-50 p-5">
@@ -222,7 +222,7 @@ export function StaffCreditWorkspace() {
           </CardContent>
         </Card>
       ) : null}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <h2 className="font-semibold">Assessment history and comparison</h2>
         </CardHeader>
@@ -230,7 +230,11 @@ export function StaffCreditWorkspace() {
           <ul className="grid gap-2">
             {history.map((row) => (
               <li key={row.id}>
-                <Button variant="secondary" onClick={() => void open(row.id)}>
+                <Button
+                  variant="secondary"
+                  className="h-auto w-full justify-start whitespace-normal break-words py-3 text-left sm:w-auto"
+                  onClick={() => void open(row.id)}
+                >
                   {new Date(row.createdAt).toLocaleString()} ·{" "}
                   {row.modelVersion}
                 </Button>
@@ -246,7 +250,7 @@ export function StaffCreditWorkspace() {
             <label className="mt-5 grid gap-2 text-sm">
               Compare with a saved result
               <select
-                className="rounded-lg border p-3"
+                className="min-w-0 max-w-full rounded-lg border p-3"
                 value={comparison}
                 onChange={(e) => setComparison(e.target.value)}
               >
@@ -298,7 +302,7 @@ export function StaffCreditWorkspace() {
           ) : null}
         </CardContent>
       </Card>
-      <details className="rounded-xl border bg-white p-5">
+      <details className="min-w-0 rounded-xl border bg-white p-5">
         <summary className="cursor-pointer font-medium">
           Model version and limitations
         </summary>

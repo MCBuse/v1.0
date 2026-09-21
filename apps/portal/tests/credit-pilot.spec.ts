@@ -24,6 +24,11 @@ test("staff-only login runs synthetic scoring, displays provenance, and handles 
   await expect(
     page.getByText('"synthetic_demonstration"', { exact: false }),
   ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
   await page.screenshot({
     path: "/tmp/mcbuse-credit-staff-desktop.png",
     fullPage: true,
