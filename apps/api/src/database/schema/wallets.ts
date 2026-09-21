@@ -16,6 +16,10 @@ export const wallets = pgTable('wallets', {
   type: varchar('type', { length: 20 }).notNull(), // 'savings' | 'routine'
   solanaPubkey: text('solana_pubkey').notNull().unique(),
   encryptedKeypair: text('encrypted_keypair').notNull(), // AES-256-GCM encrypted
+  // Which encryption key version encryptedKeypair was sealed with.
+  encryptionKeyVersion: varchar('encryption_key_version', { length: 32 })
+    .notNull()
+    .default('v1'),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

@@ -17,6 +17,8 @@ import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { PaymentRequestsService } from '../payment-requests/payment-requests.service';
 import { MerchantInventoryService } from '../data-capture/merchant-inventory.service';
+import { MerchantPresentationService } from '../merchant-events/merchant-presentation.service';
+import { AnalyticsWorkQueueService } from '../analytics-intelligence/analytics-work-queue.service';
 import { UsersService } from '../users/users.service';
 import { ExecutePaymentDto } from './dto/execute-payment.dto';
 import { ExecuteUsernamePaymentDto } from './dto/execute-username-payment.dto';
@@ -48,6 +50,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     private readonly paymentRequestsService: PaymentRequestsService,
     private readonly usersService: UsersService,
     private readonly merchantInventory: MerchantInventoryService,
+    private readonly presentation: MerchantPresentationService,
+    private readonly analyticsWork: AnalyticsWorkQueueService,
     private readonly config: ConfigService,
   ) {}
 
@@ -584,6 +588,30 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
           ),
         );
     });
+
+    // Tell the merchant's connected devices, once the money is actually
+    // settled. A failure here must not undo a completed payment.
+    try {
+      await this.presentation.noteStatusChange(
+        request.merchantId,
+        request.id,
+        'completed',
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not announce completion of ${request.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    // Mark the merchant's derived figures stale. The recalculation itself is
+    // deliberately left to the background worker, so no customer waits on it.
+    await this.analyticsWork.enqueue(
+      request.merchantId,
+      'digital_sale_finalized',
+      { type: 'payment_request', id: request.id },
+    );
   }
 
   private merchantEvidenceEnvironment(): 'live' | 'test' | 'synthetic' {

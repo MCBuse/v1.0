@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -11,11 +12,12 @@ import PDFDocument from 'pdfkit';
 import archiver = require('archiver');
 import nodemailer = require('nodemailer');
 import { PassThrough } from 'stream';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { MerchantActivityService } from './merchant-activity.service';
+import { exportIntegrityOf, truncationNote } from './export-integrity';
 import { MerchantService } from './merchant.service';
 import { MerchantImportService } from './merchant-import.service';
 
@@ -74,7 +76,10 @@ export class MerchantFinanceService {
       this.activity.analytics(userId, from, to),
       this.merchants.getReadiness(userId),
       this.imports.listReconciliation(userId),
-      this.activity.listActivity(userId, 1, 5000),
+      // Every recorded sale in the period, not a page of them. The package is
+      // evidence: a list that stopped at an arbitrary row would disagree with
+      // the totals printed beside it and nothing would say so.
+      this.salesForPeriod(merchant.merchantId, from, to),
       this.db
         .select({
           receiptNumber: schema.merchantTransactions.receiptNumber,
@@ -134,12 +139,7 @@ export class MerchantFinanceService {
       availableQuantity: null,
     }));
     const evidenceIncomplete = readiness.stage !== 'evidence_ready';
-    const sales = activityPage.items.filter((item) => {
-      const occurredAt = new Date(item.occurredAt);
-      return (
-        occurredAt >= from && occurredAt <= to && item.status === 'recorded'
-      );
-    });
+    const sales = activityPage;
     const saleItems = [
       ...digitalItems.map((item) => ({ ...item, source: 'mcbuse_payment' })),
       ...cashItems.map((item) => ({ ...item, source: 'merchant_cash' })),
@@ -154,6 +154,9 @@ export class MerchantFinanceService {
       reconciliation,
       productMetrics,
       sales,
+      // R.17 — the detail and the headline totals are checked against each
+      // other here, and the answer travels with the package.
+      exportIntegrity: exportIntegrityOf(sales, analytics),
       saleItems: saleItems.map((item) => ({
         receiptNumber: item.receiptNumber,
         occurredAt: item.occurredAt.toISOString(),
@@ -361,6 +364,88 @@ export class MerchantFinanceService {
       throw error;
     }
   }
+  /**
+   * Every recorded sale in the period, digital and cash, newest first.
+   *
+   * Deliberately unpaginated: an export that quietly stopped at a page
+   * boundary is the failure this replaces. A period large enough to produce an
+   * oversized artifact is refused explicitly further down instead.
+   */
+  private async salesForPeriod(merchantId: string, from: Date, to: Date) {
+    const [digital, cash] = await Promise.all([
+      this.db
+        .select({
+          id: schema.merchantTransactions.id,
+          receiptNumber: schema.merchantTransactions.receiptNumber,
+          amount: schema.merchantTransactions.displayAmountMinor,
+          description: schema.merchantTransactions.description,
+          occurredAt: schema.merchantTransactions.occurredAt,
+          environment: schema.merchantTransactions.evidenceEnvironment,
+        })
+        .from(schema.merchantTransactions)
+        .where(
+          and(
+            eq(schema.merchantTransactions.merchantId, merchantId),
+            eq(schema.merchantTransactions.status, 'finalized'),
+            gte(schema.merchantTransactions.occurredAt, from),
+            lte(schema.merchantTransactions.occurredAt, to),
+          ),
+        ),
+      this.db
+        .select({
+          id: schema.merchantCashSales.id,
+          receiptNumber: schema.merchantCashSales.receiptNumber,
+          amount: schema.merchantCashSales.amountMinor,
+          description: schema.merchantCashSales.description,
+          occurredAt: schema.merchantCashSales.occurredAt,
+        })
+        .from(schema.merchantCashSales)
+        .where(
+          and(
+            eq(schema.merchantCashSales.merchantId, merchantId),
+            eq(schema.merchantCashSales.status, 'recorded'),
+            gte(schema.merchantCashSales.occurredAt, from),
+            lte(schema.merchantCashSales.occurredAt, to),
+          ),
+        ),
+    ]);
+
+    return [
+      ...digital.map((item) => ({
+        id: item.id,
+        receiptNumber: item.receiptNumber,
+        source: 'mcbuse_payment' as const,
+        verification: 'internally_confirmed' as const,
+        environment: (item.environment ?? 'unknown') as string,
+        amount: {
+          minor: item.amount.toString(),
+          currency: 'EUR',
+          estimated: false,
+          rateTimestamp: null,
+        },
+        description: item.description,
+        status: 'recorded' as const,
+        occurredAt: item.occurredAt.toISOString(),
+      })),
+      ...cash.map((item) => ({
+        id: item.id,
+        receiptNumber: item.receiptNumber,
+        source: 'merchant_cash' as const,
+        verification: 'merchant_declared' as const,
+        environment: 'unknown',
+        amount: {
+          minor: item.amount.toString(),
+          currency: 'EUR',
+          estimated: false,
+          rateTimestamp: null,
+        },
+        description: item.description,
+        status: 'recorded' as const,
+        occurredAt: item.occurredAt.toISOString(),
+      })),
+    ].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+  }
+
   private async packageRow(userId: string, id: string) {
     const merchant = await this.merchants.requireMerchant(userId);
     const row = (
@@ -375,7 +460,9 @@ export class MerchantFinanceService {
         )
         .limit(1)
     )[0];
-    if (!row) throw new BadRequestException('Financial package not found');
+    // Not found, rather than a bad request: the id may be well-formed and
+    // simply belong to another merchant, and that is the same answer.
+    if (!row) throw new NotFoundException('Financial package not found');
     return row;
   }
   private async artifact(
@@ -586,13 +673,120 @@ export class MerchantFinanceService {
   private packageResponse(
     row: typeof schema.merchantFinancePackages.$inferSelect,
   ) {
+    const days = Math.round(
+      (row.periodTo.getTime() - row.periodFrom.getTime()) / 86_400_000,
+    );
     return {
       id: row.id,
       modelVersion: row.modelVersion,
       periodFrom: row.periodFrom.toISOString(),
       periodTo: row.periodTo.toISOString(),
+      /**
+       * R.12 — the reporting window, named as its own thing. The assessment
+       * this package cites has its own evidence window, which may differ; the
+       * two are labelled separately so neither is read as the other.
+       */
+      reportingWindow: {
+        days,
+        from: row.periodFrom.toISOString(),
+        to: row.periodTo.toISOString(),
+        label: `${days}-day reporting window`,
+      },
       snapshot: row.snapshot,
       createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * R.11 — everything a preview needs, tied to the bytes a download returns.
+   *
+   * The artifacts are built once at creation and stored; the checksums here
+   * are of those exact stored bytes. A preview that re-rendered the document
+   * could drift from the file the recipient receives, which is the whole
+   * failure an immutable package exists to prevent.
+   */
+  async preview(userId: string, id: string) {
+    const row = await this.packageRow(userId, id);
+    const artifacts = await this.db
+      .select({
+        kind: schema.merchantFinancePackageArtifacts.kind,
+        content: schema.merchantFinancePackageArtifacts.content,
+        byteSize: schema.merchantFinancePackageArtifacts.byteSize,
+        createdAt: schema.merchantFinancePackageArtifacts.createdAt,
+      })
+      .from(schema.merchantFinancePackageArtifacts)
+      .where(eq(schema.merchantFinancePackageArtifacts.packageId, id));
+
+    return {
+      ...this.packageResponse(row),
+      artifacts: artifacts
+        .map((artifact) => ({
+          kind: artifact.kind,
+          byteSize: artifact.byteSize,
+          sha256: createHash('sha256')
+            .update(artifact.content as Buffer)
+            .digest('hex'),
+          createdAt: artifact.createdAt.toISOString(),
+          downloadPath: `/merchants/me/finance-packages/${id}/${
+            artifact.kind === 'pdf' ? 'pdf' : 'data'
+          }`,
+        }))
+        .sort((a, b) => a.kind.localeCompare(b.kind)),
+    };
+  }
+
+  /** R.14 — the packages this merchant has produced, newest first. */
+  async listPackages(userId: string, limit = 50) {
+    const merchant = await this.merchants.requireMerchant(userId);
+    const rows = await this.db
+      .select()
+      .from(schema.merchantFinancePackages)
+      .where(eq(schema.merchantFinancePackages.merchantId, merchant.merchantId))
+      .orderBy(desc(schema.merchantFinancePackages.createdAt))
+      .limit(limit);
+
+    return {
+      items: rows.map((row) => {
+        const { snapshot, ...rest } = this.packageResponse(row);
+        void snapshot;
+        return rest;
+      }),
+    };
+  }
+
+  /**
+   * R.14 — every attempt to send a package, including the failed ones.
+   *
+   * SMTP acceptance is reported as acceptance, never as delivery: the two are
+   * different facts and the history keeps them apart.
+   */
+  async emailHistory(userId: string, limit = 50) {
+    const merchant = await this.merchants.requireMerchant(userId);
+    const rows = await this.db
+      .select()
+      .from(schema.merchantFinanceEmailAttempts)
+      .where(
+        eq(schema.merchantFinanceEmailAttempts.merchantId, merchant.merchantId),
+      )
+      .orderBy(desc(schema.merchantFinanceEmailAttempts.createdAt))
+      .limit(limit);
+
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        packageId: row.packageId,
+        recipientEmail: row.recipientEmail,
+        institutionName: row.institutionName,
+        status: row.status,
+        errorCode: row.errorCode,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+        deliveryConfirmed: false,
+        note:
+          row.status === 'accepted_by_smtp'
+            ? 'The mail server accepted this message. That is not confirmation it reached the inbox.'
+            : null,
+      })),
     };
   }
   private async updateAttempt(id: string, status: string, errorCode?: string) {
@@ -647,14 +841,21 @@ export class MerchantFinanceService {
       );
       document.moveDown().fontSize(14).text('Product performance');
       document.fontSize(10);
-      (snapshot.productMetrics ?? [])
+      const products = snapshot.productMetrics ?? [];
+      products
         .slice(0, 10)
         .forEach((item: any) =>
           document.text(
             `${item.name}: ${item.quantitySold} units · EUR ${(Number(item.revenue.minor) / 100).toFixed(2)}`,
           ),
         );
-      if (!(snapshot.productMetrics ?? []).length)
+      const productNote = truncationNote(
+        Math.min(10, products.length),
+        products.length,
+        'product-metrics.csv',
+      );
+      if (productNote) document.fillColor('#64748b').text(productNote).fillColor('black');
+      if (!products.length)
         document.text(
           'No product-linked recorded sales in the package period.',
         );
@@ -666,13 +867,36 @@ export class MerchantFinanceService {
             ? `${snapshot.reconciliation.items.length} imported payout record(s); source records are not sales revenue.`
             : 'No payout evidence available.',
         );
-      (snapshot.reconciliation?.items ?? [])
+      const reconciliationItems = snapshot.reconciliation?.items ?? [];
+      reconciliationItems
         .slice(0, 10)
         .forEach((item: any) =>
           document.text(
             `${item.externalReference}: ${item.reconciliationStatus}`,
           ),
         );
+      const reconciliationNote = truncationNote(
+        Math.min(10, reconciliationItems.length),
+        reconciliationItems.length,
+        'payout-reconciliation.csv',
+      );
+      if (reconciliationNote)
+        document.fillColor('#64748b').text(reconciliationNote).fillColor('black');
+      if (snapshot.exportIntegrity) {
+        document.moveDown().fontSize(14).text('Export completeness');
+        document
+          .fontSize(10)
+          .text(
+            `${snapshot.exportIntegrity.detailRowCount} sale(s) in the data export, totalling EUR ${(
+              Number(snapshot.exportIntegrity.detailAmountMinor) / 100
+            ).toFixed(2)}.`,
+          );
+        document.text(
+          snapshot.exportIntegrity.reconciles
+            ? 'The exported detail reconciles to the totals above.'
+            : `The exported detail does not reconcile to the totals above: ${snapshot.exportIntegrity.discrepancy}.`,
+        );
+      }
       document.moveDown().fontSize(14).text('Evidence readiness');
       document
         .fontSize(10)

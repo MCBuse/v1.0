@@ -26,6 +26,10 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RatesModule } from './rates/rates.module';
 import { ChainWatcherModule } from './chain-watcher/chain-watcher.module';
 import { DataCaptureModule } from './data-capture/data-capture.module';
+import { TreasuryModule } from './treasury/treasury.module';
+import { FinancialOperationsModule } from './financial-operations/financial-operations.module';
+import { AccountsModule } from './accounts/accounts.module';
+import { MerchantEventsModule } from './merchant-events/merchant-events.module';
 
 @Module({
   imports: [
@@ -50,6 +54,8 @@ import { DataCaptureModule } from './data-capture/data-capture.module';
     DatabaseModule,
     HealthModule,
     SolanaModule,
+    TreasuryModule,
+    FinancialOperationsModule,
     LedgerModule,
     WalletsModule,
     AuthModule,
@@ -65,6 +71,8 @@ import { DataCaptureModule } from './data-capture/data-capture.module';
     RatesModule,
     ChainWatcherModule,
     DataCaptureModule,
+    AccountsModule,
+    MerchantEventsModule,
   ],
   controllers: [AppController],
   providers: [

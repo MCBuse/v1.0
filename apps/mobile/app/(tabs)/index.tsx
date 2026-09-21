@@ -9,6 +9,7 @@ import {
   Notification,
   ReceiptText,
   Scan,
+  ScanBarcode,
   Send2,
   TransactionMinus,
   type Icon as IconType,
@@ -258,6 +259,26 @@ export default function HomeScreen() {
               <Text variant="bodyMedium">Merchant invoices</Text>
               <Text variant="caption" color="textSecondary">
                 Create and show payment QR codes
+              </Text>
+            </Box>
+          </Box>
+          <Text variant="captionMedium">Open</Text>
+        </Pressable>
+      ) : null}
+
+      {merchantQuery.data ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open the counter display"
+          onPress={() => router.push("/(flows)/merchant-receive" as any)}
+          style={[styles.merchantShortcut, { backgroundColor: colors.bgSecondary, borderColor: colors.borderDefault }]}
+        >
+          <Box flexDirection="row" alignItems="center" gap="m">
+            <ScanBarcode size={22} color={colors.textPrimary} variant="Linear" />
+            <Box>
+              <Text variant="bodyMedium">Receive</Text>
+              <Text variant="caption" color="textSecondary">
+                Show whatever is on the counter, live
               </Text>
             </Box>
           </Box>

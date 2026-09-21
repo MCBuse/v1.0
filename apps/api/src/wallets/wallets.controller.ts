@@ -1,9 +1,23 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Headers, Param, Query, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { WalletsService } from './wallets.service';
 import { InternalTransferDto } from './dto/internal-transfer.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
+
+/**
+ * A retry without a key would move money twice, so the key is required rather
+ * than generated here — only the client knows which attempts are the same one.
+ */
+function requireIdempotencyKey(key: string | undefined): string {
+  if (!key || key.trim().length === 0) {
+    throw new BadRequestException('Idempotency-Key header is required');
+  }
+  if (key.length > 128) {
+    throw new BadRequestException('Idempotency-Key is too long');
+  }
+  return key.trim();
+}
 
 @ApiTags('wallets')
 @ApiBearerAuth('access-token')
@@ -36,10 +50,22 @@ export class WalletsController {
   @Post('transfer')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Internal transfer between savings and routine wallets' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Stable client-supplied key. A retry carrying the same key returns the ' +
+      'original transfer; the same key with different inputs is refused.',
+  })
   internalTransfer(
     @CurrentUser() user: { id: string },
     @Body() dto: InternalTransferDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.walletsService.internalTransfer(user.id, dto);
+    return this.walletsService.internalTransfer(
+      user.id,
+      dto,
+      requireIdempotencyKey(idempotencyKey),
+    );
   }
 }

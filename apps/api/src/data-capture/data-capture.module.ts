@@ -9,11 +9,28 @@ import { MerchantImportService } from './merchant-import.service';
 import { MerchantFinanceService } from './merchant-finance.service';
 import { MerchantEvidenceAttachmentService } from './merchant-evidence-attachment.service';
 import { AnalyticsIntelligenceModule } from '../analytics-intelligence/analytics-intelligence.module';
+import { GeneralAnalyticsService } from './analytics/general-analytics.service';
+import { MerchantAssessmentService } from './assessment/merchant-assessment.service';
 
 @Module({
   imports: [RatesModule, AnalyticsIntelligenceModule],
   controllers: [MerchantController],
-  providers: [MerchantService, MerchantInventoryService, MerchantImageService, MerchantActivityService, MerchantImportService, MerchantFinanceService, MerchantEvidenceAttachmentService],
-  exports: [MerchantService, MerchantInventoryService],
+  providers: [
+    GeneralAnalyticsService,
+    MerchantAssessmentService,
+    MerchantService,
+    MerchantInventoryService,
+    MerchantImageService,
+    MerchantActivityService,
+    MerchantImportService,
+    MerchantFinanceService,
+    MerchantEvidenceAttachmentService,
+  ],
+  exports: [
+    MerchantService,
+    MerchantInventoryService,
+    GeneralAnalyticsService,
+    MerchantAssessmentService,
+  ],
 })
 export class DataCaptureModule {}

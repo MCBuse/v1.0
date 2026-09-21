@@ -9,6 +9,9 @@ import { PaymentRequestsModule } from '../payment-requests/payment-requests.modu
 import { UsersModule } from '../users/users.module';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 import { DataCaptureModule } from '../data-capture/data-capture.module';
+import { AnalyticsIntelligenceModule } from '../analytics-intelligence/analytics-intelligence.module';
+import { MerchantEventsModule } from '../merchant-events/merchant-events.module';
+import { TreasuryModule } from '../treasury/treasury.module';
 
 @Module({
   imports: [
@@ -16,6 +19,10 @@ import { DataCaptureModule } from '../data-capture/data-capture.module';
     PaymentRequestsModule,
     UsersModule,
     DataCaptureModule,
+    AnalyticsIntelligenceModule,
+    MerchantEventsModule,
+    // The treasury pays network fees, so a payer never needs SOL.
+    TreasuryModule,
   ],
   providers: [
     MockTransferProvider,

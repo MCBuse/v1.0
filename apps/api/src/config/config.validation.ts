@@ -9,6 +9,7 @@ import {
   MinLength,
   validateSync,
 } from 'class-validator';
+import { assertEnvironmentSeparation } from './environment-separation';
 
 export enum Environment {
   Development = 'development',
@@ -111,6 +112,25 @@ export class EnvironmentVariables {
 
   @IsString()
   SOLANA_KEYPAIR_ENCRYPTION_KEY: string;
+
+  /** Additional wallet-encryption key versions, retained until rotation is verified. */
+  @IsOptional()
+  @IsString()
+  SOLANA_KEYPAIR_ENCRYPTION_KEY_V2?: string;
+
+  @IsOptional()
+  @IsString()
+  SOLANA_KEYPAIR_ENCRYPTION_KEY_V3?: string;
+
+  /** Which key version seals newly written wallet records. Defaults to the highest. */
+  @IsOptional()
+  @IsString()
+  SOLANA_KEYPAIR_ENCRYPTION_KEY_CURRENT?: string;
+
+  /** Devnet treasury signing key, held separately from the wallet-encryption keys. */
+  @IsOptional()
+  @IsString()
+  SOLANA_TREASURY_SECRET_KEY?: string;
 
   @IsString()
   ONRAMP_PROVIDER: string;
@@ -299,6 +319,10 @@ export function validate(config: Record<string, unknown>) {
       }
     }
   }
+
+  // Devnet credentials must not be reachable from production, and production
+  // credentials must not be reachable from anywhere else.
+  assertEnvironmentSeparation(config as Parameters<typeof assertEnvironmentSeparation>[0]);
 
   return validatedConfig;
 }

@@ -1,7 +1,8 @@
 import { useTheme } from '@shopify/restyle';
+import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 import { ArrowLeft, ArrowSwapHorizontal, TickCircle } from 'iconsax-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -29,6 +30,13 @@ export default function TransferScreen() {
   const toWalletType: AccountType = fromWalletType === 'savings' ? 'routine' : 'savings';
 
   const transfer = useInternalTransfer();
+
+  // One key per intent. It survives a failed attempt so that retrying the same
+  // move replays the original rather than moving the money twice, and is
+  // dropped whenever the amount or route changes, because that is a new intent.
+  const attemptKey = useRef<string | null>(null);
+  useEffect(() => { attemptKey.current = null; }, [amount, currency, fromWalletType]);
+
   const flipDirection = () => setFromWalletType((current) => current === 'savings' ? 'routine' : 'savings');
 
   const handleTransfer = useCallback(async () => {
@@ -37,13 +45,16 @@ export default function TransferScreen() {
       Alert.alert('Enter an amount', 'Please enter an amount greater than zero.');
       return;
     }
+    attemptKey.current ??= randomUUID();
     try {
       await transfer.mutateAsync({
         fromWalletType,
         toWalletType,
         amount:         baseUnits,
         currency,
+        idempotencyKey: attemptKey.current,
       });
+      attemptKey.current = null;
       setSucceeded(true);
     } catch (err: any) {
       Alert.alert('Transfer Failed', err?.message ?? 'Something went wrong. Please try again.');

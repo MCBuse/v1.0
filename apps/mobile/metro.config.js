@@ -1,7 +1,17 @@
+const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 
+// This app lives in a pnpm workspace, so Metro has to watch the repository
+// root and resolve modules from both node_modules trees. Without this the
+// bundler cannot follow the symlink to a workspace package such as
+// @repo/shared.
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, "../..");
+
 module.exports = (() => {
-    const config = getDefaultConfig(__dirname);
+    const config = getDefaultConfig(projectRoot);
+
+    config.watchFolders = [workspaceRoot];
 
     const { transformer, resolver } = config;
 
@@ -25,6 +35,11 @@ module.exports = (() => {
     };
     config.resolver = {
         ...resolver,
+        nodeModulesPaths: [
+            path.resolve(projectRoot, "node_modules"),
+            path.resolve(workspaceRoot, "node_modules"),
+        ],
+        unstable_enableSymlinks: true,
         assetExts: [...resolver?.assetExts?.filter((ext) => ext !== "svg"), 'lottie'],
         sourceExts: [...resolver.sourceExts, "svg"],
     };

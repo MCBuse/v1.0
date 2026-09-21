@@ -1,0 +1,17 @@
+{
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
+  "rootDir": "src",
+  "testRegex": ".*\\.devnet-int-spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "testEnvironment": "node",
+  "testTimeout": 300000,
+  "moduleNameMapper": {
+    "^archiver$": "<rootDir>/database/testing/archiver-stub.ts"
+  }
+}

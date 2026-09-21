@@ -3,14 +3,10 @@ import {
   Logger,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PublicKey, Transaction } from '@solana/web3.js';
-import {
-  getOrCreateAssociatedTokenAccount,
-  createTransferCheckedInstruction,
-  getMint,
-} from '@solana/spl-token';
-import bs58 from 'bs58';
+import { PublicKey } from '@solana/web3.js';
 import { SolanaService } from '../../solana/solana.service';
+import { sendSplTransfer } from '../../solana/spl-transfer';
+import { TreasuryService } from '../../treasury/treasury.service';
 import type {
   TransferProvider,
   TransferParams,
@@ -26,11 +22,26 @@ const DEVNET_MINTS: Record<string, string> = {
   EURC: 'HzwqbKZw8HxMN6bF2yFZNrht3c2iXXzpKcFu7uBEDKtr', // devnet placeholder
 };
 
+/**
+ * Customer-to-merchant transfers on chain.
+ *
+ * The treasury pays the network fee and any rent for a missing destination
+ * token account. That is not an optimisation: this platform's custody model
+ * says users never hold SOL, so a transfer that asked the payer to cover its
+ * own fee could not execute at all — and a merchant being paid for the first
+ * time has no token account for the rent to come from either. This delegates
+ * to the same `sendSplTransfer` the account flows use, so both chain paths
+ * behave identically, including deriving and persisting the signature before
+ * anything is broadcast.
+ */
 @Injectable()
 export class SolanaTransferProvider implements TransferProvider {
   private readonly logger = new Logger(SolanaTransferProvider.name);
 
-  constructor(private readonly solanaService: SolanaService) {}
+  constructor(
+    private readonly solanaService: SolanaService,
+    private readonly treasury: TreasuryService,
+  ) {}
 
   async execute(params: TransferParams): Promise<TransferResult> {
     const mintAddress = DEVNET_MINTS[params.currency];
@@ -40,20 +51,24 @@ export class SolanaTransferProvider implements TransferProvider {
       );
     }
 
-    const connection = this.solanaService.getConnection();
     const payerKeypair = this.solanaService.decryptKeypair(
       params.payerEncryptedKeypair,
     );
-    const payerPubkey = new PublicKey(params.payerPubkey);
-    const payeePubkey = new PublicKey(params.payeePubkey);
-    const mint = new PublicKey(mintAddress);
-
-    if (!payerKeypair.publicKey.equals(payerPubkey)) {
+    if (payerKeypair.publicKey.toBase58() !== params.payerPubkey) {
       this.logger.error(
-        `[SolanaTransfer] Payer key mismatch: params.payerPubkey does not match decrypted keypair public key`,
+        '[SolanaTransfer] Payer key mismatch: params.payerPubkey does not match decrypted keypair public key',
       );
       throw new InternalServerErrorException(
         'Payer public key does not match decrypted payer keypair',
+      );
+    }
+
+    const feePayer = this.treasury.feePayer();
+    if (!feePayer) {
+      // Refused rather than attempted: without the treasury the payer would
+      // have to cover the fee, and they hold no SOL by design.
+      throw new InternalServerErrorException(
+        'The treasury is not configured, so no network fee can be paid',
       );
     }
 
@@ -62,80 +77,21 @@ export class SolanaTransferProvider implements TransferProvider {
         `${params.payerPubkey.slice(0, 8)}… → ${params.payeePubkey.slice(0, 8)}…`,
     );
 
-    let preparedSignature: string | null = null;
-    let broadcastAttempted = false;
-    try {
-      // Get or create ATAs for both wallets (payer pays for ATA creation)
-      const [payerAta, payeeAta] = await Promise.all([
-        getOrCreateAssociatedTokenAccount(
-          connection,
-          payerKeypair,
-          mint,
-          payerPubkey,
-        ),
-        getOrCreateAssociatedTokenAccount(
-          connection,
-          payerKeypair,
-          mint,
-          payeePubkey,
-        ),
-      ]);
+    const result = await sendSplTransfer({
+      connection: this.solanaService.getConnection(),
+      owner: payerKeypair,
+      feePayer,
+      mint: new PublicKey(mintAddress),
+      destinationOwner: new PublicKey(params.payeePubkey),
+      amount: params.amount,
+      onSignaturePrepared: params.onSignaturePrepared,
+      onSubmitted: params.onSubmitted,
+    });
 
-      const mintInfo = await getMint(connection, mint);
+    if (result.status === 'completed')
+      this.logger.log(`[SolanaTransfer] Finalized: ${result.signature}`);
 
-      const ix = createTransferCheckedInstruction(
-        payerAta.address,
-        mint,
-        payeeAta.address,
-        payerPubkey,
-        params.amount,
-        mintInfo.decimals,
-      );
-
-      const latestBlockhash = await connection.getLatestBlockhash('confirmed');
-      const tx = new Transaction({
-        feePayer: payerPubkey,
-        recentBlockhash: latestBlockhash.blockhash,
-      }).add(ix);
-      tx.sign(payerKeypair);
-      const signatureBytes = tx.signature;
-      if (!signatureBytes)
-        throw new Error('Signed transaction did not contain a signature');
-      const signature = bs58.encode(signatureBytes);
-      preparedSignature = signature;
-      await params.onSignaturePrepared?.(signature);
-
-      broadcastAttempted = true;
-      const txSignature = await connection.sendRawTransaction(tx.serialize(), {
-        preflightCommitment: 'confirmed',
-      });
-      if (txSignature !== preparedSignature) {
-        throw new Error('RPC returned an unexpected transaction signature');
-      }
-      await params.onSubmitted?.(txSignature);
-      const confirmation = await connection.confirmTransaction(
-        { signature: txSignature, ...latestBlockhash },
-        'finalized',
-      );
-      if (confirmation.value.err)
-        throw new Error('Transaction failed before finalization');
-
-      this.logger.log(`[SolanaTransfer] Finalized: ${txSignature}`);
-      return { txSignature, status: 'completed' };
-    } catch (err) {
-      this.logger.error(
-        '[SolanaTransfer] Failed',
-        err instanceof Error ? err.stack : err,
-      );
-      if (broadcastAttempted && preparedSignature) {
-        const status = await this.getStatus(preparedSignature).catch(
-          () => 'pending' as const,
-        );
-        if (status !== 'failed')
-          return { txSignature: preparedSignature, status: 'pending' };
-      }
-      return { txSignature: null, status: 'failed' };
-    }
+    return { txSignature: result.signature, status: result.status };
   }
 
   async getStatus(

@@ -17,6 +17,7 @@ import {
   Minus,
   PackagePlus,
   Plus,
+  QrCode,
   RotateCcw,
   Search,
   X,
@@ -37,6 +38,7 @@ import { usePortalResource } from "@/lib/client/use-portal-resource";
 import { MerchantImportDrawer } from "@/components/merchant-import-drawer";
 import { InventoryAnalytics } from "@/components/inventory-analytics";
 import { ProductAnalyticsDrawer } from "@/components/product-analytics-drawer";
+import { ReceivePaymentDrawer } from "@/components/receive-payment";
 
 type Draft = {
   name: string;
@@ -120,6 +122,8 @@ export function InventoryView() {
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [analyticsProduct, setAnalyticsProduct] = useState<MerchantProduct | null>(null);
+  // Q.1 — one drawer for the whole table; the chosen product seeds its lines.
+  const [invoiceProductId, setInvoiceProductId] = useState<string | null>(null);
 
   const products = (resource.data?.items ?? []).filter((product) => {
     const term = query.trim().toLowerCase();
@@ -383,6 +387,19 @@ export function InventoryView() {
                   </div>
                   <div className="flex gap-2">
                     <Button
+                      variant="secondary"
+                      size="sm"
+                      aria-label={`Create invoice or QR for ${product.name}`}
+                      disabled={
+                        product.status === "archived" ||
+                        product.availableQuantity === 0
+                      }
+                      onClick={() => setInvoiceProductId(product.id)}
+                    >
+                      <QrCode data-icon="inline-start" aria-hidden="true" />
+                      Create invoice / QR
+                    </Button>
+                    <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setAnalyticsProduct(product)}
@@ -455,6 +472,12 @@ export function InventoryView() {
       <InventoryAnalytics />
 
       <ProductAnalyticsDrawer product={analyticsProduct} open={Boolean(analyticsProduct)} onOpenChange={(open) => { if (!open) setAnalyticsProduct(null); }} />
+
+      <ReceivePaymentDrawer
+        open={Boolean(invoiceProductId)}
+        onOpenChange={(open) => { if (!open) setInvoiceProductId(null); }}
+        preloadProductIds={invoiceProductId ? [invoiceProductId] : undefined}
+      />
 
       <Drawer
         direction="right"

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { OnRampService } from './onramp.service';
@@ -22,9 +22,11 @@ import { WalletsModule } from '../wallets/wallets.module';
 import { UsersModule } from '../users/users.module';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 import { OffRampModule } from '../offramp/offramp.module';
+import { AccountsModule } from '../accounts/accounts.module';
 
 @Module({
   imports: [
+    forwardRef(() => AccountsModule),
     HttpModule,
     ConfigModule,
     LedgerModule,

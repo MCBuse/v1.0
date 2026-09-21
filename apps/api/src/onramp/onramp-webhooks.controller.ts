@@ -17,6 +17,7 @@ import { StripeOnrampProvider } from './widget/stripe-onramp.provider';
 import { OfframpSessionsService } from '../offramp/offramp-sessions.service';
 import { MoonpayOfframpProvider } from '../offramp/moonpay-offramp.provider';
 import { StripeOfframpProvider } from '../offramp/stripe-offramp.provider';
+import { AccountsWebhookService } from '../accounts/accounts-webhook.service';
 
 type ReqWithRaw = { rawBody?: Buffer };
 
@@ -32,6 +33,7 @@ export class OnrampWebhooksController {
     private readonly offrampSessions: OfframpSessionsService,
     private readonly moonpayOfframp: MoonpayOfframpProvider,
     private readonly stripeOfframp: StripeOfframpProvider,
+    private readonly accountsWebhooks: AccountsWebhookService,
   ) {}
 
   @Post('onramp/webhooks/:provider')
@@ -96,6 +98,17 @@ export class OnrampWebhooksController {
       }
 
       const eventType = this.extractEventType(parsed);
+
+      // Account funding and withdrawal events are handled first; they carry
+      // their own de-duplication and must not fall through to the legacy ramps.
+      if (this.accountsWebhooks.handles(eventType)) {
+        const result = await this.accountsWebhooks.handleStripeEvent(
+          parsed,
+          rawBody.toString('utf8'),
+        );
+        if (result.handled) return { received: true };
+      }
+
       if (this.stripeOfframp.isOfframpEvent(eventType)) {
         const event = this.stripeOfframp.parseWebhook(parsed);
         await this.offrampSessions.applyStripeWebhook(event, parsed);

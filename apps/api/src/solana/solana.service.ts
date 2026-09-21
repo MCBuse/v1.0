@@ -2,29 +2,21 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Keypair, Connection, PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddressSync } from '@solana/spl-token';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-
-const ALGORITHM = 'aes-256-gcm';
-const IV_BYTES = 12;
-const AUTH_TAG_BYTES = 16;
+import { WalletKeyRegistry } from './wallet-key-registry';
 
 @Injectable()
 export class SolanaService implements OnModuleInit {
   private readonly logger = new Logger(SolanaService.name);
-  private encryptionKey!: Buffer;
+  private keys!: WalletKeyRegistry;
   private connection!: Connection;
 
   constructor(private readonly config: ConfigService) {}
 
   onModuleInit() {
-    const hexKey = this.config.get<string>('SOLANA_KEYPAIR_ENCRYPTION_KEY') ?? '';
-    if (hexKey.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(hexKey)) {
-      throw new Error(
-        'SOLANA_KEYPAIR_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes). ' +
-          'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
-      );
-    }
-    this.encryptionKey = Buffer.from(hexKey, 'hex');
+    this.keys = new WalletKeyRegistry((name) => this.config.get<string>(name));
+    this.logger.log(
+      `Wallet encryption key versions: ${this.keys.versions().join(', ')} (current ${this.keys.currentVersion})`,
+    );
 
     const rpcUrl = this.config.getOrThrow<string>('SOLANA_RPC_URL');
     this.connection = new Connection(rpcUrl, 'confirmed');
@@ -32,50 +24,46 @@ export class SolanaService implements OnModuleInit {
   }
 
   /** Generate a new Solana keypair and return pubkey + encrypted secret key. */
-  generateKeypair(): { publicKey: string; encryptedKeypair: string } {
+  generateKeypair(): {
+    publicKey: string;
+    encryptedKeypair: string;
+    encryptionKeyVersion: string;
+  } {
     const keypair = Keypair.generate();
     return {
       publicKey: keypair.publicKey.toBase58(),
       encryptedKeypair: this.encryptKeypair(keypair.secretKey),
+      encryptionKeyVersion: this.keys.currentVersion,
     };
   }
 
-  /** AES-256-GCM encrypt. Returns "iv:authTag:ciphertext" (all hex). */
-  encryptKeypair(secretKey: Uint8Array): string {
-    const iv = randomBytes(IV_BYTES);
-    const cipher = createCipheriv(ALGORITHM, this.encryptionKey, iv);
-    const ciphertext = Buffer.concat([
-      cipher.update(Buffer.from(secretKey)),
-      cipher.final(),
-    ]);
-    const authTag = cipher.getAuthTag();
-    return [
-      iv.toString('hex'),
-      authTag.toString('hex'),
-      ciphertext.toString('hex'),
-    ].join(':');
+  /** The key version new wallet records are sealed with. */
+  get currentKeyVersion(): string {
+    return this.keys.currentVersion;
   }
 
-  /** Decrypt an encrypted keypair string back to a Solana Keypair. */
-  decryptKeypair(encrypted: string): Keypair {
-    const parts = encrypted.split(':');
-    if (parts.length !== 3) throw new Error('Invalid encrypted keypair format');
-    const [ivHex, authTagHex, ciphertextHex] = parts;
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const ciphertext = Buffer.from(ciphertextHex, 'hex');
+  get keyRegistry(): WalletKeyRegistry {
+    return this.keys;
+  }
 
-    const decipher = createDecipheriv(ALGORITHM, this.encryptionKey, iv);
-    decipher.setAuthTag(authTag);
-    const secretKey = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-    return Keypair.fromSecretKey(secretKey);
+  /** AES-256-GCM encrypt under the current key version. */
+  encryptKeypair(secretKey: Uint8Array): string {
+    return this.keys.encrypt(secretKey);
+  }
+
+  /** Decrypt a stored keypair, using whichever key version sealed it. */
+  decryptKeypair(encrypted: string): Keypair {
+    return Keypair.fromSecretKey(this.keys.decrypt(encrypted));
   }
 
   /**
    * Get SPL token balance for a wallet pubkey and mint address.
    * Returns balance in base units (bigint). Returns 0n if token account doesn't exist.
    */
-  async getTokenBalance(walletPubkey: string, mintAddress: string): Promise<bigint> {
+  async getTokenBalance(
+    walletPubkey: string,
+    mintAddress: string,
+  ): Promise<bigint> {
     try {
       const wallet = new PublicKey(walletPubkey);
       const mint = new PublicKey(mintAddress);
@@ -84,6 +72,45 @@ export class SolanaService implements OnModuleInit {
       return BigInt(info.value.amount);
     } catch {
       return 0n;
+    }
+  }
+
+  /**
+   * The same read, but able to say "I could not tell".
+   *
+   * `getTokenBalance` answers 0 for a missing token account *and* for an RPC
+   * that did not respond, which is the right trade for a balance display and
+   * exactly the wrong one for reconciliation: a report that treated an
+   * unreachable RPC as an empty wallet would declare a discrepancy against
+   * every funded wallet at once.
+   */
+  async readTokenBalance(
+    walletPubkey: string,
+    mintAddress: string,
+  ): Promise<{ baseUnits: bigint | null; reason?: string }> {
+    let ata: PublicKey;
+    try {
+      const wallet = new PublicKey(walletPubkey);
+      const mint = new PublicKey(mintAddress);
+      ata = getAssociatedTokenAddressSync(mint, wallet);
+    } catch (error) {
+      return {
+        baseUnits: null,
+        reason: error instanceof Error ? error.message : 'invalid address',
+      };
+    }
+
+    try {
+      const info = await this.connection.getTokenAccountBalance(ata);
+      return { baseUnits: BigInt(info.value.amount) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // A wallet that has never received the token has no account, and that
+      // genuinely is a zero balance.
+      if (/could not find account|account does not exist/i.test(message)) {
+        return { baseUnits: 0n };
+      }
+      return { baseUnits: null, reason: message };
     }
   }
 

@@ -12,9 +12,17 @@ import * as schema from '../database/schema';
 import { SolanaService } from '../solana/solana.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { InternalTransferDto } from './dto/internal-transfer.dto';
-import { randomUUID } from 'crypto';
+import {
+  assertIdempotentReuse,
+  operationFingerprint,
+} from '../financial-operations/operation-fingerprint';
 
 const CURRENCIES = ['USDC', 'EURC'] as const;
+
+/** Postgres unique-violation. Two racing requests with one key produce exactly this. */
+function isUniqueViolation(error: unknown): boolean {
+  return (error as { code?: string } | null)?.code === '23505';
+}
 
 @Injectable()
 export class WalletsService {
@@ -38,12 +46,14 @@ export class WalletsService {
             type: 'savings',
             solanaPubkey: savings.publicKey,
             encryptedKeypair: savings.encryptedKeypair,
+            encryptionKeyVersion: savings.encryptionKeyVersion,
           },
           {
             userId,
             type: 'routine',
             solanaPubkey: routine.publicKey,
             encryptedKeypair: routine.encryptedKeypair,
+            encryptionKeyVersion: routine.encryptionKeyVersion,
           },
         ])
         .returning({
@@ -133,7 +143,11 @@ export class WalletsService {
   }
 
   /** Internal Savings ↔ Routine transfer. Both wallets are custodial — no on-chain tx. */
-  async internalTransfer(userId: string, dto: InternalTransferDto) {
+  async internalTransfer(
+    userId: string,
+    dto: InternalTransferDto,
+    clientIdempotencyKey: string,
+  ) {
     if (dto.fromWalletType === dto.toWalletType) {
       throw new BadRequestException('Source and destination wallets must differ');
     }
@@ -144,53 +158,81 @@ export class WalletsService {
     const from = await this.getWalletForUser(userId, dto.fromWalletType);
     const to = await this.getWalletForUser(userId, dto.toWalletType);
     const currency = dto.currency.toUpperCase();
-    const idempotencyKey = randomUUID();
 
-    await this.db.transaction(async (tx) => {
-      // Atomic conditional deduct: only succeeds if available >= amount (no race)
-      const srcUpdated = await tx
-        .update(schema.balances)
-        .set({ available: sql`${schema.balances.available} - ${amount}` })
-        .where(
-          and(
-            eq(schema.balances.walletId, from.id),
-            eq(schema.balances.currency, currency),
-            gte(schema.balances.available, amount),
-          ),
-        )
-        .returning({ id: schema.balances.id });
-
-      if (srcUpdated.length === 0) {
-        throw new BadRequestException('Insufficient balance');
-      }
-
-      // Credit destination — verify the balance row exists (affected exactly 1 row)
-      const dstUpdated = await tx
-        .update(schema.balances)
-        .set({ available: sql`${schema.balances.available} + ${amount}` })
-        .where(
-          and(
-            eq(schema.balances.walletId, to.id),
-            eq(schema.balances.currency, currency),
-          ),
-        )
-        .returning({ id: schema.balances.id });
-
-      if (dstUpdated.length !== 1) {
-        throw new BadRequestException('Invalid destination wallet or currency');
-      }
-
-      await tx.insert(schema.ledgerEntries).values({
-        debitWalletId: from.id,
-        creditWalletId: to.id,
-        amount,
-        currency,
-        type: 'internal',
-        status: 'completed',
-        idempotencyKey,
-        metadata: JSON.stringify({ initiatedBy: userId }),
-      });
+    // The key is namespaced per user so one person's key can never collide with
+    // another's on the ledger's global unique index.
+    const idempotencyKey = `wallet-transfer:${userId}:${clientIdempotencyKey}`;
+    const fingerprint = operationFingerprint({
+      userId,
+      from: dto.fromWalletType,
+      to: dto.toWalletType,
+      amount,
+      currency,
     });
+
+    const replay = await this.findInternalTransfer(idempotencyKey);
+    if (replay) {
+      assertIdempotentReuse(replay.fingerprint, fingerprint, 'wallet transfer');
+      return this.presentInternalTransfer(replay, dto, currency, idempotencyKey);
+    }
+
+    try {
+      await this.db.transaction(async (tx) => {
+        // Atomic conditional deduct: only succeeds if available >= amount (no race)
+        const srcUpdated = await tx
+          .update(schema.balances)
+          .set({ available: sql`${schema.balances.available} - ${amount}` })
+          .where(
+            and(
+              eq(schema.balances.walletId, from.id),
+              eq(schema.balances.currency, currency),
+              gte(schema.balances.available, amount),
+            ),
+          )
+          .returning({ id: schema.balances.id });
+
+        if (srcUpdated.length === 0) {
+          throw new BadRequestException('Insufficient balance');
+        }
+
+        // Credit destination — verify the balance row exists (affected exactly 1 row)
+        const dstUpdated = await tx
+          .update(schema.balances)
+          .set({ available: sql`${schema.balances.available} + ${amount}` })
+          .where(
+            and(
+              eq(schema.balances.walletId, to.id),
+              eq(schema.balances.currency, currency),
+            ),
+          )
+          .returning({ id: schema.balances.id });
+
+        if (dstUpdated.length !== 1) {
+          throw new BadRequestException('Invalid destination wallet or currency');
+        }
+
+        // Inserting the ledger entry inside the same transaction is what makes
+        // the key authoritative: a duplicate key aborts the balance moves too.
+        await tx.insert(schema.ledgerEntries).values({
+          debitWalletId: from.id,
+          creditWalletId: to.id,
+          amount,
+          currency,
+          type: 'internal',
+          status: 'completed',
+          idempotencyKey,
+          metadata: JSON.stringify({ initiatedBy: userId, fingerprint }),
+        });
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      // Another request carrying the same key committed first. Its entry is the
+      // outcome; ours rolled back whole, so no money moved twice.
+      const winner = await this.findInternalTransfer(idempotencyKey);
+      if (!winner) throw error;
+      assertIdempotentReuse(winner.fingerprint, fingerprint, 'wallet transfer');
+      return this.presentInternalTransfer(winner, dto, currency, idempotencyKey);
+    }
 
     return {
       from: dto.fromWalletType,
@@ -198,6 +240,47 @@ export class WalletsService {
       currency,
       amount: dto.amount,
       idempotencyKey,
+      replayed: false,
+    };
+  }
+
+  private async findInternalTransfer(idempotencyKey: string) {
+    const rows = await this.db
+      .select({
+        amount: schema.ledgerEntries.amount,
+        currency: schema.ledgerEntries.currency,
+        metadata: schema.ledgerEntries.metadata,
+      })
+      .from(schema.ledgerEntries)
+      .where(eq(schema.ledgerEntries.idempotencyKey, idempotencyKey))
+      .limit(1);
+
+    if (!rows[0]) return null;
+    let fingerprint: string | null = null;
+    try {
+      const parsed = JSON.parse(rows[0].metadata ?? '{}') as {
+        fingerprint?: string;
+      };
+      fingerprint = parsed.fingerprint ?? null;
+    } catch {
+      fingerprint = null;
+    }
+    return { ...rows[0], fingerprint };
+  }
+
+  private presentInternalTransfer(
+    stored: { amount: bigint; currency: string },
+    dto: InternalTransferDto,
+    currency: string,
+    idempotencyKey: string,
+  ) {
+    return {
+      from: dto.fromWalletType,
+      to: dto.toWalletType,
+      currency,
+      amount: stored.amount.toString(),
+      idempotencyKey,
+      replayed: true,
     };
   }
 

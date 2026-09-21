@@ -45,6 +45,7 @@ import { CreateMerchantProductDto } from './dto/create-merchant-product.dto';
 import { ListMerchantInvoicesDto } from './dto/list-merchant-invoices.dto';
 import { ListMerchantProductsDto } from './dto/list-merchant-products.dto';
 import { UpdateMerchantProductDto } from './dto/update-merchant-product.dto';
+import { AnalyticsWorkQueueService } from '../analytics-intelligence/analytics-work-queue.service';
 
 const QR_SCHEME = 'mcbuse://pay';
 const QR_VERSION = '1';
@@ -66,6 +67,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
     private readonly merchants: MerchantService,
     private readonly rates: RatesService,
     private readonly images: MerchantImageService,
+    private readonly analyticsWork: AnalyticsWorkQueueService,
   ) {}
 
   onModuleInit() {
@@ -251,6 +253,10 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
       );
     }
     await this.db.insert(schema.merchantStockMovements).values({ merchantId: merchant.merchantId, productId, kind: 'manual_adjustment', onHandChange: dto.change, reservedChange: 0, referenceType: 'product', referenceId: productId });
+    await this.analyticsWork.enqueue(merchant.merchantId, 'stock_adjusted', {
+      type: 'merchant_product',
+      id: productId,
+    });
     return this.productResponse(rows[0]);
   }
 
@@ -337,6 +343,9 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
             type: 'product',
             name: product.name,
             sku: product.sku,
+            // Snapshotted, so re-categorising the product later does not
+            // rewrite what this sale was.
+            category: product.category,
             quantity: input.quantity,
             unitPriceMinor: product.unitPriceMinor,
             lineTotalMinor: lineTotal,
@@ -350,6 +359,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
             type: 'custom',
             name: input.name!.trim(),
             sku: null,
+            category: null,
             quantity: input.quantity,
             unitPriceMinor,
             lineTotalMinor: lineTotal,
@@ -515,6 +525,11 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
     invoiceId: string,
   ): Promise<MerchantInvoice> {
     const merchant = await this.merchants.requireMerchant(userId);
+    // Establish that the invoice is this merchant's before saying anything
+    // about its state. Without this, another merchant's invoice answered
+    // "only pending invoices can be cancelled", which is both wrong and a
+    // statement about a row the caller has no business hearing about.
+    await this.loadInvoice(merchant.merchantId, invoiceId);
     await this.cancelPendingInvoice(invoiceId, merchant.merchantId);
     return this.loadInvoice(merchant.merchantId, invoiceId);
   }

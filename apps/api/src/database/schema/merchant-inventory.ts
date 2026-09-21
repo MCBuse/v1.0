@@ -59,6 +59,12 @@ export const merchantInvoiceItems = pgTable(
     type: varchar('type', { length: 20 }).notNull(),
     name: varchar('name', { length: 160 }).notNull(),
     sku: varchar('sku', { length: 64 }),
+    /**
+     * The product's category at the moment of sale. NULL on rows written
+     * before this was captured; analytics falls back to the product's current
+     * category for those and labels the fallback.
+     */
+    category: varchar('category', { length: 100 }),
     quantity: integer('quantity').notNull(),
     unitPriceMinor: bigint('unit_price_minor', { mode: 'bigint' }).notNull(),
     lineTotalMinor: bigint('line_total_minor', { mode: 'bigint' }).notNull(),
