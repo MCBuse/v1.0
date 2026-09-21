@@ -1,0 +1,120 @@
+{
+  "verifiedAt": "2026-09-21T15:43:27.514997+00:00",
+  "scope": "Restore existing Stripe sandbox / Solana devnet checkout initiation on merchant portal and mobile",
+  "rootCauses": {
+    "treasuryUsdcBefore": "3.321366",
+    "mobileMinimumUsd": "20",
+    "moneyInitiationEnabledBefore": false,
+    "observedFailure": "POST /api/v1/accounts/funding returned 503 Funding is temporarily unavailable"
+  },
+  "changes": {
+    "treasuryFaucet": "https://faucet.circle.com/",
+    "testUsdcAdded": "20",
+    "treasuryUsdcAfter": "23.321366",
+    "moneyInitiationEnabled": true,
+    "financialMode": "sandbox",
+    "solanaNetwork": "devnet",
+    "apiRevision": "mcbuse-api-00044-zbq",
+    "trafficPercent": 100,
+    "repositoryConfig": "deploy/cloud-run/api.env.yaml"
+  },
+  "verification": {
+    "stripeTestKeyVerified": true,
+    "cardConfigurationActiveAndTestMode": true,
+    "bankConfigurationActiveAndTestMode": true,
+    "merchantCardCheckout": "Stripe Sandbox card form observed for USD 1.00",
+    "merchantBankCheckout": "Stripe Sandbox US bank account form observed for USD 1.00",
+    "apiHealth": "ok; database ok",
+    "gitDiffCheck": "passed",
+    "mobileRetry": "HTTP 201 from deployed API; Stripe independently confirms the resulting USD20 card session is complete and paid in sandbox",
+    "settlement": "Mobile USD20 Stripe test payment paid; finalized Solana devnet transfer of 20 USDC independently verified; recovery job logged Holding credit of 20000000 base units",
+    "mobileScreenshot": "/tmp/mcbuse-mobile-checkout-restored.png",
+    "mobileScreenshotObservation": "Home screen visible after retry; checkout form not captured",
+    "verificationSessionsCleanup": "Both unpaid USD1 sessions expired in Stripe; merchant UI shows both failed after recovery"
+  },
+  "verificationSessions": [
+    {
+      "sessionId": "cs_test_a1stE7bEf2qhlIPmrX7vJKjftpwDKxHqiXzUqC3NyUGPoijBHLXIFK4a4t",
+      "operationId": "26219f33-bf4b-4421-a56b-b8c4b07e813c",
+      "method": [
+        "card"
+      ],
+      "status": "expired",
+      "paymentStatus": "unpaid",
+      "livemode": false,
+      "amountCents": 100
+    },
+    {
+      "sessionId": "cs_test_a1NmGvJMcDBCoYMlkc1pVmH1fPz81iceIyy8Ibq89ObJplUOXtMGLRFBbA",
+      "operationId": "9b6e4546-1b04-4971-855b-13669cce8410",
+      "method": [
+        "us_bank_account"
+      ],
+      "status": "expired",
+      "paymentStatus": "unpaid",
+      "livemode": false,
+      "amountCents": 100
+    }
+  ],
+  "recovery": {
+    "schedule": "0 * * * *",
+    "timezone": "Etc/UTC",
+    "scheduleChanged": false,
+    "manualRun": "User manually triggered mcbuse-api-financial-recovery-x4lf7; execution completed successfully at 2026-09-21T15:41:35.232709Z",
+    "fundingFinalizationLog": "2026-09-21T15:41:30.153292Z Funding 0c6aef7a-1fcc-4859-9f1f-a2fd34bd8d2e finalized: 20000000 base units credited"
+  },
+  "limitations": [
+    "Only 3.321366 test USDC remains in treasury after the successful USD20 mobile payment; replenish before another USD20 or larger test.",
+    "Merchant card and US bank checkout forms were verified; bank collection and settlement were not exercised.",
+    "Existing hourly recovery cadence can delay final balance credit."
+  ],
+  "mobilePayment": {
+    "operationId": "0c6aef7a-1fcc-4859-9f1f-a2fd34bd8d2e",
+    "sessionId": "cs_test_a1p573uU32Nuypcn6DFinlYvioUUaGjIghNm4ZSwc55j561B82WCaVyzLc",
+    "amountCents": 2000,
+    "status": "complete",
+    "paymentStatus": "paid",
+    "livemode": false,
+    "settlement": "finalized",
+    "chainSignature": "4tbNLhrfJbgj6WAV6iKdivCBfM2c3FHWujABf6R4NM4jTxBSyLxaDuvW1aEaWY7ar9CuUuJ1wrthXXprbP1dj5d1"
+  },
+  "chainEvidence": {
+    "treasuryUsdcRemaining": "3.321366",
+    "transactions": [
+      {
+        "signature": "4tbNLhrfJbgj6WAV6iKdivCBfM2c3FHWujABf6R4NM4jTxBSyLxaDuvW1aEaWY7ar9CuUuJ1wrthXXprbP1dj5d1",
+        "confirmation": "finalized",
+        "blockTime": 1790005136,
+        "changes": [
+          {
+            "owner": "8RGk4zNtuqEXyvmPjAaeZc8cgNjTVc8EjeuTyqxymuEL",
+            "deltaBaseUnits": "20000000",
+            "balance": "20"
+          },
+          {
+            "owner": "82ihqmVixpNYoqJDrGPSexJ6kV2JP8Mis38pAnzzXqV4",
+            "deltaBaseUnits": "-20000000",
+            "balance": "3.321366"
+          }
+        ]
+      },
+      {
+        "signature": "4cKBdMHvBt8qXiyMSW1UA5iFK94ytQ9v9drW6361DZD7HP3oCZ6buPQHcYshDTaLWXVtctvVSSHAJC8VFDU3df5f",
+        "confirmation": "finalized",
+        "blockTime": 1790004754,
+        "changes": [
+          {
+            "owner": "H3sjyipQtXAJkvWNkXhDgped7k323kAba8QMwCLcV79w",
+            "deltaBaseUnits": "-20000000",
+            "balance": "997931141.039276"
+          },
+          {
+            "owner": "82ihqmVixpNYoqJDrGPSexJ6kV2JP8Mis38pAnzzXqV4",
+            "deltaBaseUnits": "20000000",
+            "balance": "23.321366"
+          }
+        ]
+      }
+    ]
+  }
+}
