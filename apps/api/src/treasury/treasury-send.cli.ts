@@ -41,9 +41,12 @@ async function fundFees(
     }),
   );
   transaction.sign(treasury);
-  const signature = await connection.sendRawTransaction(transaction.serialize(), {
-    preflightCommitment: 'confirmed',
-  });
+  const signature = await connection.sendRawTransaction(
+    transaction.serialize(),
+    {
+      preflightCommitment: 'confirmed',
+    },
+  );
   await connection.confirmTransaction(
     { signature, blockhash, lastValidBlockHeight },
     'confirmed',
@@ -84,8 +87,9 @@ async function main() {
     mint: new PublicKey(mintAddress),
     destinationOwner: destination,
     amount: amountBaseUnits,
-    onSignaturePrepared: async (signature) => {
+    onSignaturePrepared: (signature) => {
       preparedSignatures.push(signature);
+      return Promise.resolve();
     },
   });
 

@@ -291,7 +291,7 @@ therefore new work, not a configuration change.
 | X.11 | Key-version migration and backup restoration | not-started |
 | X.12 | Secrets excluded from responses and logs | not-started |
 | X.13 | Invoice reservation, expiry, cancellation, cash void | built |
-| X.14 | Cross-device event replay, reconnect, multiple API instances | not-started |
+| X.14 | Cross-device event replay, reconnect, multiple API instances | built (L) — two instances, cursor replay, reconnect, per-merchant isolation, ordered bursts |
 | X.15 | Analytics totals, timezone boundaries, empty periods, missing baselines, mixed sources, incomplete stock history | not-started |
 | X.16 | Every combined-analysis example | not-started |
 | X.17 | Automatic stock-risk creation and resolution | not-started |
