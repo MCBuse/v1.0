@@ -697,5 +697,45 @@
     "hostedApiReadOnlyRoutes": "9 passed",
     "hostedPortalBrowserPages": "6 passed",
     "backgroundJobExecutions": "all 3 passed; scheduled minute executions verified"
+  },
+  "hostedAcceptanceFollowup": {
+    "sourceCommit": "afacbba03a62bc9d2e6ee26162691119a8ef41c6",
+    "portalRevision": "mcbuse-portal-00028-t7n",
+    "portalImage": "sha256:53b2f436809d2a9a6c151c3b9de853cf8cde35195091000a622103555a4a8276",
+    "portalTestsPassed": 31,
+    "portalTypeCheck": "passed",
+    "mobileTypeCheck": "passed",
+    "physicalQrUpdatesMatched": 40,
+    "physicalQrP95UpperBoundMs": 2844,
+    "qrGate": "open",
+    "gmailReceipt": "confirmed",
+    "receivedAttachmentHashes": "pending",
+    "legacyWalletMismatchCount": 6,
+    "legacyUsdcLedgerTotal": "1173",
+    "moneyInitiation": "disabled",
+    "expoDeployment": "held",
+    "reports": [
+      "merchant-iphone-qr-acceptance-2026-09-21.json",
+      "merchant-finance-hosted-acceptance-2026-09-21.json",
+      "merchant-older-assessment-acceptance-2026-09-21.json",
+      "merchant-portal-acceptance-fixes-2026-09-21.json",
+      "merchant-legacy-financial-reconciliation-2026-09-21.json"
+    ],
+    "filesSha256": {
+      "apps/portal/app/api/accounts/route.ts": "78e2525cf2dc12cb00e6a38a2e305ec882ccc832568ecbbd9a2ff071152910c5",
+      "apps/portal/next.config.ts": "0063eab7747ba5fc04323e6a0e3f23ce5a56a3aafa83dabc43d926b9fbf32086",
+      "apps/portal/lib/server/csrf-session.test.ts": "2d4478524ae4498a33c9b0ca3aeca8200451e1e9a12a39cce43c584cb282f0d0",
+      "apps/portal/tests/assessment-finance.spec.ts": "8fb3410c812d0c4bc42e58d30e2c0eb7a22e2db7c80bb91390df15fb3f5063e3",
+      "apps/mobile/features/merchant-events/hooks.ts": "690472c121e57bb56085c39bbfbbd3fcaec58cca3616e1f4b3d137994cb4e6ab"
+    }
+  },
+  "legacySandboxReset": {
+    "complete": true,
+    "evidence": "merchant-legacy-sandbox-reset-2026-09-21.json",
+    "auditId": "02015c2f-6b3d-4aaf-82dc-58052e6d989f",
+    "walletsPreserved": 8,
+    "currencyBalanceRowsZeroed": 16,
+    "hostedReadbackPassed": true,
+    "moneyInitiationEnabled": false
   }
 }

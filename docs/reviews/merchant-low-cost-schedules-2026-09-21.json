@@ -1,0 +1,116 @@
+{
+  "verifiedAt": "2026-09-21T14:46:59.674609+00:00",
+  "purpose": "Restore pre-user cost-saving cadence following user concern about minute-by-minute idle compute costs",
+  "preflight": {
+    "checkedAt": "2026-09-21T14:44:49.844Z",
+    "apiRevision": "mcbuse-api-00042-v97",
+    "financialMode": "sandbox",
+    "network": "devnet",
+    "moneyInitiationEnabled": "false",
+    "checks": {
+      "unfinishedFinancialOperations": 0,
+      "unfinishedCustomerPayments": 0,
+      "processingPaymentRequests": 0,
+      "pendingLedger": 0,
+      "reservedWalletBalances": 0,
+      "unfinishedFunding": 0,
+      "offrampRecords": 0,
+      "chainAttemptRecords": 0
+    },
+    "before": [
+      {
+        "httpTarget": {
+          "uri": "https://run.googleapis.com/v2/projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics:run"
+        },
+        "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-every-10-minutes",
+        "schedule": "0 */6 * * *",
+        "state": "ENABLED",
+        "timeZone": "Etc/UTC"
+      },
+      {
+        "httpTarget": {
+          "uri": "https://run.googleapis.com/v2/projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-financial-recovery:run"
+        },
+        "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-financial-recovery-every-minute",
+        "schedule": "* * * * *",
+        "state": "ENABLED",
+        "timeZone": "Etc/UTC"
+      },
+      {
+        "httpTarget": {
+          "uri": "https://run.googleapis.com/v2/projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-queue:run"
+        },
+        "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-queue-every-minute",
+        "schedule": "* * * * *",
+        "state": "ENABLED",
+        "timeZone": "Etc/UTC"
+      }
+    ],
+    "safeForIdleCadence": true
+  },
+  "after": [
+    {
+      "httpTarget": {
+        "uri": "https://run.googleapis.com/v2/projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics:run"
+      },
+      "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-every-10-minutes",
+      "schedule": "0 */6 * * *",
+      "state": "ENABLED",
+      "timeZone": "Etc/UTC"
+    },
+    {
+      "description": "Low-cost pre-user recovery: every six hours while money initiation is disabled and no payments are pending; restore minute cadence before payment testing.",
+      "httpTarget": {
+        "uri": "https://run.googleapis.com/v2/projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-financial-recovery:run"
+      },
+      "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-financial-recovery-every-minute",
+      "schedule": "0 */6 * * *",
+      "state": "ENABLED",
+      "timeZone": "Etc/UTC"
+    },
+    {
+      "description": "Low-cost pre-user analytics queue: every six hours; enable minute cadence only for an active acceptance window.",
+      "httpTarget": {
+        "uri": "https://run.googleapis.com/v2/projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-queue:run"
+      },
+      "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-queue-every-minute",
+      "schedule": "0 */6 * * *",
+      "state": "ENABLED",
+      "timeZone": "Etc/UTC"
+    }
+  ],
+  "changedSchedules": [
+    "mcbuse-api-analytics-queue-every-minute",
+    "mcbuse-api-financial-recovery-every-minute"
+  ],
+  "runsPerDayPerChangedJob": 4,
+  "executionCountReductionPercent": 99.722,
+  "estimate": {
+    "currency": "USD",
+    "days": 30,
+    "combinedScheduledRuns": 240,
+    "combinedComputeBeforeFreeTierAndCredits": 0.2736,
+    "assumptions": [
+      "One task per job, one vCPU and 512 MiB",
+      "Each execution lasts at most 60 seconds",
+      "No retries or manual executions",
+      "Excludes full sweep and other cloud resources"
+    ],
+    "actualBillVerified": false,
+    "pricingSource": "https://cloud.google.com/run/pricing"
+  },
+  "validation": [
+    "Independent Cloud Scheduler readback matched schedule, timezone, enabled state and original job targets",
+    "No unsettled operations, customer payments, processing requests, pending wallet balances, onramps, offramps or chain attempts at preflight",
+    "Money initiation disabled",
+    "bash -n passed for both deployment scripts",
+    "Targeted git diff --check passed"
+  ],
+  "deploymentDefaults": {
+    "analyticsQueueOverride": "MCBUSE_ANALYTICS_QUEUE_SCHEDULE",
+    "financialRecoveryOverride": "MCBUSE_RECOVERY_SCHEDULE",
+    "default": "0 */6 * * *",
+    "recoveryGuard": "Explicit recovery schedule required when money initiation is enabled"
+  },
+  "acceptanceImpact": "The idle six-hour cadence does not satisfy the two-minute insight acceptance gate. Restore a temporary minute schedule for active acceptance; restore frequent recovery before enabling payments. Manual job execution remains available."
+}

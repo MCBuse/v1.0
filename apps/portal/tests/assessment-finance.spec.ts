@@ -9,7 +9,7 @@ test.beforeEach(async({context,page})=>{
 });
 test('assessment retries retain their intent after a lost response and page refresh',async({page})=>{
  const keys:string[]=[];
- await page.route('**/api/merchant/me/assessments',route=>{if(route.request().method()==='GET')return route.fallback();keys.push(route.request().headers()['idempotency-key']);return keys.length===1?route.abort():route.fulfill({json:latest});});
+ await page.route('**/api/merchant/me/assessments',route=>{if(route.request().method()==='GET')return route.fallback();const key=route.request().headers()['idempotency-key'];if(!key)throw new Error('Missing assessment idempotency key');keys.push(key);return keys.length===1?route.abort():route.fulfill({json:latest});});
  await page.goto('/credit-assessment');await page.getByRole('button',{name:'Run assessment',exact:true}).click();await expect(page.getByRole('button',{name:'Run assessment',exact:true})).toBeEnabled();
  await page.reload();await page.getByRole('button',{name:'Run assessment',exact:true}).click();await expect.poll(()=>keys.length).toBe(2);expect(keys[1]).toBe(keys[0]);
  await expect(page.getByText('readiness-rules-v1 / 1')).toBeVisible();

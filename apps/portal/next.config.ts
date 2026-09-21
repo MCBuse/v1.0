@@ -32,7 +32,21 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: root,
   transpilePackages: ["@repo/ui", "@repo/shared"],
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      {
+        // The immutable PDF is embedded by Finance Match on this same origin.
+        // All other pages continue to reject framing entirely.
+        source: "/api/merchant/me/finance-packages/:id/pdf",
+        headers: securityHeaders.map((header) =>
+          header.key === "X-Frame-Options"
+            ? { ...header, value: "SAMEORIGIN" }
+            : header.key === "Content-Security-Policy"
+              ? { ...header, value: header.value.replace("frame-ancestors 'none'", "frame-ancestors 'self'") }
+              : header,
+        ),
+      },
+    ];
   },
 };
 

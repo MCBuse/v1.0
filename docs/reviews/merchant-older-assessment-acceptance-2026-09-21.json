@@ -1,0 +1,96 @@
+{
+  "checkedAt": "2026-09-21T14:16:15.810Z",
+  "scenario": "One explicitly labelled EUR0.01 cash acceptance entry, older saved assessment retained after newer data and assessment, then cash voided",
+  "source": "hosted API",
+  "olderAssessmentId": "0011cc8d-f2d0-472f-a863-47fbf770c6ce",
+  "cashSaleId": "de57f07c-971c-42ba-8c40-e36233dd8872",
+  "cashReplaySameId": true,
+  "newerAssessmentId": "2ddd8575-e67f-4cf4-b18d-9d75a54cc88e",
+  "olderSourceCoverage": {
+    "digitalPayments": true,
+    "importedRecords": false,
+    "merchantRecordedCash": false
+  },
+  "newerSourceCoverage": {
+    "digitalPayments": true,
+    "importedRecords": false,
+    "merchantRecordedCash": false
+  },
+  "packageId": "9b964bd4-11c6-4242-a625-a5f7dd7b2aef",
+  "packageReplaySameId": true,
+  "previewRetainsOlder": true,
+  "assessmentBinding": "verified",
+  "artifacts": [
+    {
+      "kind": "pdf",
+      "byteSize": 3144,
+      "sha256": "52d5388b38b9dda0fdbbf2fed237f5f41c33f5ed3a40b8077d1e87abe9090b3b",
+      "createdAt": "2026-09-21T14:16:17.792Z",
+      "downloadPath": "/merchants/me/finance-packages/9b964bd4-11c6-4242-a625-a5f7dd7b2aef/pdf"
+    },
+    {
+      "kind": "zip",
+      "byteSize": 7343,
+      "sha256": "a65cb619ec34317b98f8f0abaaf1e539092b5aa67733cbe2584b4fb67014d05d",
+      "createdAt": "2026-09-21T14:16:17.792Z",
+      "downloadPath": "/merchants/me/finance-packages/9b964bd4-11c6-4242-a625-a5f7dd7b2aef/data"
+    }
+  ],
+  "cashRecord": {
+    "id": "de57f07c-971c-42ba-8c40-e36233dd8872",
+    "receiptNumber": "MCB-4C52415E9855",
+    "amount": {
+      "minor": "1",
+      "currency": "EUR",
+      "estimated": false,
+      "rateTimestamp": null
+    },
+    "status": "recorded",
+    "occurredAt": "2026-09-21T14:16:15.159Z",
+    "recordedAt": "2026-09-21T14:16:16.378Z"
+  },
+  "cashVoid": {
+    "id": "de57f07c-971c-42ba-8c40-e36233dd8872",
+    "receiptNumber": "MCB-4C52415E9855",
+    "amount": {
+      "minor": "1",
+      "currency": "EUR",
+      "estimated": false,
+      "rateTimestamp": null
+    },
+    "status": "voided",
+    "occurredAt": "2026-09-21T14:16:15.159Z",
+    "recordedAt": "2026-09-21T14:16:16.378Z"
+  },
+  "cashVoidReplay": {
+    "id": "de57f07c-971c-42ba-8c40-e36233dd8872",
+    "receiptNumber": "MCB-4C52415E9855",
+    "amount": {
+      "minor": "1",
+      "currency": "EUR",
+      "estimated": false,
+      "rateTimestamp": null
+    },
+    "status": "voided",
+    "occurredAt": "2026-09-21T14:16:15.159Z",
+    "recordedAt": "2026-09-21T14:16:16.378Z"
+  },
+  "zipRetainsOlder": true,
+  "comparisonNote": "Structural equality used; the initial JSON.stringify comparison differed only in object property order.",
+  "testCashIncludedInFrozenReport": true,
+  "files": [
+    {
+      "kind": "pdf",
+      "bytes": 3144,
+      "sha256": "52d5388b38b9dda0fdbbf2fed237f5f41c33f5ed3a40b8077d1e87abe9090b3b"
+    },
+    {
+      "kind": "zip",
+      "bytes": 7343,
+      "sha256": "a65cb619ec34317b98f8f0abaaf1e539092b5aa67733cbe2584b4fb67014d05d"
+    }
+  ],
+  "zipPdfEqualsDownload": true,
+  "emailedPackage": "Not sent yet; first package receipt confirmed separately",
+  "apiRevision": "mcbuse-api-00042-v97"
+}

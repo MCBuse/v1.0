@@ -1,0 +1,9 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY apps/credit-scoring/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home scorer
+COPY --chown=scorer:scorer apps/credit-scoring/scoring ./scoring
+COPY --chown=scorer:scorer apps/credit-scoring/artifacts ./artifacts
+USER scorer
+ENV PORT=8080
+CMD ["sh", "-c", "exec uvicorn scoring.app:app --host 0.0.0.0 --port ${PORT} --no-access-log"]

@@ -8,3 +8,4 @@ export * from './general-analytics';
 export * from './sse';
 
 export * from './merchant-assessment';
+export * from './credit-assessment';

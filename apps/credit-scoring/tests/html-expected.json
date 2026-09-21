@@ -1,0 +1,352 @@
+[
+  {
+    "financial": 51.19065858078231,
+    "confidence": {
+      "confidenceScore": 70.82444185444186,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 72.41811447811448,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.1273211208364764,
+      "statisticalScore": 637.3655458400442,
+      "overlayPoints": 20.757856038177717,
+      "overlayBreakdown": {
+        "business_age_months": 8.571428571428571,
+        "capture_quality": 12,
+        "finalized_payments": 0,
+        "verified_sales_eur": 0.18642746674914934
+      },
+      "score": 658.1234018782219
+    },
+    "grade": "Acceptable"
+  },
+  {
+    "financial": 68.09211529999999,
+    "confidence": {
+      "confidenceScore": 71.13325498575497,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 73.03574074074074,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.061757275071952514,
+      "statisticalScore": 683.2975889299751,
+      "overlayPoints": 31.621224489795914,
+      "overlayBreakdown": {
+        "business_age_months": 2.2040816326530615,
+        "capture_quality": 5.417142857142851,
+        "finalized_payments": 12,
+        "verified_sales_eur": 12
+      },
+      "score": 714.918813419771
+    },
+    "grade": "Good"
+  },
+  {
+    "financial": 43.27414271598639,
+    "confidence": {
+      "confidenceScore": 63.49298562548563,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 57.755202020202034,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.4157232298482969,
+      "statisticalScore": 545.9275237376564,
+      "overlayPoints": 22.00365582290278,
+      "overlayBreakdown": {
+        "business_age_months": 11.755102040816325,
+        "capture_quality": 6.497142857142869,
+        "finalized_payments": 1.6702355460385439,
+        "verified_sales_eur": 2.0811753789050416
+      },
+      "score": 567.9311795605593
+    },
+    "grade": "Sufficient"
+  },
+  {
+    "financial": 54.56134611445578,
+    "confidence": {
+      "confidenceScore": 73.63590650090649,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 78.04104377104376,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.14068252409123141,
+      "statisticalScore": 630.716305520182,
+      "overlayPoints": 27.060024974338255,
+      "overlayBreakdown": {
+        "business_age_months": 7.591836734693878,
+        "capture_quality": 9.377142857142855,
+        "finalized_payments": 4.9336188436830835,
+        "verified_sales_eur": 5.157426538818434
+      },
+      "score": 657.7763304945203
+    },
+    "grade": "Acceptable"
+  },
+  {
+    "financial": 64.33120717244897,
+    "confidence": {
+      "confidenceScore": 67.40527518777519,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 65.57978114478115,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.09667234110438082,
+      "statisticalScore": 655.2493530347499,
+      "overlayPoints": 21.54970356649182,
+      "overlayBreakdown": {
+        "business_age_months": 12,
+        "capture_quality": 3.6857142857142953,
+        "finalized_payments": 3.6745182012847963,
+        "verified_sales_eur": 2.189471079492731
+      },
+      "score": 676.7990566012418
+    },
+    "grade": "Acceptable"
+  },
+  {
+    "financial": 65.49496276666667,
+    "confidence": {
+      "confidenceScore": 61.98280885780885,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 54.73484848484848,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.21057461197950872,
+      "statisticalScore": 602.545237480572,
+      "overlayPoints": 33.7738775510204,
+      "overlayBreakdown": {
+        "business_age_months": 2.693877551020408,
+        "capture_quality": 7.079999999999991,
+        "finalized_payments": 12,
+        "verified_sales_eur": 12
+      },
+      "score": 636.3191150315924
+    },
+    "grade": "Sufficient"
+  },
+  {
+    "financial": 39.20085091445578,
+    "confidence": {
+      "confidenceScore": 63.65131054131054,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 58.071851851851854,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.4350007671873483,
+      "statisticalScore": 541.375619626414,
+      "overlayPoints": 17.513032817906833,
+      "overlayBreakdown": {
+        "business_age_months": 2.9387755102040813,
+        "capture_quality": 12,
+        "finalized_payments": 0.5396145610278372,
+        "verified_sales_eur": 2.0346427466749146
+      },
+      "score": 558.8886524443209
+    },
+    "grade": "Sufficient"
+  },
+  {
+    "financial": 73.353036075,
+    "confidence": {
+      "confidenceScore": 70.14751424501424,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 71.06425925925926,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.0837001507713418,
+      "statisticalScore": 664.3870873107152,
+      "overlayPoints": 31.491428571428578,
+      "overlayBreakdown": {
+        "business_age_months": 0,
+        "capture_quality": 7.491428571428578,
+        "finalized_payments": 12,
+        "verified_sales_eur": 12
+      },
+      "score": 695.8785158821438
+    },
+    "grade": "Acceptable"
+  },
+  {
+    "financial": 55.75217458333333,
+    "confidence": {
+      "confidenceScore": 59.08571289821289,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 48.94065656565656,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.3819337258234603,
+      "statisticalScore": 554.0639500786169,
+      "overlayPoints": 39.44325481798715,
+      "overlayBreakdown": {
+        "business_age_months": 12,
+        "capture_quality": 12,
+        "finalized_payments": 3.4432548179871523,
+        "verified_sales_eur": 12
+      },
+      "score": 593.5072048966041
+    },
+    "grade": "Sufficient"
+  },
+  {
+    "financial": 48.688260391496605,
+    "confidence": {
+      "confidenceScore": 70.49415565915565,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 71.75754208754208,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.1953930259543244,
+      "statisticalScore": 607.9625918109138,
+      "overlayPoints": 14.17714285714285,
+      "overlayBreakdown": {
+        "business_age_months": 12,
+        "capture_quality": 2.1771428571428504,
+        "finalized_payments": 0,
+        "verified_sales_eur": 0
+      },
+      "score": 622.1397346680566
+    },
+    "grade": "Sufficient"
+  },
+  {
+    "financial": 48.99997470646258,
+    "confidence": {
+      "confidenceScore": 66.32077182077182,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 63.41077441077442,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.34393028062296066,
+      "statisticalScore": 563.5557009040464,
+      "overlayPoints": 22.282948741563676,
+      "overlayBreakdown": {
+        "business_age_months": 0.4897959183673469,
+        "capture_quality": 8.588571428571438,
+        "finalized_payments": 4.008565310492505,
+        "verified_sales_eur": 9.196016084132385
+      },
+      "score": 585.8386496456101
+    },
+    "grade": "Sufficient"
+  },
+  {
+    "financial": 68.56962074829931,
+    "confidence": {
+      "confidenceScore": 61.07844017094017,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 69.23076923076923,
+      "reliabilityQuality": 52.92611111111111,
+      "filled": 18,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.11998653591738889,
+      "statisticalScore": 641.2725039617965,
+      "overlayPoints": 26.779218530379925,
+      "overlayBreakdown": {
+        "business_age_months": 8.571428571428571,
+        "capture_quality": 9.82285714285715,
+        "finalized_payments": 5.8586723768736615,
+        "verified_sales_eur": 2.5262604392205383
+      },
+      "score": 668.0517224921764
+    },
+    "grade": "Acceptable"
+  },
+  {
+    "financial": 51.19065858078231,
+    "confidence": {
+      "confidenceScore": 68.90136493136492,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 65.38461538461539,
+      "reliabilityQuality": 72.41811447811448,
+      "filled": 17,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.11795737695043178,
+      "statisticalScore": 642.3896901673461,
+      "overlayPoints": 20.757856038177717,
+      "overlayBreakdown": {
+        "business_age_months": 8.571428571428571,
+        "capture_quality": 12,
+        "finalized_payments": 0,
+        "verified_sales_eur": 0.18642746674914934
+      },
+      "score": 663.1475462055238
+    },
+    "grade": "Acceptable"
+  },
+  {
+    "financial": 51.08221323790628,
+    "confidence": {
+      "confidenceScore": 65.05521108521108,
+      "label": "Medium",
+      "cls": "warn",
+      "coverage": 57.692307692307686,
+      "reliabilityQuality": 72.41811447811448,
+      "filled": 15,
+      "total": 26
+    },
+    "risk": {
+      "pDefault": 0.11303901665131523,
+      "statisticalScore": 645.1683739970513,
+      "overlayPoints": 20.757856038177717,
+      "overlayBreakdown": {
+        "business_age_months": 8.571428571428571,
+        "capture_quality": 12,
+        "finalized_payments": 0,
+        "verified_sales_eur": 0.18642746674914934
+      },
+      "score": 665.926230035229
+    },
+    "grade": "Acceptable"
+  }
+]

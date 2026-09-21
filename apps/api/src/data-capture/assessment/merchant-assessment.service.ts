@@ -1,3 +1,6 @@
+import { publicCreditSnapshot } from '../../credit-assessment/scoring-client';
+import { CreditEvidenceService } from '../../credit-assessment/credit-evidence.service';
+import type { CreditPublicResult } from '@repo/shared';
 import {
   BadRequestException,
   ConflictException,
@@ -24,6 +27,7 @@ export interface SavedAssessment {
   modelVersion: string;
   stage: string;
   score: number | null;
+  credit?: CreditPublicResult;
   evidenceWindow: { from: string; to: string; days: number };
   passedRequirements: string[];
   missingRequirements: string[];
@@ -48,6 +52,7 @@ export class MerchantAssessmentService {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly merchants: MerchantService,
+    private readonly creditEvidence: CreditEvidenceService,
   ) {}
 
   /** Runs the model and saves the result. */
@@ -61,13 +66,15 @@ export class MerchantAssessmentService {
     };
     const replay = await findReplay();
     if (replay) return replay;
-    const readiness = await this.merchants.getReadiness(userId);
     const profile = await this.merchants.getMe(userId);
 
     const evidenceTo = new Date();
     const evidenceFrom = new Date(
       evidenceTo.getTime() - EVIDENCE_WINDOW_DAYS * 86_400_000,
     );
+
+    const readiness = await this.merchants.getReadiness(userId, { from: evidenceFrom, to: evidenceTo });
+    const creditAssessment = await this.creditEvidence.assess(merchant.merchantId, evidenceTo, evidenceFrom);
 
     // Naming a model that does not exist is a caller mistake, not a server
     // fault, and must not be answered by quietly using a different model.
@@ -79,14 +86,16 @@ export class MerchantAssessmentService {
         error instanceof Error ? error.message : 'Unknown assessment model',
       );
     }
-    const result = model.assess({
+    const result = { ...model.assess({
       measurements: readiness.measured,
       evidenceFrom,
       evidenceTo,
-    });
+    }), credit: creditAssessment.result };
 
     const profileSnapshot = {
       businessName: profile.businessName,
+      creditProfile: creditAssessment.input.profile,
+      creditInputSnapshot: creditAssessment.input,
       timezone: profile.timezone,
       displayCurrency: profile.displayCurrency,
       consent: { active: readiness.measured.activeConsent },
@@ -177,7 +186,7 @@ export class MerchantAssessmentService {
   private present(
     row: typeof schema.merchantAssessments.$inferSelect,
   ): SavedAssessment {
-    const result = row.result as AssessmentResult;
+    const result = row.result as AssessmentResult & { credit?: CreditPublicResult };
     const days = Math.round(
       (row.evidenceTo.getTime() - row.evidenceFrom.getTime()) / 86_400_000,
     );
@@ -186,7 +195,8 @@ export class MerchantAssessmentService {
       modelId: row.modelId,
       modelVersion: row.modelVersion,
       stage: row.stage,
-      score: result.score ?? null,
+      score: null,
+      ...(result.credit ? { credit: publicCreditSnapshot(result.credit) } : {}),
       evidenceWindow: {
         from: row.evidenceFrom.toISOString(),
         to: row.evidenceTo.toISOString(),

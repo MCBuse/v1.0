@@ -1,3 +1,4 @@
+import { creditPilotMock } from './credit-pilot-mock.mjs';
 import { createServer } from "node:http";
 import process from "node:process";
 
@@ -468,12 +469,15 @@ function generalAnalytics() {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${host}:${port}`);
 
+  if (await creditPilotMock(request,response,url,{send,readJson,bearer})) return;
+
   if (request.method === "GET" && url.pathname === "/api/v1/health") {
     return send(response, 200, { status: "ok" });
   }
 
   if (request.method === "POST" && url.pathname === "/api/v1/auth/login") {
     const body = await readJson(request).catch(() => ({}));
+    if (body.email === 'analyst@example.test' && body.password === 'analyst-password') return send(response,200,{accessToken:'staff-access',refreshToken:'staff-refresh'});
     if (
       body.email === "merchant@example.test" &&
       body.password === "merchant-password"
@@ -495,6 +499,7 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "POST" && url.pathname === "/api/v1/auth/refresh") {
     const body = await readJson(request).catch(() => ({}));
+    if (body.refreshToken === 'staff-refresh') return send(response,200,{accessToken:'staff-refreshed',refreshToken:'staff-refresh'});
     if (["merchant-refresh", "expired-refresh"].includes(body.refreshToken))
       return send(response, 200, {
         accessToken: "refreshed-access",
@@ -622,7 +627,7 @@ const server = createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && url.pathname === "/api/v1/merchants/me") {
-    if (bearer(request) === "consumer-access")
+    if (["consumer-access", "staff-access", "staff-refreshed"].includes(bearer(request)))
       return send(response, 403, {
         message: "Merchant access is not provisioned",
       });

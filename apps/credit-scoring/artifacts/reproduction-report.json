@@ -1,0 +1,75 @@
+{
+  "datasetSha256": "d1f3e419ad7be786025920d08329f166e012545d6d1ecee1f7f97a295a4fa66c",
+  "rows": 3000,
+  "seed": 42,
+  "trainRows": 2000,
+  "testRows": 1000,
+  "python": "3.12.14",
+  "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.2.3",
+    "scipy": "1.16.3",
+    "scikit-learn": "1.6.1"
+  },
+  "models": {
+    "notebook": {
+      "intercept": -1.3960960173657202,
+      "trainAuc": 0.6774120697341561,
+      "testAuc": 0.6648091226917572,
+      "coefficients": {
+        "active_day_ratio": -0.4391411665485217,
+        "finalized_payments": 0.0,
+        "avg_txn_value_eur": -0.05345481350102683,
+        "cv_txn_value": 0.07873659489543515,
+        "verified_sales_eur": 0.2565406984499977,
+        "exception_rate": 0.11091944685580894,
+        "critical_unresolved_ratio": 0.15325749626133328,
+        "retry_success_rate": -0.10901684951062017,
+        "capture_quality": 0.0,
+        "finality": -0.08445862912325074,
+        "capture_quality_trend": -0.060179080544187684,
+        "revenue_trend_slope_pct": -0.06204170586110279,
+        "business_age_months": 0.0,
+        "existing_debt_to_sales": 0.12788520773362316,
+        "estimated_margin_pct": -0.396421073628156,
+        "loan_amount_eur": -0.33079807304240466,
+        "loan_term_months": -0.01814992401845112,
+        "merchant_type_grocer": -0.013428456906069565,
+        "merchant_type_kiosk": -0.04899461625769584,
+        "merchant_type_takeaway": 0.03232207527164763
+      },
+      "maxCoefficientDifferenceFromHtml": 0.2565406984499977,
+      "interceptDifferenceFromHtml": 0.0031253563371196336
+    },
+    "html_constraints": {
+      "intercept": -1.3929706609990804,
+      "trainAuc": 0.6749117177784556,
+      "testAuc": 0.6606971069241419,
+      "coefficients": {
+        "active_day_ratio": -0.421664139409662,
+        "finalized_payments": 0.0,
+        "avg_txn_value_eur": -0.019356547488369756,
+        "cv_txn_value": 0.07671336627177638,
+        "verified_sales_eur": 0.0,
+        "exception_rate": 0.11298014335940254,
+        "critical_unresolved_ratio": 0.1516567036470665,
+        "retry_success_rate": -0.11166090368988107,
+        "capture_quality": 0.0,
+        "finality": -0.08289917608907675,
+        "capture_quality_trend": -0.0625075998969681,
+        "revenue_trend_slope_pct": -0.060372184376485755,
+        "business_age_months": 0.0,
+        "existing_debt_to_sales": 0.1255807981523864,
+        "estimated_margin_pct": -0.39268413169625443,
+        "loan_amount_eur": -0.11560303238457771,
+        "loan_term_months": -0.01528853390159481,
+        "merchant_type_grocer": -0.014293214612138113,
+        "merchant_type_kiosk": -0.04720824493635516,
+        "merchant_type_takeaway": 0.03163171598049381
+      },
+      "maxCoefficientDifferenceFromHtml": 4.660984051912953e-07,
+      "interceptDifferenceFromHtml": 2.952016409096814e-11
+    }
+  },
+  "conclusion": "HTML reference preserved. Reproduction differences are recorded, not silently deployed. Synthetic AUC is not real-outcome validation."
+}

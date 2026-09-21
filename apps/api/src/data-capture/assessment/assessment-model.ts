@@ -54,7 +54,7 @@ const FALLBACK_LIMITATIONS = [
   'This is an evidence-readiness assessment, not a credit score and not a lending decision.',
   'It describes only activity MCBuse observed; it cannot see trading recorded elsewhere.',
   'Merchant-recorded cash is self-declared and is not independently verified.',
-  'It does not implement the outstanding third-party credit-scoring model.',
+  'Evidence-readiness rules do not estimate default risk.',
 ];
 
 /**

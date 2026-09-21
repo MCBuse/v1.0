@@ -24,9 +24,9 @@ export function SignInForm() {
           password: form.get("password"),
         }),
       });
-      const result = (await response.json()) as { message?: string };
+      const result = (await response.json()) as { message?: string; destination?: string };
       if (!response.ok) throw new Error(result.message ?? "Sign-in failed");
-      router.replace("/overview");
+      router.replace(result.destination === "/staff/credit-assessments" ? result.destination : "/overview");
       router.refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sign-in failed");
@@ -65,7 +65,7 @@ export function SignInForm() {
         {pending ? "Signing in…" : "Sign in"}
       </Button>
       <p className="text-center text-xs leading-5 text-slate-400">
-        Access is limited to merchant accounts provisioned for this pilot.
+        Access is limited to provisioned merchant and MCBuse staff accounts.
       </p>
     </form>
   );

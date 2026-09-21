@@ -78,7 +78,7 @@ describe('readiness-rules-v1', () => {
   it('states its limitations, including that it is not the credit model', () => {
     const result = model.assess(input());
     expect(result.limitations.join(' ')).toMatch(/not a credit score/i);
-    expect(result.limitations.join(' ')).toMatch(/third-party credit-scoring/i);
+    expect(result.limitations.join(' ')).toMatch(/do not estimate default risk/i);
     expect(result.disclaimer).toMatch(/not a credit decision/i);
   });
 

@@ -1,0 +1,994 @@
+{
+  "checkedAt": "2026-09-21T14:06:46.004431+00:00",
+  "sourceCommit": "afacbba03a62bc9d2e6ee26162691119a8ef41c6",
+  "apiRevision": "mcbuse-api-00042-v97",
+  "portalRevisionDuringTiming": "mcbuse-portal-00027-wfk",
+  "device": "physical iPhone 14 Pro Max, iOS 26.0",
+  "mobileDelivery": "Existing development client with local Metro; no Expo deployment",
+  "merchantPublicId": "mrc_7226ebf0b0b84c81b775",
+  "method": "Start host clock immediately before Playwright clicks Present on app in the hosted portal; capture actual physical iPhone screenshot; decode QR with Apple Vision and compare nonce. Screenshot completion gives a conservative upper bound including device capture overhead. Failed and slow captures are retained.",
+  "functionalMatches": 40,
+  "measuredUpdates": 40,
+  "p95UpperBoundMs": 2844,
+  "maximumUpperBoundMs": 4467,
+  "aboveTwoSeconds": 7,
+  "latencyGate": "not established; observed upper bound exceeds 2000ms",
+  "reconnectAndPollingFallback": "pending physical test",
+  "harnessInterruption": "First run stopped after 35 matched samples when portal form did not reappear; remaining five measured in a fresh browser. Initial warmup request matched manually after correcting full-URI versus bare-nonce comparison and is excluded from timing.",
+  "cleanup": {
+    "checkedAt": "2026-09-21T14:03:59.941Z",
+    "scope": "Only unpaid QR requests created by this acceptance run",
+    "results": [
+      {
+        "id": "ac763d75-ca96-4354-a92c-025254b2ebe6",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "75722779-85aa-4993-8f56-e0abd83b7bf8",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "e6e07be8-5212-4253-9f75-56002d0e0317",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "ab57c870-0a34-46f9-bf28-3417c2fb5fa6",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "eb67d4af-5c57-4648-9775-eb55a70379d3",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "90bdea56-3034-4f92-aa83-d630929648b2",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "54529764-d554-4e5c-92cb-f662dc42bd4a",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "31857abc-a775-41b4-868b-225e71aa1f12",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "ab600436-706d-4212-81b1-a23ee03214a8",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "79cec072-c08a-4917-b29e-99bd7476c832",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "0d92ef9b-b4a8-4426-a486-ff341514ad11",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "3902b6cc-d192-4aee-b699-ca9fccdaf173",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "40bb5cf6-9240-466d-b15e-ee1f21f5fe71",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "e485a123-3385-41d5-b0f7-511ed6adf878",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "e10bb11c-f87f-4d9f-871d-7065fb519586",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "224e0c6f-7fb1-408c-9830-d7510842f437",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "a1879b89-7e50-46eb-b361-1fc343442d2d",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "d2543119-0162-498d-a514-7247b5d226a7",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "aa515a94-9426-4504-a50b-62aed4147563",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "3c4f32cd-ce5b-4e31-98bd-75c019f2ee7b",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "bf0d874a-1f4f-48d7-9a3f-6798447c12a9",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "1981da8b-5576-4e94-9531-c5cd2c6c2ca2",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "25b59c2a-0c69-4b39-80d3-c930ee4e21ac",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "f0bc990c-caf2-4283-8860-852f4e9023d6",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "bdbf9809-48c7-4241-9c30-cee9f359a26b",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "333148f7-efb4-4270-951f-c6bc5c3a8f9a",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "7de0248b-8771-42f5-a14c-0ad05dcb28a6",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "c3e89c40-e67d-417c-9634-3840545c64c2",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "e6c7eb73-b5dc-474f-be40-a516364e624b",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "f37ead21-d912-4d3f-b14a-6831c623c959",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "d1d7b910-f2d1-43a0-9453-d3486b3617bb",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "b1658328-a23c-4f20-a3a5-73fc20a3e476",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "6f6bf1cc-a0bb-4765-8e25-a792024462ad",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "1ca78769-91f6-4bf3-827f-7accce49d258",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "36d0f410-f020-416d-b883-362e61b2f530",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "84c91f42-528c-454e-94d1-f951b1d9a49c",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "bf7f7471-af1f-452e-a83f-a52e1d1769a7",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "ac896535-3285-4cfd-922f-6cf0a74b1106",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "36d79a15-3b2a-4b8a-a1c1-effb60ecb3f7",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "3c544c75-f197-4ae3-aa56-958dc51e5e59",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      },
+      {
+        "id": "a2634393-3f26-491f-a0b2-2246712d56ce",
+        "httpStatus": 400,
+        "message": "Cannot cancel a expired payment request"
+      }
+    ],
+    "counterCleared": true
+  },
+  "samples": [
+    {
+      "number": 1,
+      "requestId": "75722779-85aa-4993-8f56-e0abd83b7bf8",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:46:43.631Z",
+      "startedAt": "2026-09-21T13:46:43.165Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-1-1.png",
+          "captureDurationMs": 1801,
+          "visibleUpperBoundMs": 2554,
+          "matched": true,
+          "screenshotSha256": "0d21832b1e75631f9f3289382dab70eb7316fd13cbf5d0afdfb38933f7f42fbb"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "requestId": "e6e07be8-5212-4253-9f75-56002d0e0317",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:46:50.659Z",
+      "startedAt": "2026-09-21T13:46:50.162Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-2-1.png",
+          "captureDurationMs": 543,
+          "visibleUpperBoundMs": 1245,
+          "matched": true,
+          "screenshotSha256": "bbfbcb4a9ab43e78b0a81b0fb2b1ddb1fff84df8e598dc5661e7a274cb4c5c1c"
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "requestId": "ab57c870-0a34-46f9-bf28-3417c2fb5fa6",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:46:56.103Z",
+      "startedAt": "2026-09-21T13:46:55.623Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-3-1.png",
+          "captureDurationMs": 835,
+          "visibleUpperBoundMs": 1497,
+          "matched": true,
+          "screenshotSha256": "250e53bc5dd18afc951c8ef091ffaa830c1532f7590b8470a4bbb09b9a2cda16"
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "requestId": "eb67d4af-5c57-4648-9775-eb55a70379d3",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:03.363Z",
+      "startedAt": "2026-09-21T13:47:02.826Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-4-1.png",
+          "captureDurationMs": 1730,
+          "visibleUpperBoundMs": 2466,
+          "matched": true,
+          "screenshotSha256": "84e0c1bb29962c8b97310ef1d194581809cd220adbe6d0bb398764d8d1bdcf4b"
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "requestId": "90bdea56-3034-4f92-aa83-d630929648b2",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:10.463Z",
+      "startedAt": "2026-09-21T13:47:10.011Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-5-1.png",
+          "captureDurationMs": 724,
+          "visibleUpperBoundMs": 1355,
+          "matched": true,
+          "screenshotSha256": "b8293ac47a539c89fb3b19cfe2fac6b6188ce19a0b8e68ab5c9c742ab1d11bc6"
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "requestId": "54529764-d554-4e5c-92cb-f662dc42bd4a",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:16.059Z",
+      "startedAt": "2026-09-21T13:47:15.606Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-6-1.png",
+          "captureDurationMs": 672,
+          "visibleUpperBoundMs": 1430,
+          "matched": true,
+          "screenshotSha256": "01890daed761ee9139e656392c0e804f9a4c0db3c7fcac49ef74d93deb9a971e"
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "requestId": "31857abc-a775-41b4-868b-225e71aa1f12",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:21.912Z",
+      "startedAt": "2026-09-21T13:47:21.410Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-7-1.png",
+          "captureDurationMs": 582,
+          "visibleUpperBoundMs": 1264,
+          "matched": true,
+          "screenshotSha256": "da5c18f2798c08a893eec141ae82288aa0828b5fa95b386bd011e7e2f7d6c750"
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "requestId": "ab600436-706d-4212-81b1-a23ee03214a8",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:27.421Z",
+      "startedAt": "2026-09-21T13:47:26.928Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-8-1.png",
+          "captureDurationMs": 593,
+          "visibleUpperBoundMs": 1272,
+          "matched": false,
+          "screenshotSha256": "da5c18f2798c08a893eec141ae82288aa0828b5fa95b386bd011e7e2f7d6c750"
+        },
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-8-2.png",
+          "captureDurationMs": 574,
+          "visibleUpperBoundMs": 2044,
+          "matched": true,
+          "screenshotSha256": "ba15aca1f95d9e193aaf4781b6b791f1b64bce7ae388b1aaf382effc2879505b"
+        }
+      ]
+    },
+    {
+      "number": 9,
+      "requestId": "79cec072-c08a-4917-b29e-99bd7476c832",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:33.685Z",
+      "startedAt": "2026-09-21T13:47:33.195Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-9-1.png",
+          "captureDurationMs": 628,
+          "visibleUpperBoundMs": 1323,
+          "matched": true,
+          "screenshotSha256": "a254cef7b72540ac9d76f1f542e0d6c75e0e7665f923ae1bb3b48e4c12e2d0c6"
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "requestId": "0d92ef9b-b4a8-4426-a486-ff341514ad11",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:39.327Z",
+      "startedAt": "2026-09-21T13:47:38.714Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-10-1.png",
+          "captureDurationMs": 581,
+          "visibleUpperBoundMs": 1388,
+          "matched": true,
+          "screenshotSha256": "01d33389cd6a18bb7776c8e0e104e97c31a566198f91971fe8b8a1460be6d0e3"
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "requestId": "3902b6cc-d192-4aee-b699-ca9fccdaf173",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:44.772Z",
+      "startedAt": "2026-09-21T13:47:44.309Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-11-1.png",
+          "captureDurationMs": 602,
+          "visibleUpperBoundMs": 1245,
+          "matched": true,
+          "screenshotSha256": "97a1ed74134898e9f38544d509535982f8783ccf5fa5742bb765e70628ebbb75"
+        }
+      ]
+    },
+    {
+      "number": 12,
+      "requestId": "40bb5cf6-9240-466d-b15e-ee1f21f5fe71",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:50.228Z",
+      "startedAt": "2026-09-21T13:47:49.749Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-12-1.png",
+          "captureDurationMs": 612,
+          "visibleUpperBoundMs": 1274,
+          "matched": true,
+          "screenshotSha256": "7b5db1d1e8aebefc0db0d5826175bf96f7491642e53a30eef437de5677856829"
+        }
+      ]
+    },
+    {
+      "number": 13,
+      "requestId": "e485a123-3385-41d5-b0f7-511ed6adf878",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:47:55.683Z",
+      "startedAt": "2026-09-21T13:47:55.200Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-13-1.png",
+          "captureDurationMs": 565,
+          "visibleUpperBoundMs": 1237,
+          "matched": true,
+          "screenshotSha256": "52e671c45ef126a270c929be114b040b1c0ff20e6b5200ee154dbc5b1d16b7d6"
+        }
+      ]
+    },
+    {
+      "number": 14,
+      "requestId": "e10bb11c-f87f-4d9f-871d-7065fb519586",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:01.082Z",
+      "startedAt": "2026-09-21T13:48:00.618Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-14-1.png",
+          "captureDurationMs": 565,
+          "visibleUpperBoundMs": 1220,
+          "matched": true,
+          "screenshotSha256": "ce15b81af16410b8659b2ab4b5be74ba44de4cdcdff9b7898ed26f75d6b16fd2"
+        }
+      ]
+    },
+    {
+      "number": 15,
+      "requestId": "224e0c6f-7fb1-408c-9830-d7510842f437",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:06.697Z",
+      "startedAt": "2026-09-21T13:48:06.075Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-15-1.png",
+          "captureDurationMs": 575,
+          "visibleUpperBoundMs": 1377,
+          "matched": true,
+          "screenshotSha256": "29928aedeabb778364a06074cd134a992015e757fe4ffbe4609c5e417ca9ef48"
+        }
+      ]
+    },
+    {
+      "number": 16,
+      "requestId": "a1879b89-7e50-46eb-b361-1fc343442d2d",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:12.333Z",
+      "startedAt": "2026-09-21T13:48:11.845Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-16-1.png",
+          "captureDurationMs": 613,
+          "visibleUpperBoundMs": 1285,
+          "matched": true,
+          "screenshotSha256": "577c02fd196ce3fea20729294072b4252e10ef486edac1df3318ebf5d5291db8"
+        }
+      ]
+    },
+    {
+      "number": 17,
+      "requestId": "d2543119-0162-498d-a514-7247b5d226a7",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:17.925Z",
+      "startedAt": "2026-09-21T13:48:17.388Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-17-1.png",
+          "captureDurationMs": 625,
+          "visibleUpperBoundMs": 1336,
+          "matched": true,
+          "screenshotSha256": "d26ace57bf41e4ed5adc98b83488e7c2f99607312310259945d8345f54a8abc6"
+        }
+      ]
+    },
+    {
+      "number": 18,
+      "requestId": "aa515a94-9426-4504-a50b-62aed4147563",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:23.696Z",
+      "startedAt": "2026-09-21T13:48:23.213Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-18-1.png",
+          "captureDurationMs": 557,
+          "visibleUpperBoundMs": 1302,
+          "matched": true,
+          "screenshotSha256": "ddcbb331ef26089c3c4d55d82f5f90ce9c5a3c0e985aa6304696184548b1daab"
+        }
+      ]
+    },
+    {
+      "number": 19,
+      "requestId": "3c4f32cd-ce5b-4e31-98bd-75c019f2ee7b",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:29.289Z",
+      "startedAt": "2026-09-21T13:48:28.782Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-19-1.png",
+          "captureDurationMs": 693,
+          "visibleUpperBoundMs": 1375,
+          "matched": false,
+          "screenshotSha256": "ddcbb331ef26089c3c4d55d82f5f90ce9c5a3c0e985aa6304696184548b1daab"
+        },
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-19-2.png",
+          "captureDurationMs": 610,
+          "visibleUpperBoundMs": 2269,
+          "matched": false,
+          "screenshotSha256": "057f37094d196da25e21094dc111ee149f01abe73a925e0d97f9e75b12348cd0"
+        },
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-19-3.png",
+          "captureDurationMs": 522,
+          "visibleUpperBoundMs": 3040,
+          "matched": false,
+          "screenshotSha256": "057f37094d196da25e21094dc111ee149f01abe73a925e0d97f9e75b12348cd0"
+        },
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-19-4.png",
+          "captureDurationMs": 636,
+          "visibleUpperBoundMs": 3894,
+          "matched": true,
+          "screenshotSha256": "d5f093ff92988744fe26563638d9a25d237de7891b55ff36aca7599337673212"
+        }
+      ]
+    },
+    {
+      "number": 20,
+      "requestId": "bf0d874a-1f4f-48d7-9a3f-6798447c12a9",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:37.476Z",
+      "startedAt": "2026-09-21T13:48:36.960Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-20-1.png",
+          "captureDurationMs": 609,
+          "visibleUpperBoundMs": 1300,
+          "matched": true,
+          "screenshotSha256": "b87342e396ead1e6a7c51880f737cc8eb1a622906424e44387408fc00f8304bc"
+        }
+      ]
+    },
+    {
+      "number": 21,
+      "requestId": "1981da8b-5576-4e94-9531-c5cd2c6c2ca2",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:43.263Z",
+      "startedAt": "2026-09-21T13:48:42.757Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-21-1.png",
+          "captureDurationMs": 563,
+          "visibleUpperBoundMs": 1255,
+          "matched": true,
+          "screenshotSha256": "f9cc5586b3134d921cbd733f1cd4592df262c04e9b2a2486581e38accfb94359"
+        }
+      ]
+    },
+    {
+      "number": 22,
+      "requestId": "25b59c2a-0c69-4b39-80d3-c930ee4e21ac",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:48.636Z",
+      "startedAt": "2026-09-21T13:48:48.176Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-22-1.png",
+          "captureDurationMs": 848,
+          "visibleUpperBoundMs": 1484,
+          "matched": true,
+          "screenshotSha256": "3ad5f6001483df073ebb7823432177da1c5e200f52ce8ccd23b05a5247f90b5c"
+        }
+      ]
+    },
+    {
+      "number": 23,
+      "requestId": "f0bc990c-caf2-4283-8860-852f4e9023d6",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:48:54.529Z",
+      "startedAt": "2026-09-21T13:48:54.056Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-23-1.png",
+          "captureDurationMs": 776,
+          "visibleUpperBoundMs": 1472,
+          "matched": true,
+          "screenshotSha256": "6117507efccf05e11d1f85c99823ff7445e172027ae1dcc8af2fa0b8556f2c91"
+        }
+      ]
+    },
+    {
+      "number": 24,
+      "requestId": "bdbf9809-48c7-4241-9c30-cee9f359a26b",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:00.363Z",
+      "startedAt": "2026-09-21T13:48:59.858Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-24-1.png",
+          "captureDurationMs": 597,
+          "visibleUpperBoundMs": 1351,
+          "matched": true,
+          "screenshotSha256": "e408c8e1d746e897a3dd6d7e20f4550066e8af9577642c3b721f80ae8c201e53"
+        }
+      ]
+    },
+    {
+      "number": 25,
+      "requestId": "333148f7-efb4-4270-951f-c6bc5c3a8f9a",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:06.112Z",
+      "startedAt": "2026-09-21T13:49:05.499Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-25-1.png",
+          "captureDurationMs": 648,
+          "visibleUpperBoundMs": 1432,
+          "matched": true,
+          "screenshotSha256": "7378f4a9fc15c3b503027dbc1b9e18f6a06468c21aae6efa9e26e10238d264cc"
+        }
+      ]
+    },
+    {
+      "number": 26,
+      "requestId": "7de0248b-8771-42f5-a14c-0ad05dcb28a6",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:11.796Z",
+      "startedAt": "2026-09-21T13:49:11.315Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-26-1.png",
+          "captureDurationMs": 651,
+          "visibleUpperBoundMs": 1313,
+          "matched": true,
+          "screenshotSha256": "969a3c4a4e7f44a5468dca0519ae935dc8ba4184e2e28b2d57feaf5bae757262"
+        }
+      ]
+    },
+    {
+      "number": 27,
+      "requestId": "c3e89c40-e67d-417c-9634-3840545c64c2",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:17.348Z",
+      "startedAt": "2026-09-21T13:49:16.854Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-27-1.png",
+          "captureDurationMs": 574,
+          "visibleUpperBoundMs": 1271,
+          "matched": true,
+          "screenshotSha256": "be6161b79b67eeda75d8d42283dc8113276d29b2028fff951555a822c8818d8f"
+        }
+      ]
+    },
+    {
+      "number": 28,
+      "requestId": "e6c7eb73-b5dc-474f-be40-a516364e624b",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:22.826Z",
+      "startedAt": "2026-09-21T13:49:22.358Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-28-1.png",
+          "captureDurationMs": 605,
+          "visibleUpperBoundMs": 1258,
+          "matched": true,
+          "screenshotSha256": "15c3f0a4bc195e688d30c86ab2f869fb42ce48993414bdde125def11976517b0"
+        }
+      ]
+    },
+    {
+      "number": 29,
+      "requestId": "f37ead21-d912-4d3f-b14a-6831c623c959",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:28.290Z",
+      "startedAt": "2026-09-21T13:49:27.816Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-29-1.png",
+          "captureDurationMs": 692,
+          "visibleUpperBoundMs": 1351,
+          "matched": true,
+          "screenshotSha256": "c91fe93cfb6f9c2730eb8efbf3587801aa0fc0f52b31981d901dfa199965b9c7"
+        }
+      ]
+    },
+    {
+      "number": 30,
+      "requestId": "d1d7b910-f2d1-43a0-9453-d3486b3617bb",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:33.931Z",
+      "startedAt": "2026-09-21T13:49:33.448Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-30-1.png",
+          "captureDurationMs": 580,
+          "visibleUpperBoundMs": 1279,
+          "matched": false,
+          "screenshotSha256": "0368bb55a4783a0d5ea07e9c6b5c4d83519050c85569058f1f018911b2a27e7c"
+        },
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-30-2.png",
+          "captureDurationMs": 579,
+          "visibleUpperBoundMs": 2052,
+          "matched": false,
+          "screenshotSha256": "0368bb55a4783a0d5ea07e9c6b5c4d83519050c85569058f1f018911b2a27e7c"
+        },
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-30-3.png",
+          "captureDurationMs": 566,
+          "visibleUpperBoundMs": 2844,
+          "matched": true,
+          "screenshotSha256": "562dd0d8daecc7e53832cf020ac99a418f1386b629544ebaeebf18fe636dda65"
+        }
+      ]
+    },
+    {
+      "number": 31,
+      "requestId": "b1658328-a23c-4f20-a3a5-73fc20a3e476",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:40.908Z",
+      "startedAt": "2026-09-21T13:49:40.441Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-31-1.png",
+          "captureDurationMs": 537,
+          "visibleUpperBoundMs": 1184,
+          "matched": true,
+          "screenshotSha256": "6d64b8591ceea6b0962a02a10e5186955f05adebc62ae19cf20dd86beb5733c3"
+        }
+      ]
+    },
+    {
+      "number": 32,
+      "requestId": "6f6bf1cc-a0bb-4765-8e25-a792024462ad",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:46.400Z",
+      "startedAt": "2026-09-21T13:49:45.836Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-32-1.png",
+          "captureDurationMs": 615,
+          "visibleUpperBoundMs": 1379,
+          "matched": true,
+          "screenshotSha256": "3a7b5a90dc38fc8c5e3d3db9b09ba429449240206c728a87cb61c7add8640303"
+        }
+      ]
+    },
+    {
+      "number": 33,
+      "requestId": "1ca78769-91f6-4bf3-827f-7accce49d258",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:52.077Z",
+      "startedAt": "2026-09-21T13:49:51.605Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-33-1.png",
+          "captureDurationMs": 592,
+          "visibleUpperBoundMs": 1241,
+          "matched": true,
+          "screenshotSha256": "47372b33312788bc63adfbb4ee6c171a34c7bab1af870698217fe007fa4cf17c"
+        }
+      ]
+    },
+    {
+      "number": 34,
+      "requestId": "36d0f410-f020-416d-b883-362e61b2f530",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:49:57.510Z",
+      "startedAt": "2026-09-21T13:49:57.017Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-34-1.png",
+          "captureDurationMs": 544,
+          "visibleUpperBoundMs": 1215,
+          "matched": true,
+          "screenshotSha256": "437f115e8bdbb6c33754be51f9057dd1a79ba63b372317e95a7334db4fa454d0"
+        }
+      ]
+    },
+    {
+      "number": 35,
+      "requestId": "84c91f42-528c-454e-94d1-f951b1d9a49c",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:50:02.908Z",
+      "startedAt": "2026-09-21T13:50:02.457Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-live/sample-35-1.png",
+          "captureDurationMs": 1270,
+          "visibleUpperBoundMs": 2001,
+          "matched": true,
+          "screenshotSha256": "57f6a1abf4669bcfb6c4639aac486efe12cdadd601879d3bb144526c2026b79e"
+        }
+      ]
+    },
+    {
+      "number": 1,
+      "requestId": "bf7f7471-af1f-452e-a83f-a52e1d1769a7",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:52:27.827Z",
+      "startedAt": "2026-09-21T13:52:26.722Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-followup/sample-1-1.png",
+          "captureDurationMs": 2794,
+          "visibleUpperBoundMs": 4467,
+          "matched": true,
+          "screenshotSha256": "cbec31c287ad6f434e2b2420f95e92be4896f1fb7e7450907de1d6c6523a00db"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "requestId": "ac896535-3285-4cfd-922f-6cf0a74b1106",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:52:36.111Z",
+      "startedAt": "2026-09-21T13:52:35.624Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-followup/sample-2-1.png",
+          "captureDurationMs": 571,
+          "visibleUpperBoundMs": 1243,
+          "matched": true,
+          "screenshotSha256": "6f2a724f5b6cf2c09b483f8d61c7a905189232a297f2ef27ace63e94f809d3aa"
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "requestId": "36d79a15-3b2a-4b8a-a1c1-effb60ecb3f7",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:52:41.570Z",
+      "startedAt": "2026-09-21T13:52:41.064Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-followup/sample-3-1.png",
+          "captureDurationMs": 536,
+          "visibleUpperBoundMs": 1241,
+          "matched": true,
+          "screenshotSha256": "a21de8de2beeb55c313e7a37006ea5a533319dd74f121b2111375acd95755cb0"
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "requestId": "3c544c75-f197-4ae3-aa56-958dc51e5e59",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:52:47.009Z",
+      "startedAt": "2026-09-21T13:52:46.535Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-followup/sample-4-1.png",
+          "captureDurationMs": 590,
+          "visibleUpperBoundMs": 1244,
+          "matched": true,
+          "screenshotSha256": "a859f2bffd320bd8357865d038c5a798bb6610c96af2aa99297c6a1fc80427ce"
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "requestId": "a2634393-3f26-491f-a0b2-2246712d56ce",
+      "createdStatus": 201,
+      "presentedStatus": 201,
+      "presentedAt": "2026-09-21T13:52:52.454Z",
+      "startedAt": "2026-09-21T13:52:51.972Z",
+      "matched": true,
+      "captures": [
+        {
+          "screenshot": "/private/tmp/mcbuse-iphone-qr-followup/sample-5-1.png",
+          "captureDurationMs": 556,
+          "visibleUpperBoundMs": 1217,
+          "matched": true,
+          "screenshotSha256": "0ae128fca6955452a8d8297b588a3942ce9f9821eb1f4820e9c5156a425382f2"
+        }
+      ]
+    }
+  ]
+}

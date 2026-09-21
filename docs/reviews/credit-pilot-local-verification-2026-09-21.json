@@ -1,0 +1,49 @@
+{
+  "date": "2026-09-21",
+  "scope": "Local credit assessment pilot; no deployment performed",
+  "modelVersion": "george-html-2026.09.1",
+  "checks": {
+    "python": {
+      "result": "passed",
+      "tests": 6,
+      "htmlParityCases": 14,
+      "covers": ["calculation parity", "missing required and optional inputs", "service authentication", "invalid inputs", "public response excludes experimental risk"]
+    },
+    "offlineReproduction": {
+      "result": "passed",
+      "report": "apps/credit-scoring/artifacts/reproduction-report.json",
+      "interpretation": "Four-constraint model matches HTML constants within their rounding precision. Synthetic dataset performance does not establish real-world predictive validity."
+    },
+    "apiUnit": {
+      "result": "passed",
+      "tests": 17,
+      "suites": ["credit-profile.spec.ts", "assessment-model.spec.ts"]
+    },
+    "apiIntegration": {
+      "result": "passed",
+      "tests": 56,
+      "suites": ["credit-pilot.int-spec.ts", "finance-package.int-spec.ts", "cross-merchant-access.int-spec.ts"],
+      "environment": "Real Python scoring service and isolated PostgreSQL 16 database with all 34 migrations applied",
+      "covers": ["staff permissions and revocation", "pilot enrollment and consent", "merchant isolation", "money precision", "evidence window", "immutable history", "concurrent idempotency", "service outage", "public history and export projection"],
+      "limitation": "Test identity guard replaces JWT authentication; database-backed staff authorization remains active."
+    },
+    "portalUnit": { "result": "passed", "tests": 31 },
+    "browser": {
+      "result": "passed",
+      "tests": 15,
+      "viewports": ["desktop", "tablet", "mobile"],
+      "command": "pnpm --filter portal exec playwright test tests/credit-pilot.spec.ts --project=desktop --project=mobile --project=tablet",
+      "covers": ["staff-only sign-in", "synthetic assessment display", "missing margin", "merchant denied staff routes", "staff-only session refresh", "CSRF", "merchant presentation excludes risk", "declared cents", "separate pilot consent"],
+      "limitation": "Next.js browser tests use a fixture API. The real NestJS/Python/database path is covered separately by API integration tests."
+    },
+    "buildAndStatic": {
+      "result": "passed",
+      "checks": ["API build and TypeScript", "portal production build and TypeScript", "focused API and portal ESLint", "compiled scoring client loads without source-only shared package", "deployment script shell syntax", "git diff HEAD --check"]
+    }
+  },
+  "releaseLimitations": [
+    "No production database migration, provisioning, deployment or live Cloud Run authentication check was performed.",
+    "Verified margin remains unavailable for real merchants, so complete financial-profile and experimental risk scores remain unavailable under the reference required-field rules.",
+    "George must review the documented model, grade, policy-bonus and prediction-horizon discrepancies before any broader model release."
+  ]
+}

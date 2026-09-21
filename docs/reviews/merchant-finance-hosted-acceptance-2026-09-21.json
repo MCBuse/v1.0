@@ -1,0 +1,62 @@
+{
+  "checkedAt": "2026-09-21T13:56:34.986Z",
+  "packageId": "7fbc41db-9e7b-4f9b-8190-f820ad908b76",
+  "files": [
+    {
+      "name": "preview.json",
+      "bytes": 12235,
+      "sha256": "1b58886c3ef55ec4b936245af8b22829806c64638f549871c742f3992e2f9430"
+    },
+    {
+      "name": "assessment.json",
+      "bytes": 1456,
+      "sha256": "33630c2086a9dd233135824336116ada395298c5d400b90ba14a1543103f445d"
+    },
+    {
+      "name": "package.pdf",
+      "bytes": 3085,
+      "sha256": "79778e257c52bf510d5076a347839088fc5e092015ed793e07ceef10bc77a18d"
+    },
+    {
+      "name": "package.zip",
+      "bytes": 7023,
+      "sha256": "792f673af2c2ee9870c819ad2affdd002cd2d2c4c3d790f62c6c5163c214e858"
+    }
+  ],
+  "assessmentId": "0011cc8d-f2d0-472f-a863-47fbf770c6ce",
+  "assessmentBinding": "verified",
+  "artifacts": [
+    {
+      "kind": "pdf",
+      "byteSize": 3085,
+      "sha256": "79778e257c52bf510d5076a347839088fc5e092015ed793e07ceef10bc77a18d",
+      "createdAt": "2026-09-21T13:51:21.267Z",
+      "downloadPath": "/merchants/me/finance-packages/7fbc41db-9e7b-4f9b-8190-f820ad908b76/pdf"
+    },
+    {
+      "kind": "zip",
+      "byteSize": 7023,
+      "sha256": "792f673af2c2ee9870c819ad2affdd002cd2d2c4c3d790f62c6c5163c214e858",
+      "createdAt": "2026-09-21T13:51:21.267Z",
+      "downloadPath": "/merchants/me/finance-packages/7fbc41db-9e7b-4f9b-8190-f820ad908b76/data"
+    }
+  ],
+  "apiRevision": "mcbuse-api-00042-v97",
+  "portalCreationRevision": "mcbuse-portal-00027-wfk",
+  "previewFixRevision": "mcbuse-portal-00028-t7n",
+  "previewAssessmentEqualsSavedAssessment": true,
+  "zipSnapshotAssessmentEqualsSavedAssessment": true,
+  "zipContainedPdfEqualsDownload": true,
+  "renderedPdfInspected": true,
+  "hostedPdfPreviewVisuallyVerified": true,
+  "email": {
+    "recipient": "nernuer@gmail.com",
+    "sentAt": "2026-09-21T13:57:49Z",
+    "method": "Hosted Finance Match form with recipient confirmation",
+    "serverStatus": "accepted_by_smtp",
+    "inboxReceipt": "confirmed in signed-in Gmail with matching PDF and ZIP filenames",
+    "messageId": "1876950069956903070",
+    "receivedAttachmentHashes": "not yet verified; requested downloads unavailable locally; browser download-manager page blocked by browser security policy"
+  },
+  "olderAssessmentAfterBusinessChange": "Hosted API preview and ZIP passed; see merchant-older-assessment-acceptance-2026-09-21.json. Email/hash follow-through remains pending."
+}

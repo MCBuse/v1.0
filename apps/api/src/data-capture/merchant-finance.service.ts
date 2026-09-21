@@ -913,6 +913,16 @@ export class MerchantFinanceService {
         document.text(`Business profile and consent: ${JSON.stringify(snapshot.assessment.businessProfile)}`);
         snapshot.assessment.limitations.forEach((item: string) => document.text(item));
       }
+      if (snapshot.assessment?.credit) {
+        const credit = snapshot.assessment.credit;
+        document.moveDown().fontSize(14).text('Business financial profile');
+        document.fontSize(10).text(`Model: ${credit.modelVersion} | Status: ${credit.status}`);
+        document.text(`Financial profile: ${credit.financialProfile ? credit.financialProfile.score.toFixed(1) + ' / 100' : 'Not available'}`);
+        document.text(`Profile confidence: ${credit.profileConfidence?.label ?? 'Not available'}`);
+        document.text('Confidence describes completeness and processing quality, not independent verification or credit risk.');
+        for (const line of credit.integritySummary) document.text(line);
+        for (const [field, reason] of Object.entries(credit.missingReasons)) document.text(`${field}: ${reason}`);
+      }
       document.moveDown().fontSize(14).text('Evidence readiness');
       document
         .fontSize(10)

@@ -22,6 +22,7 @@ vi.mock("./config", () => ({
 
 import { CSRF_COOKIE, setSessionCookies } from "./session";
 import { GET, POST } from "@/app/api/merchant/[...path]/route";
+import { GET as accountSummary } from "@/app/api/accounts/route";
 import { GET as renewSession } from "@/app/api/auth/session/route";
 
 const url = "https://merchant.example.test/api/merchant/me/invoices";
@@ -84,4 +85,11 @@ describe("CSRF continuity for authenticated merchant sessions", () => {
     expect(response.status).toBe(403);
     expect(fetch).not.toHaveBeenCalled();
   });
+});
+
+// Exercise the real root route; browser API mocks previously hid its absence.
+it("proxies the account summary from the root account endpoint", async () => {
+  const response = await accountSummary(new NextRequest("https://merchant.example.test/api/accounts"));
+  expect(response.status).toBe(200);
+  expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe("https://api.example.test/api/v1/accounts");
 });

@@ -232,6 +232,13 @@
       "when": 1799733000004,
       "tag": "0032_private_analytics_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1799733000005,
+      "tag": "0033_credit_assessment_pilot",
+      "breakpoints": true
     }
   ]
 }

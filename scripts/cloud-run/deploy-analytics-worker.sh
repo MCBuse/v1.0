@@ -18,7 +18,7 @@ worker_args="dist/src/analytics-intelligence/worker.js"
 if [[ "${MCBUSE_ANALYTICS_MODE:-sweep}" == "queue" ]]; then
   job="${service}-analytics-queue"
   scheduler="${service}-analytics-queue-every-minute"
-  analytics_schedule="* * * * *"
+  analytics_schedule="${MCBUSE_ANALYTICS_QUEUE_SCHEDULE:-0 * * * *}"
   worker_args="dist/src/analytics-intelligence/worker.js,--queue"
 fi
 analytics_scheduler_enabled="${MCBUSE_ANALYTICS_SCHEDULER_ENABLED:-true}"
@@ -116,7 +116,7 @@ elif [[ -n "$scheduler_state" && "$scheduler_state" != "PAUSED" ]]; then
 fi
 
 # A deployment changes the enablement/allowlist. Seed the leased queue once now;
-# normal minute executions consume only changes, and the six-hour sweep remains.
+# scheduled queue executions consume only changes, and the six-hour sweep remains.
 gcloud run jobs execute "$job" --project="$project_id" --region="$region" --args=dist/src/analytics-intelligence/worker.js --wait
 
 echo "analytics_job=$job"

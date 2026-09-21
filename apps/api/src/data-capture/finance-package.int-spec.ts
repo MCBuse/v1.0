@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { CreditEvidenceService } from '../credit-assessment/credit-evidence.service';
+import { ScoringClient } from '../credit-assessment/scoring-client';
 import { ConfigService } from '@nestjs/config';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
@@ -81,9 +84,9 @@ describe('finance packages (integration)', () => {
       activity,
       imports,
       config,
-      new MerchantAssessmentService(db, merchants),
+      new MerchantAssessmentService(db, merchants, new CreditEvidenceService(db, new ScoringClient(new ConfigService({})))),
     );
-    assessments = new MerchantAssessmentService(db, merchants);
+    assessments = new MerchantAssessmentService(db, merchants, new CreditEvidenceService(db, new ScoringClient(new ConfigService({}))));
 
     merchant = await createMerchantFixture(db, 'Package');
 
@@ -112,6 +115,15 @@ describe('finance packages (integration)', () => {
   });
 
   let packageId: string;
+
+  it('exports public credit evidence without any internal risk output', async () => {
+    const saved = await assessments.run(merchant.userId, undefined, randomUUID());
+    const pkg = await finance.createPackage(merchant.userId, 30, true, randomUUID(), saved.id);
+    const details = await finance.getPackage(merchant.userId, pkg.id);
+    const serialized = JSON.stringify(details);
+    expect(serialized).toContain('credit');
+    expect(serialized).not.toMatch(/experimentalCredit|probabilityOfDefault|policyOverlayPoints/);
+  });
 
   it('creates a package over the chosen reporting window', async () => {
     const created = await finance.createPackage(

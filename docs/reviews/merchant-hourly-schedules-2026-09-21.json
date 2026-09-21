@@ -1,0 +1,46 @@
+{
+  "verifiedAt": "2026-09-21T14:51:14.787147+00:00",
+  "userRequest": "let's do once an hour",
+  "schedules": [
+    {
+      "httpTarget": {
+        "uri": "https://run.googleapis.com/v2/projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics:run"
+      },
+      "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-every-10-minutes",
+      "schedule": "0 */6 * * *",
+      "state": "ENABLED",
+      "timeZone": "Etc/UTC"
+    },
+    {
+      "httpTarget": {
+        "uri": "https://run.googleapis.com/v2/projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-financial-recovery:run"
+      },
+      "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-financial-recovery-every-minute",
+      "schedule": "0 * * * *",
+      "state": "ENABLED",
+      "timeZone": "Etc/UTC"
+    },
+    {
+      "httpTarget": {
+        "uri": "https://run.googleapis.com/v2/projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-queue:run"
+      },
+      "name": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/jobs/mcbuse-api-analytics-queue-every-minute",
+      "schedule": "0 * * * *",
+      "state": "ENABLED",
+      "timeZone": "Etc/UTC"
+    }
+  ],
+  "changedSchedules": [
+    "mcbuse-api-analytics-queue-every-minute",
+    "mcbuse-api-financial-recovery-every-minute"
+  ],
+  "runsPerDayPerChangedJob": 24,
+  "deploymentDefaultsVerified": "Hourly analytics queue and financial recovery; full sweep unchanged",
+  "checks": [
+    "Cloud Scheduler readback",
+    "bash -n",
+    "targeted git diff --check"
+  ],
+  "supersedes": "Six-hour cadence for the two jobs in merchant-low-cost-schedules-2026-09-21.json",
+  "acceptanceImpact": "Hourly background processing does not satisfy the two-minute insight timing gate; minute cadence remains an explicit acceptance override."
+}

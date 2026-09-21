@@ -1,0 +1,685 @@
+openapi: 3.1.0
+
+info:
+  title: MCBuse Credit Assessment API
+  version: 1.0.0
+  description: |
+    Scores a merchant's profile and returns three independent outputs:
+
+    1. **Financial Profile Score** (0-100) - a transparent, threshold-based
+       score built only from Merchant Activity and Financial Behaviour
+       fields. Not a statistical model; no claim about default probability.
+    2. **Profile Confidence** (Low/Medium/High) - a data-quality signal
+       combining field coverage and Data Reliability metric quality. Tells
+       you how much to trust the data behind the scores, not how risky the
+       merchant is.
+    3. **Experimental Credit Risk Assessment** - a logistic-regression
+       probability of default and a 300-850 credit score/grade, fitted on
+       synthetic historical data. **This output is explicitly experimental**
+       and MUST be labeled as such in any consuming UI. It is not validated
+       against real repayment/default outcomes and should not drive
+       automated lending decisions on its own.
+
+    Additional Credit Information (collateral, inventory, business/personal
+    debts and assets, external bureau score/report) is accepted and
+    returned as-is for lender review. It does not feed any score in this
+    version of the API.
+
+    ### Design notes for integrators
+    - Endpoints are versioned under `/v1`.
+    - Monetary fields are decimal EUR values (not minor units/cents) and
+      MUST preserve at least 2 decimal places end-to-end - MCBuse's typical
+      transaction size (EUR 0.10-EUR 10.00) means naive rounding to whole
+      euros materially distorts the data.
+    - `businessAgeMonths` is derived server-side from `commencementDate`;
+      clients should not compute or submit it directly.
+    - A field is "required" if the assessment cannot be produced without
+      it. `loanAmountEur`, `loanTermMonths`, and `existingDebtToSalesPct`
+      are the only optional fields inside `financials`/`applicationSpecific`
+      that a valid assessment can be produced without - if only these are
+      missing, `financialProfile` and `experimentalCredit` are still
+      computed, using only the variables that ARE available. Any other
+      missing required field makes both of those objects `null`, with the
+      reason listed in `unavailableFields`.
+    - Additional Credit Information fields are always optional and never
+      block scoring.
+
+  contact:
+    name: MCBuse Credit Assessment Platform
+    email: credit-platform@mcbuse.example
+
+servers:
+  - url: https://api.mcbuse.example/v1
+    description: Production (placeholder - replace with actual host)
+  - url: https://staging-api.mcbuse.example/v1
+    description: Staging
+
+tags:
+  - name: Assessments
+    description: Submit merchant data and retrieve credit assessment results
+  - name: Model
+    description: Metadata about the scoring models and configuration in use
+  - name: System
+    description: Health and readiness checks
+
+paths:
+
+  /assessments:
+    post:
+      tags: [Assessments]
+      summary: Submit a merchant profile and generate a credit assessment
+      description: |
+        Runs the full pipeline: validates required fields, computes the
+        Financial Profile Score, computes Profile Confidence, and (if all
+        required fields are present) runs the experimental PD/credit model.
+        Additional Credit Information is stored and echoed back unmodified.
+      operationId: createAssessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentRequest'
+            examples:
+              fullProfile:
+                summary: A fully-populated merchant profile
+                value:
+                  merchantRef: "m_00000"
+                  merchantType: grocer
+                  commencementDate: "2020-01-15"
+                  merchantActivity:
+                    activeDayRatioPct: 84.65
+                    finalizedPayments: 236
+                    avgTxnValueEur: 4.75
+                    cvTxnValue: 0.369
+                    verifiedSalesEur: 3630.50
+                  dataReliability:
+                    exceptionRatePct: 9.36
+                    criticalUnresolvedRatioPct: 8.06
+                    retrySuccessRatePct: 76.35
+                    captureQuality: 100.0
+                    finality: 96.0
+                    captureQualityTrend: 0.4
+                  financialBehaviour:
+                    revenueTrendSlopePct: -1.44
+                    estimatedMarginPct: 33.03
+                    existingDebtToSalesPct: 28.7
+                  applicationSpecific:
+                    loanAmountEur: 400.00
+                    loanTermMonths: 6
+                  additionalCreditInformation:
+                    inventoryValueEur: 900.00
+                    collateralValueEur: 1500.00
+                    businessDebtsEur: 2000.00
+                    businessAssetsEur: 5000.00
+                    ownerPersonalAssetsEur: 8000.00
+                    ownerPersonalDebtsEur: 1000.00
+                    externalBureauScore: 800
+                    externalBureauReport: "SCHUFA report, no adverse entries, retrieved 2026-09-01"
+              minimalProfile:
+                summary: Only the truly required fields (optional loan/debt fields omitted)
+                value:
+                  merchantType: kiosk
+                  commencementDate: "2022-06-01"
+                  merchantActivity:
+                    activeDayRatioPct: 70.0
+                    finalizedPayments: 150
+                    avgTxnValueEur: 3.20
+                    cvTxnValue: 0.4
+                    verifiedSalesEur: 1800.00
+                  dataReliability:
+                    exceptionRatePct: 6.0
+                    criticalUnresolvedRatioPct: 3.0
+                    retrySuccessRatePct: 80.0
+                    captureQuality: 95.0
+                    finality: 94.0
+                    captureQualityTrend: 0.0
+                  financialBehaviour:
+                    revenueTrendSlopePct: 1.0
+                    estimatedMarginPct: 22.0
+      responses:
+        '201':
+          description: Assessment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentResponse'
+              examples:
+                complete:
+                  summary: Fully scored assessment
+                  value:
+                    assessmentId: "a_7f3e1c9b"
+                    merchantRef: "m_00000"
+                    generatedAt: "2026-09-20T14:32:00Z"
+                    businessAgeMonths: 52
+                    unavailableFields: []
+                    financialProfile:
+                      score: 60.1
+                      scale: "0-100"
+                    profileConfidence:
+                      label: Medium
+                      confidenceScore: 70.2
+                      coveragePct: 76.9
+                      dataReliabilityQualityPct: 82.4
+                      fieldsFilled: 20
+                      fieldsTotal: 26
+                    experimentalCredit:
+                      experimental: true
+                      disclaimer: "Not validated against real repayment/default outcomes. Do not use as the sole basis for a lending decision."
+                      probabilityOfDefault: 0.1305
+                      statisticalScore: 637
+                      policyOverlayPoints: 0.0
+                      creditScore: 637
+                      creditGrade: Sufficient
+                      scale: "300-850"
+                    inventoryAssessment:
+                      status: Healthy
+                      inventoryToSalesRatioPct: 24.8
+                    collateralAssessment:
+                      status: "Fully collateralized"
+                      coveragePct: 375.0
+                    additionalCreditInformation:
+                      inventoryValueEur: 900.00
+                      collateralValueEur: 1500.00
+                      businessDebtsEur: 2000.00
+                      businessAssetsEur: 5000.00
+                      ownerPersonalAssetsEur: 8000.00
+                      ownerPersonalDebtsEur: 1000.00
+                      externalBureauScore: 800
+                      externalBureauReport: "SCHUFA report, no adverse entries, retrieved 2026-09-01"
+        '400':
+          description: Malformed request (e.g. wrong type, out-of-range value)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: >
+            Request was well-formed but a required field was missing.
+            financialProfile and experimentalCredit will be null; see
+            unavailableFields in the 201 schema for the equivalent
+            partial-success shape used when the assessment is still created
+            but unscored. Returned here only if the API is configured to
+            reject rather than create an unscored record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /assessments/{assessmentId}:
+    get:
+      tags: [Assessments]
+      summary: Retrieve a previously generated assessment
+      operationId: getAssessment
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "a_7f3e1c9b"
+      responses:
+        '200':
+          description: Assessment found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentResponse'
+        '404':
+          description: No assessment with that ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /model/metadata:
+    get:
+      tags: [Model]
+      summary: Metadata about the currently active scoring configuration
+      description: |
+        Machine-readable governance info: model version, validation status,
+        and the business rules (thresholds, weights, constraints) currently
+        in effect. Intended so the config driving scores lives in one place
+        or storage
+        answers - rather than being hardcoded separately in multiple
+        client implementations.
+      operationId: getModelMetadata
+      responses:
+        '200':
+          description: Current model and configuration metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelMetadata'
+              example:
+                experimentalCreditModel:
+                  modelVersion: "2026.09.1"
+                  modelType: "logistic_regression_constrained"
+                  trainedOn: "2026-08-15"
+                  validationStatus: "EXPERIMENTAL - synthetic data only, not validated against real outcomes"
+                  trainTestSplit: "2/3 train, 1/3 test, stratified"
+                  testAuc: 0.661
+                  trainAuc: 0.675
+                  pdoPointsToDoubleOdds: 40
+                  baseScore: 600
+                  baseDefaultRate: 0.218
+                  scoreRange: [300, 850]
+                  gradeBands:
+                    - { grade: Excellent, minScore: 776 }
+                    - { grade: Good, minScore: 709 }
+                    - { grade: Acceptable, minScore: 642 }
+                    - { grade: Sufficient, minScore: 100 }
+                  monotonicConstraints:
+                    - feature: businessAgeMonths
+                      rule: "max (coefficient <= 0)"
+                      fittedCoefficient: 0.0
+                      rationale: "No statistically significant relationship to default (p=0.39)"
+                    - feature: captureQuality
+                      rule: "max (coefficient <= 0)"
+                      fittedCoefficient: 0.0
+                      rationale: "No statistically significant relationship to default (p=0.63)"
+                    - feature: finalizedPayments
+                      rule: "max (coefficient <= 0)"
+                      fittedCoefficient: 0.0
+                      rationale: "Real univariate signal (p=0.029) fully absorbed by correlated fields (verifiedSalesEur, loanAmountEur)"
+                    - feature: verifiedSalesEur
+                      rule: "max (coefficient <= 0)"
+                      fittedCoefficient: 0.0
+                      rationale: "Real univariate signal (p=0.0066), 91% correlated with loanAmountEur; constraint cost ~0.4pt test AUC"
+                  policyOverlay:
+                    description: "Business-judgment bonus points layered on the statistical score for the four constrained features, since the data alone cannot justify rewarding them further"
+                    maxPointsPerFeature: 12
+                    features:
+                      - { feature: businessAgeMonths, floor: 17, ceiling: 66, unit: months }
+                      - { feature: captureQuality, floor: 93, ceiling: 100, unit: "0-100" }
+                      - { feature: finalizedPayments, floor: 71, ceiling: 538, unit: count }
+                      - { feature: verifiedSalesEur, floor: 859, ceiling: 10558, unit: EUR }
+                missingValueRule:
+                  optionalFields: [loanAmountEur, loanTermMonths, existingDebtToSalesPct]
+                  behavior: "If ONLY these are missing, scoring proceeds using available variables only (missing terms dropped from the model, not imputed). Any other missing required field returns null scores."
+                financialProfileScore:
+                  scale: "0-100"
+                  aggregation: "weighted average (missing optional factors drop out of numerator and denominator, not penalized twice)"
+                  factors:
+                    - { factor: activeDayRatioPct, floor: 30, ceiling: 90, weight: 15 }
+                    - { factor: finalizedPayments, floor: 20, ceiling: 500, weight: 10 }
+                    - { factor: cvTxnValue, floor: 0.60, ceiling: 0, weight: 10, note: "inverse: lower is better" }
+                    - { factor: verifiedSalesEur, floor: 200, ceiling: 10000, weight: 15 }
+                    - { factor: businessAgeMonths, floor: 0, ceiling: 60, weight: 10 }
+                    - { factor: revenueTrendSlopePct, floor: -10, ceiling: 10, weight: 10 }
+                    - { factor: existingDebtToSalesPct, floor: 60, ceiling: 0, weight: 10, note: "inverse; optional" }
+                    - { factor: estimatedMarginPct, floor: 0, ceiling: 50, weight: 20 }
+                  excludedFromScoring:
+                    - { factor: avgTxnValueEur, reason: "No defensible 'higher is better' rule for MCBuse's EUR0.10-EUR10 ticket size; shown for context only" }
+                profileConfidence:
+                  scale: "0-100, bucketed Low/Medium/High"
+                  bands: [{ label: Low, max: 44.999 }, { label: Medium, min: 45, max: 74.999 }, { label: High, min: 75 }]
+                  formula: "0.5 * fieldCoveragePct + 0.5 * dataReliabilityQualityPct"
+                  totalTrackedFields: 26
+
+  /health:
+    get:
+      tags: [System]
+      summary: Liveness/readiness check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  modelVersion:
+                    type: string
+                    example: "2026.09.1"
+
+components:
+
+  schemas:
+
+    MerchantType:
+      type: string
+      enum: [cafe_bakery, grocer, kiosk, takeaway]
+
+    ProfileConfidenceLabel:
+      type: string
+      enum: [Low, Medium, High]
+
+    CreditGrade:
+      type: string
+      enum: [Excellent, Good, Acceptable, Sufficient, E]
+      description: "'E' is the theoretical floor grade; unreachable in practice because the score is clipped at 300, which already qualifies as 'Sufficient'."
+
+    MerchantActivity:
+      type: object
+      description: Category 1 - core business activity signals. All fields required.
+      required: [activeDayRatioPct, finalizedPayments, avgTxnValueEur, cvTxnValue, verifiedSalesEur]
+      properties:
+        activeDayRatioPct:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 84.65
+          description: Percent of observed days the merchant processed at least one transaction.
+        finalizedPayments:
+          type: integer
+          minimum: 0
+          example: 236
+        avgTxnValueEur:
+          type: number
+          format: decimal
+          minimum: 0
+          example: 4.75
+          description: >
+            MUST preserve at least 2 decimal places. MCBuse's typical range
+            is EUR 0.10-EUR 10.00; rounding to whole euros is a data-quality
+            bug, not a display simplification.
+        cvTxnValue:
+          type: number
+          minimum: 0
+          example: 0.369
+          description: Coefficient of variation of transaction value (volatility).
+        verifiedSalesEur:
+          type: number
+          format: decimal
+          minimum: 0
+          example: 3630.50
+
+    DataReliability:
+      type: object
+      description: Category 2 - payment-processing quality signals. All fields required.
+      required: [exceptionRatePct, criticalUnresolvedRatioPct, retrySuccessRatePct, captureQuality, finality, captureQualityTrend]
+      properties:
+        exceptionRatePct:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 9.36
+        criticalUnresolvedRatioPct:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 8.06
+        retrySuccessRatePct:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 76.35
+        captureQuality:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 100.0
+        finality:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 96.0
+        captureQualityTrend:
+          type: number
+          example: 0.4
+          description: Recent change in capture quality, in points.
+
+    FinancialBehaviour:
+      type: object
+      description: Category 3 - profitability and leverage. Margin and trend required; debt-to-sales optional.
+      required: [revenueTrendSlopePct, estimatedMarginPct]
+      properties:
+        revenueTrendSlopePct:
+          type: number
+          example: -1.44
+        estimatedMarginPct:
+          type: number
+          example: 33.03
+        existingDebtToSalesPct:
+          type: number
+          minimum: 0
+          nullable: true
+          example: 28.7
+          description: Optional. If omitted, this factor is dropped from scoring rather than imputed.
+
+    ApplicationSpecific:
+      type: object
+      description: Category 4 - this loan request. Both fields optional.
+      properties:
+        loanAmountEur:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+          example: 400.00
+        loanTermMonths:
+          type: integer
+          minimum: 0
+          nullable: true
+          example: 6
+
+    AdditionalCreditInformation:
+      type: object
+      description: >
+        Passed through for lender review only. Does not feed any score.
+        All fields optional.
+      properties:
+        inventoryValueEur:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        collateralValueEur:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        businessDebtsEur:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        businessAssetsEur:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        ownerPersonalAssetsEur:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        ownerPersonalDebtsEur:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        externalBureauScore:
+          type: integer
+          nullable: true
+          description: e.g. a SCHUFA score, in whatever native scale the issuing bureau uses.
+        externalBureauReport:
+          type: string
+          nullable: true
+          maxLength: 2000
+          example: "SCHUFA report, no adverse entries, retrieved 2026-09-01"
+
+    AssessmentRequest:
+      type: object
+      required: [merchantType, commencementDate, merchantActivity, dataReliability, financialBehaviour]
+      properties:
+        merchantRef:
+          type: string
+          description: Caller-supplied external merchant identifier, echoed back but not validated.
+          example: "m_00000"
+        merchantType:
+          $ref: '#/components/schemas/MerchantType'
+        commencementDate:
+          type: string
+          format: date
+          example: "2020-01-15"
+          description: Business age in months is computed server-side from this date; do not submit businessAgeMonths directly.
+        merchantActivity:
+          $ref: '#/components/schemas/MerchantActivity'
+        dataReliability:
+          $ref: '#/components/schemas/DataReliability'
+        financialBehaviour:
+          $ref: '#/components/schemas/FinancialBehaviour'
+        applicationSpecific:
+          $ref: '#/components/schemas/ApplicationSpecific'
+        additionalCreditInformation:
+          $ref: '#/components/schemas/AdditionalCreditInformation'
+
+    FinancialProfileResult:
+      type: object
+      nullable: true
+      description: Null if a required field was missing (see unavailableFields on the parent response).
+      properties:
+        score:
+          type: number
+          minimum: 0
+          maximum: 100
+        scale:
+          type: string
+          example: "0-100"
+
+    ProfileConfidenceResult:
+      type: object
+      description: Always computed, even when scoring is unavailable - it is precisely the tool for describing incomplete submissions.
+      properties:
+        label:
+          $ref: '#/components/schemas/ProfileConfidenceLabel'
+        confidenceScore:
+          type: number
+          minimum: 0
+          maximum: 100
+        coveragePct:
+          type: number
+        dataReliabilityQualityPct:
+          type: number
+        fieldsFilled:
+          type: integer
+        fieldsTotal:
+          type: integer
+
+    ExperimentalCreditResult:
+      type: object
+      nullable: true
+      description: >
+        Null if a required field was missing. EXPERIMENTAL - fitted on
+        synthetic data, not validated against real repayment/default
+        outcomes. Must not be the sole basis for an automated lending
+        decision. Any UI displaying this MUST surface the disclaimer field.
+      properties:
+        experimental:
+          type: boolean
+          const: true
+        disclaimer:
+          type: string
+        probabilityOfDefault:
+          type: number
+          minimum: 0
+          maximum: 1
+        statisticalScore:
+          type: integer
+          description: Score from the fitted model alone, before the policy overlay is added.
+        policyOverlayPoints:
+          type: number
+          description: Business-judgment bonus points added on top of statisticalScore (see /model/metadata).
+        creditScore:
+          type: integer
+          description: statisticalScore + policyOverlayPoints, clipped to [300, 850].
+        creditGrade:
+          $ref: '#/components/schemas/CreditGrade'
+        scale:
+          type: string
+          example: "300-850"
+
+    InventoryAssessment:
+      type: object
+      nullable: true
+      properties:
+        status:
+          type: string
+          enum: ["Low / lean stock", Healthy, "High / possible overstock", "Not provided", "N/A"]
+        inventoryToSalesRatioPct:
+          type: number
+          nullable: true
+
+    CollateralAssessment:
+      type: object
+      nullable: true
+      properties:
+        status:
+          type: string
+          enum: ["Under-collateralized", "Partially collateralized", "Fully collateralized", "Not provided", "N/A"]
+        coveragePct:
+          type: number
+          nullable: true
+          description: collateralValueEur / loanAmountEur * 100, if both are present.
+
+    AssessmentResponse:
+      type: object
+      properties:
+        assessmentId:
+          type: string
+        merchantRef:
+          type: string
+          nullable: true
+        generatedAt:
+          type: string
+          format: date-time
+        businessAgeMonths:
+          type: integer
+          nullable: true
+        unavailableFields:
+          type: array
+          items:
+            type: string
+          description: >
+            Required fields that were missing from the request. Empty if
+            the submission was complete enough to score. If non-empty,
+            financialProfile and experimentalCredit are both null.
+        financialProfile:
+          $ref: '#/components/schemas/FinancialProfileResult'
+        profileConfidence:
+          $ref: '#/components/schemas/ProfileConfidenceResult'
+        experimentalCredit:
+          $ref: '#/components/schemas/ExperimentalCreditResult'
+        inventoryAssessment:
+          $ref: '#/components/schemas/InventoryAssessment'
+        collateralAssessment:
+          $ref: '#/components/schemas/CollateralAssessment'
+        additionalCreditInformation:
+          $ref: '#/components/schemas/AdditionalCreditInformation'
+
+    ModelMetadata:
+      type: object
+      description: Free-form governance/config document - see the example on GET /model/metadata for the full current shape.
+      additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: "MISSING_REQUIRED_FIELD"
+        message:
+          type: string
+          example: "dataReliability.captureQuality is required"
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              issue:
+                type: string

@@ -1,0 +1,391 @@
+{
+  "requestedAction": "Remove all legacy wallet records",
+  "status": "Completed per clarified scope: legacy sandbox records cleared; wallet records preserved",
+  "checkedAt": "2026-09-21T14:25:12.664Z",
+  "walletCount": 8,
+  "orphanCount": 0,
+  "wallets": [
+    {
+      "walletId": "17689901-733b-4cec-8538-a3ab99a59487",
+      "username": "fred",
+      "type": "routine",
+      "active": true,
+      "references": [
+        {
+          "schema": "public",
+          "table": "balances",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "credit_wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "merchants",
+          "column": "receiving_wallet_id",
+          "delete_action": "a",
+          "count": 1
+        },
+        {
+          "schema": "public",
+          "table": "payment_requests",
+          "column": "creator_wallet_id",
+          "delete_action": "a",
+          "count": 51
+        }
+      ],
+      "balances": [
+        {
+          "wallet_id": "17689901-733b-4cec-8538-a3ab99a59487",
+          "currency": "EURC",
+          "available": "0",
+          "pending": "0"
+        },
+        {
+          "wallet_id": "17689901-733b-4cec-8538-a3ab99a59487",
+          "currency": "USDC",
+          "available": "109196883",
+          "pending": "0"
+        }
+      ]
+    },
+    {
+      "walletId": "e8069f3a-8627-46fd-8d7a-00ffaeaf9b84",
+      "username": "fred",
+      "type": "savings",
+      "active": true,
+      "references": [
+        {
+          "schema": "public",
+          "table": "balances",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "credit_wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "debit_wallet_id",
+          "delete_action": "a",
+          "count": 3
+        },
+        {
+          "schema": "public",
+          "table": "onramp_transactions",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 4
+        }
+      ],
+      "balances": [
+        {
+          "wallet_id": "e8069f3a-8627-46fd-8d7a-00ffaeaf9b84",
+          "currency": "EURC",
+          "available": "0",
+          "pending": "0"
+        },
+        {
+          "wallet_id": "e8069f3a-8627-46fd-8d7a-00ffaeaf9b84",
+          "currency": "USDC",
+          "available": "175000000",
+          "pending": "0"
+        }
+      ]
+    },
+    {
+      "walletId": "7707798b-7b24-4fdc-b48f-b4ee2b0b5e37",
+      "username": "kabe",
+      "type": "routine",
+      "active": true,
+      "references": [
+        {
+          "schema": "public",
+          "table": "balances",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "credit_wallet_id",
+          "delete_action": "a",
+          "count": 1
+        },
+        {
+          "schema": "public",
+          "table": "payment_requests",
+          "column": "creator_wallet_id",
+          "delete_action": "a",
+          "count": 14
+        }
+      ],
+      "balances": [
+        {
+          "wallet_id": "7707798b-7b24-4fdc-b48f-b4ee2b0b5e37",
+          "currency": "EURC",
+          "available": "0",
+          "pending": "0"
+        },
+        {
+          "wallet_id": "7707798b-7b24-4fdc-b48f-b4ee2b0b5e37",
+          "currency": "USDC",
+          "available": "20000000",
+          "pending": "0"
+        }
+      ]
+    },
+    {
+      "walletId": "d500824a-f87b-4b20-961e-81f67040d503",
+      "username": "kabe",
+      "type": "savings",
+      "active": true,
+      "references": [
+        {
+          "schema": "public",
+          "table": "balances",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "credit_wallet_id",
+          "delete_action": "a",
+          "count": 4
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "debit_wallet_id",
+          "delete_action": "a",
+          "count": 5
+        },
+        {
+          "schema": "public",
+          "table": "onramp_transactions",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 10
+        }
+      ],
+      "balances": [
+        {
+          "wallet_id": "d500824a-f87b-4b20-961e-81f67040d503",
+          "currency": "EURC",
+          "available": "0",
+          "pending": "0"
+        },
+        {
+          "wallet_id": "d500824a-f87b-4b20-961e-81f67040d503",
+          "currency": "USDC",
+          "available": "730000000",
+          "pending": "0"
+        }
+      ]
+    },
+    {
+      "walletId": "87724385-9a83-46d1-bd83-f558611b70cc",
+      "username": "e_aci",
+      "type": "routine",
+      "active": true,
+      "references": [
+        {
+          "schema": "public",
+          "table": "balances",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "payment_requests",
+          "column": "creator_wallet_id",
+          "delete_action": "a",
+          "count": 7
+        }
+      ],
+      "balances": [
+        {
+          "wallet_id": "87724385-9a83-46d1-bd83-f558611b70cc",
+          "currency": "EURC",
+          "available": "0",
+          "pending": "0"
+        },
+        {
+          "wallet_id": "87724385-9a83-46d1-bd83-f558611b70cc",
+          "currency": "USDC",
+          "available": "0",
+          "pending": "0"
+        }
+      ]
+    },
+    {
+      "walletId": "6f6c761f-5a68-42d0-8ebe-8d43877eeba9",
+      "username": "e_aci",
+      "type": "savings",
+      "active": true,
+      "references": [
+        {
+          "schema": "public",
+          "table": "balances",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "onramp_transactions",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 3
+        }
+      ],
+      "balances": [
+        {
+          "wallet_id": "6f6c761f-5a68-42d0-8ebe-8d43877eeba9",
+          "currency": "EURC",
+          "available": "0",
+          "pending": "0"
+        },
+        {
+          "wallet_id": "6f6c761f-5a68-42d0-8ebe-8d43877eeba9",
+          "currency": "USDC",
+          "available": "0",
+          "pending": "0"
+        }
+      ]
+    },
+    {
+      "walletId": "69a29597-8fcf-40e7-ac76-fb6d738fa16f",
+      "username": "theody",
+      "type": "routine",
+      "active": true,
+      "references": [
+        {
+          "schema": "public",
+          "table": "balances",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "credit_wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "debit_wallet_id",
+          "delete_action": "a",
+          "count": 1
+        }
+      ],
+      "balances": [
+        {
+          "wallet_id": "69a29597-8fcf-40e7-ac76-fb6d738fa16f",
+          "currency": "EURC",
+          "available": "50000000",
+          "pending": "0"
+        },
+        {
+          "wallet_id": "69a29597-8fcf-40e7-ac76-fb6d738fa16f",
+          "currency": "USDC",
+          "available": "10803117",
+          "pending": "0"
+        }
+      ]
+    },
+    {
+      "walletId": "ebdc4da5-f617-4a8c-8efe-a03bfde55533",
+      "username": "theody",
+      "type": "savings",
+      "active": true,
+      "references": [
+        {
+          "schema": "public",
+          "table": "balances",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 2
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "credit_wallet_id",
+          "delete_action": "a",
+          "count": 3
+        },
+        {
+          "schema": "public",
+          "table": "ledger_entries",
+          "column": "debit_wallet_id",
+          "delete_action": "a",
+          "count": 5
+        },
+        {
+          "schema": "public",
+          "table": "onramp_transactions",
+          "column": "wallet_id",
+          "delete_action": "a",
+          "count": 1
+        }
+      ],
+      "balances": [
+        {
+          "wallet_id": "ebdc4da5-f617-4a8c-8efe-a03bfde55533",
+          "currency": "EURC",
+          "available": "43840000",
+          "pending": "0"
+        },
+        {
+          "wallet_id": "ebdc4da5-f617-4a8c-8efe-a03bfde55533",
+          "currency": "USDC",
+          "available": "128000000",
+          "pending": "0"
+        }
+      ]
+    }
+  ],
+  "backup": {
+    "verifiedAt": "2026-09-21T14:26:57.893Z",
+    "source": "hosted",
+    "restoreScope": "Application public and drizzle schemas; full Supabase archive retained",
+    "directory": "/private/tmp/mcbuse-legacy-removal-backup-20260921",
+    "restoredDatabase": "mcbuse_legacy_removal_restore_20260921",
+    "bytes": 564266,
+    "sha256": "e6379871f622e2717066f6876970186906cb74a86dbfd55effb481902d457b62",
+    "archiveListingVerified": true,
+    "restoredWallets": 8,
+    "identicalWalletRecords": true,
+    "keyRecoveryFailures": [],
+    "complete": true
+  },
+  "chainAssetCheck": {
+    "status": "incomplete",
+    "network": "devnet",
+    "reason": "Public RPC rate limited with HTTP 429; no empty-wallet conclusion"
+  },
+  "scopeQuestion": "Clear legacy sandbox balances and transaction records while preserving wallet addresses, or remove and replace all eight wallets as well?",
+  "preservationBoundary": "All eight wallet records, encrypted keys, addresses, users and the merchant workspace were preserved. User explicitly authorized removal of legacy sandbox financial records.",
+  "scopeResolution": "Clear legacy sandbox records; keep wallet addresses",
+  "completedAt": "2026-09-21T14:32:09.752Z",
+  "resultEvidence": "merchant-legacy-sandbox-reset-2026-09-21.json"
+}

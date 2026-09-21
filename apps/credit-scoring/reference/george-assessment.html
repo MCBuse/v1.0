@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merchant Underwriting Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12161B; --panel: #171C22; --panel-raised: #1D242C; --line: #2A323C;
+    --text: #E7EAEE; --text-dim: #93A0AD; --text-faint: #5E6B78;
+    --accent: #4FA88F; --accent-dim: #33564C; --risk: #C4664A; --risk-dim: #4A342C; --amber: #C9A24A;
+    --font-serif: 'Source Serif 4', Georgia, serif;
+    --font-sans: 'IBM Plex Sans', -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+  :root[data-theme="light"] {
+    --bg:#F4F5F2; --panel:#FFFFFF; --panel-raised:#FBFBF9; --line:#DCE0DA;
+    --text:#1B211D; --text-dim:#5B6660; --text-faint:#8B958E; --accent-dim:#D8ECE5; --risk-dim:#F4DAD1;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg:#F4F5F2; --panel:#FFFFFF; --panel-raised:#FBFBF9; --line:#DCE0DA;
+      --text:#1B211D; --text-dim:#5B6660; --text-faint:#8B958E; --accent-dim:#D8ECE5; --risk-dim:#F4DAD1;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+  a { color: inherit; }
+  button { font-family: var(--font-sans); }
+
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  @media (max-width: 820px) { .app { grid-template-columns: 1fr; } }
+
+  /* ---- side nav ---- */
+  .sidenav {
+    background: var(--panel); border-right: 1px solid var(--line);
+    padding: 22px 14px; display: flex; flex-direction: column; gap: 2px;
+  }
+  @media (max-width: 820px) {
+    .sidenav { border-right: none; border-bottom: 1px solid var(--line); flex-direction: row; overflow-x: auto; padding: 12px; }
+  }
+  .brand { font-family: var(--font-serif); font-weight: 600; font-size: 16px; padding: 0 10px 18px; letter-spacing: -0.01em; }
+  @media (max-width: 820px) { .brand { display: none; } }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 10px; border-radius: 3px;
+    color: var(--text-dim); cursor: pointer; font-size: 13.5px; border-left: 2px solid transparent;
+    white-space: nowrap;
+  }
+  .nav-item:hover { background: var(--panel-raised); color: var(--text); }
+  .nav-item.active { color: var(--text); background: var(--panel-raised); border-left-color: var(--accent); }
+  .nav-item .ic { width: 16px; text-align: center; opacity: 0.85; }
+  .nav-item.soon { opacity: 0.5; cursor: default; }
+  .nav-item.soon:hover { background: none; color: var(--text-dim); }
+  .nav-tag { margin-left: auto; font-size: 10px; color: var(--text-faint); border: 1px solid var(--line); border-radius: 10px; padding: 1px 6px; }
+
+  .content { padding: 36px 32px 80px; max-width: 1180px; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  header.masthead { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 28px; gap: 20px; flex-wrap: wrap; }
+  header.masthead h1 { font-family: var(--font-serif); font-weight: 600; font-size: 24px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  header.masthead p { margin: 0; color: var(--text-dim); max-width: 50ch; }
+  .masthead-meta { text-align: right; color: var(--text-faint); font-size: 12px; line-height: 1.6; }
+  .masthead-meta strong { color: var(--text-dim); font-weight: 500; }
+
+  /* ---- dashboard ---- */
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+  @media (max-width: 700px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
+  .stat-card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 16px 18px; }
+  .stat-card .sv { font-family: var(--font-mono); font-size: 24px; font-weight: 600; }
+  .stat-card .sl { color: var(--text-faint); font-size: 12px; margin-top: 4px; }
+
+  .tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 820px) { .tile-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .tile-grid { grid-template-columns: 1fr; } }
+  .tile {
+    background: var(--panel); border: 1px solid var(--line); border-left: 2px solid var(--accent);
+    border-radius: 3px; padding: 18px; cursor: pointer;
+  }
+  .tile:hover { background: var(--panel-raised); }
+  .tile.soon { border-left-color: var(--line); cursor: default; opacity: 0.55; }
+  .tile.soon:hover { background: var(--panel); }
+  .tile h3 { margin: 0 0 6px; font-size: 14.5px; }
+  .tile p { margin: 0; color: var(--text-faint); font-size: 12.5px; }
+  .tile .badge { display:inline-block; margin-top:10px; font-size:10.5px; color: var(--text-faint); border:1px solid var(--line); border-radius:10px; padding:2px 8px; }
+
+  /* ---- form / report layout (Credit Assessment view) ---- */
+  .layout { display: grid; grid-template-columns: 1.35fr 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+
+  .section { border-left: 2px solid var(--accent); padding: 18px 22px 22px; margin-bottom: 2px; background: var(--panel); border-top: 1px solid var(--line); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .section + .section { border-top: none; }
+  .section:first-of-type { border-radius: 3px 3px 0 0; }
+  .section:last-of-type { border-radius: 0 0 3px 3px; }
+  .section.optional { border-left-color: var(--amber); }
+  .section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 600; margin: 0 0 3px; }
+  .section .section-note { color: var(--text-faint); font-size: 12.5px; margin: 0 0 14px; }
+
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 16px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 12.5px; color: var(--text-dim); display: flex; justify-content: space-between; }
+  .field label .unit { color: var(--text-faint); font-weight: 400; }
+  .field input, .field select { background: var(--panel-raised); border: 1px solid var(--line); color: var(--text); padding: 8px 10px; border-radius: 2px; font-family: var(--font-mono); font-size: 13.5px; width: 100%; }
+  .field select { font-family: var(--font-sans); }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+  .field input::placeholder { color: var(--text-faint); font-family: var(--font-sans); }
+  .field .computed-hint { font-size: 12px; color: var(--accent); font-family: var(--font-mono); min-height: 15px; }
+
+  .calc-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 22px; margin-top: 14px; background: var(--panel-raised); border: 1px solid var(--line); border-radius: 3px; }
+  .calc-bar p { margin: 0; color: var(--text-faint); font-size: 12.5px; max-width: 40ch; }
+  button.primary { background: var(--accent); color: #0C1210; border: none; font-weight: 600; padding: 12px 22px; border-radius: 2px; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.secondary { background: var(--panel-raised); color: var(--text); border: 1px solid var(--line); font-weight: 500; padding: 9px 16px; border-radius: 2px; font-size: 13px; cursor: pointer; }
+  button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+  button.danger { background: var(--panel-raised); color: var(--risk); border: 1px solid var(--risk-dim); font-weight: 500; padding: 9px 16px; border-radius: 2px; font-size: 13px; cursor: pointer; }
+
+  .report { position: sticky; top: 24px; }
+  .report-header { padding: 18px 22px; border-bottom: 1px solid var(--line); }
+  .report-header h2 { font-family: var(--font-serif); font-size: 17px; font-weight: 600; margin: 0 0 3px; }
+  .report-header p { margin: 0; color: var(--text-faint); font-size: 12.5px; }
+  .score-block { padding: 22px; border-bottom: 1px solid var(--line); text-align: center; }
+  .score-number { font-family: var(--font-mono); font-weight: 600; font-size: 52px; line-height: 1; letter-spacing: -0.02em; }
+  .score-scale { color: var(--text-faint); font-size: 12px; margin-top: 4px; }
+  .score-band { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 20px; font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em; }
+  .score-meter { margin: 16px auto 0; height: 6px; width: 100%; max-width: 260px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .score-meter-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+  .report-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 22px; border-bottom: 1px solid var(--line); gap: 12px; }
+  .report-row:last-child { border-bottom: none; }
+  .report-row .rl { color: var(--text-dim); font-size: 13px; }
+  .report-row .rv { font-family: var(--font-mono); font-size: 13.5px; text-align: right; }
+  .report-row .rv.dim { color: var(--text-faint); font-family: var(--font-sans); font-size: 12.5px; }
+  .subreport { padding: 16px 22px; border-bottom: 1px solid var(--line); }
+  .subreport:last-child { border-bottom: none; }
+  .subreport h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); font-weight: 600; margin: 0 0 10px; }
+  .subreport .line { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+  .tag { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .tag.good { background: var(--accent-dim); color: var(--accent); }
+  .tag.warn { background: #3D3320; color: var(--amber); }
+  .tag.bad { background: var(--risk-dim); color: var(--risk); }
+  .tag.neutral { background: var(--panel-raised); color: var(--text-faint); border: 1px solid var(--line); }
+  .missing-note { margin: 16px 22px; padding: 12px 14px; border: 1px solid var(--risk); border-radius: 2px; background: var(--risk-dim); color: var(--risk); font-size: 12.5px; line-height: 1.5; }
+  .missing-note strong { display:block; margin-bottom: 4px; color: var(--risk); }
+  .empty-state { padding: 40px 24px; text-align: center; color: var(--text-faint); font-size: 13px; }
+  .model-footnote { margin-top: 20px; padding: 16px 18px; border-top: 1px solid var(--line); color: var(--text-faint); font-size: 12px; line-height: 1.6; }
+
+  /* ---- data records table ---- */
+  .records-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; flex-wrap: wrap; }
+  .records-toolbar .count { color: var(--text-faint); font-size: 12.5px; }
+  .btn-row { display: flex; gap: 10px; }
+  .table-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; overflow: auto; max-height: 68vh; }
+  table.records { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  table.records th { position: sticky; top: 0; background: var(--panel-raised); text-align: left; padding: 10px 14px; color: var(--text-dim); font-weight: 600; border-bottom: 1px solid var(--line); white-space: nowrap; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  table.records td { padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; font-family: var(--font-mono); color: var(--text); }
+  table.records tr:last-child td { border-bottom: none; }
+  table.records tr:hover td { background: var(--panel-raised); }
+  .soon-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 40px; text-align: center; color: var(--text-faint); }
+  .soon-panel h3 { color: var(--text-dim); font-weight: 600; margin: 0 0 6px; font-family: var(--font-serif); font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidenav" id="sidenav">
+    <div class="brand">MCB · Underwriting</div>
+    <div class="nav-item active" data-view="dashboard"><span class="ic">&#9670;</span> Dashboard</div>
+    <div class="nav-item" data-view="assessment"><span class="ic">&#9679;</span> Credit assessment</div>
+    <div class="nav-item" data-view="records"><span class="ic">&#9632;</span> Data records</div>
+    <div class="nav-item soon" data-view="portfolio"><span class="ic">&#9651;</span> Loan portfolio <span class="nav-tag">soon</span></div>
+    <div class="nav-item soon" data-view="transactions"><span class="ic">&#9711;</span> Transactions <span class="nav-tag">soon</span></div>
+    <div class="nav-item soon" data-view="settings"><span class="ic">&#9881;</span> Settings <span class="nav-tag">soon</span></div>
+  </nav>
+
+  <main class="content">
+
+    <!-- ================= DASHBOARD ================= -->
+    <section id="view-dashboard" class="view active">
+      <header class="masthead">
+        <div>
+          <h1>Merchant Underwriting Console</h1>
+          <p>One place to assess a merchant, review submitted profiles, and (soon) manage loans and transactions.</p>
+        </div>
+        <div class="masthead-meta">
+          <div><strong>Model</strong> · Logistic regression, AUC 0.664 (test)</div>
+          <div><strong>Financial Profile Score</strong> · 0–100</div>
+        </div>
+      </header>
+
+      <div class="stat-row">
+        <div class="stat-card"><div class="sv" id="statCount">0</div><div class="sl">Merchants recorded</div></div>
+        <div class="stat-card"><div class="sv" id="statAvgScore">—</div><div class="sl">Avg. Financial Profile Score</div></div>
+        <div class="stat-card"><div class="sv" id="statScored">0</div><div class="sl">Scored (complete data)</div></div>
+        <div class="stat-card"><div class="sv" id="statNA">0</div><div class="sl">Not available</div></div>
+      </div>
+
+      <div class="tile-grid">
+        <div class="tile" data-view="assessment">
+          <h3>Credit assessment</h3>
+          <p>Enter a merchant's profile and generate a score, inventory read, and collateral coverage.</p>
+        </div>
+        <div class="tile" data-view="records">
+          <h3>Data records</h3>
+          <p>Every profile submitted through Credit assessment, in one table you can export.</p>
+        </div>
+        <div class="tile soon">
+          <h3>Loan portfolio</h3>
+          <p>Track disbursed loans against this scoring history.</p>
+          <span class="badge">Coming soon</span>
+        </div>
+        <div class="tile soon">
+          <h3>Transactions</h3>
+          <p>Live payment activity feed per merchant.</p>
+          <span class="badge">Coming soon</span>
+        </div>
+        <div class="tile soon">
+          <h3>Repayment monitoring</h3>
+          <p>Track scheduled vs. actual repayments once a loan is live.</p>
+          <span class="badge">Coming soon</span>
+        </div>
+        <div class="tile soon">
+          <h3>Settings</h3>
+          <p>Model thresholds, scoring bands, and users.</p>
+          <span class="badge">Coming soon</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CREDIT ASSESSMENT ================= -->
+    <section id="view-assessment" class="view">
+      <header class="masthead">
+        <div>
+          <h1>Credit assessment</h1>
+          <p>Enter one merchant's data to generate an MCBuse Financial Profile Score, a Profile Confidence rating, an experimental PD model output, and additional credit information for lender review.</p>
+        </div>
+        <div class="masthead-meta">
+          <div><strong>Profile score</strong> · 0–100</div>
+          <div><strong>PD model</strong> · Experimental</div>
+        </div>
+      </header>
+
+      <div class="layout">
+        <form id="entryForm" class="card">
+
+          <div class="section">
+            <h2>Merchant activity</h2>
+            <p class="section-note">Required for scoring. Drives the Financial Profile Score.</p>
+            <div class="grid">
+              <div class="field">
+                <label for="merchant_type">Merchant type</label>
+                <select id="merchant_type" required>
+                  <option value="">— select —</option>
+                  <option value="cafe_bakery">Café / bakery</option>
+                  <option value="grocer">Grocer</option>
+                  <option value="kiosk">Kiosk</option>
+                  <option value="takeaway">Takeaway</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="commencement_date">Commencement date</label>
+                <input type="date" id="commencement_date">
+                <div class="computed-hint" id="ageHint">Business age will be calculated automatically</div>
+              </div>
+              <div class="field"><label for="active_day_ratio">Active-day ratio <span class="unit">%</span></label><input type="number" id="active_day_ratio" placeholder="e.g. 84.7" min="0" max="100" step="0.1"></div>
+              <div class="field"><label for="finalized_payments">Finalized payments <span class="unit">count</span></label><input type="number" id="finalized_payments" placeholder="e.g. 236" min="0" step="1"></div>
+              <div class="field"><label for="avg_txn_value_eur">Avg. transaction value <span class="unit">€ · cents preserved</span></label><input type="number" id="avg_txn_value_eur" placeholder="e.g. 4.75 (typical range €0.10–€10.00)" min="0" step="0.01"></div>
+              <div class="field"><label for="cv_txn_value">Transaction-value volatility <span class="unit">CV</span></label><input type="number" id="cv_txn_value" placeholder="e.g. 0.35" min="0" step="0.01"></div>
+              <div class="field"><label for="verified_sales_eur">Verified sales <span class="unit">€</span></label><input type="number" id="verified_sales_eur" placeholder="e.g. 3630" min="0" step="0.01"></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h2>Data reliability</h2>
+            <p class="section-note">Required for scoring. Drives Profile Confidence, not the Financial Profile Score itself.</p>
+            <div class="grid">
+              <div class="field"><label for="exception_rate">Exception rate <span class="unit">%</span></label><input type="number" id="exception_rate" placeholder="e.g. 8.1" min="0" max="100" step="0.1"></div>
+              <div class="field"><label for="critical_unresolved_ratio">Critical unresolved ratio <span class="unit">%</span></label><input type="number" id="critical_unresolved_ratio" placeholder="e.g. 4.6" min="0" max="100" step="0.1"></div>
+              <div class="field"><label for="retry_success_rate">Retry success rate <span class="unit">%</span></label><input type="number" id="retry_success_rate" placeholder="e.g. 82" min="0" max="100" step="0.1"></div>
+              <div class="field"><label for="capture_quality">Capture quality <span class="unit">0–100</span></label><input type="number" id="capture_quality" placeholder="e.g. 97" min="0" max="100" step="0.1"></div>
+              <div class="field"><label for="finality">Finality <span class="unit">0–100</span></label><input type="number" id="finality" placeholder="e.g. 96" min="0" max="100" step="0.1"></div>
+              <div class="field"><label for="capture_quality_trend">Capture quality trend <span class="unit">Δ pts</span></label><input type="number" id="capture_quality_trend" placeholder="e.g. 0.4" step="0.01"></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h2>Financial behaviour</h2>
+            <p class="section-note">Margin and revenue trend required. Debt-to-sales may be left blank.</p>
+            <div class="grid">
+              <div class="field"><label for="revenue_trend_slope_pct">Revenue trend <span class="unit">% / period</span></label><input type="number" id="revenue_trend_slope_pct" placeholder="e.g. 0.3" step="0.01"></div>
+              <div class="field"><label for="estimated_margin_pct">Estimated margin <span class="unit">%</span></label><input type="number" id="estimated_margin_pct" placeholder="e.g. 27.4" step="0.01"></div>
+              <div class="field"><label for="existing_debt_to_sales">Existing debt-to-sales <span class="unit">% · optional</span></label><input type="number" id="existing_debt_to_sales" placeholder="e.g. 23.1" min="0" step="0.1"></div>
+            </div>
+          </div>
+
+          <div class="section optional">
+            <h2>Application-specific</h2>
+            <p class="section-note">This loan request. Both fields may be left blank — scoring still runs from everything else.</p>
+            <div class="grid">
+              <div class="field"><label for="loan_amount_eur">Loan amount <span class="unit">€ · optional</span></label><input type="number" id="loan_amount_eur" placeholder="e.g. 1200" min="0" step="1"></div>
+              <div class="field"><label for="loan_term_months">Loan term <span class="unit">months · optional</span></label><input type="number" id="loan_term_months" placeholder="e.g. 12" min="0" step="1"></div>
+            </div>
+          </div>
+
+          <div class="section optional">
+            <h2>Additional credit information</h2>
+            <p class="section-note">Passed through as-is for lender review — not used in any score. All optional.</p>
+            <div class="grid">
+              <div class="field"><label for="inventory_value_eur">Inventory value <span class="unit">€</span></label><input type="number" id="inventory_value_eur" placeholder="e.g. 900" min="0" step="1"></div>
+              <div class="field"><label for="collateral_value_eur">Collateral value offered <span class="unit">€</span></label><input type="number" id="collateral_value_eur" placeholder="e.g. 1500" min="0" step="1"></div>
+              <div class="field"><label for="business_debts_eur">Reported business debts <span class="unit">€</span></label><input type="number" id="business_debts_eur" placeholder="e.g. 2000" min="0" step="1"></div>
+              <div class="field"><label for="business_assets_eur">Reported business assets <span class="unit">€</span></label><input type="number" id="business_assets_eur" placeholder="e.g. 5000" min="0" step="1"></div>
+              <div class="field"><label for="owner_personal_assets_eur">Owner personal assets <span class="unit">€</span></label><input type="number" id="owner_personal_assets_eur" placeholder="e.g. 8000" min="0" step="1"></div>
+              <div class="field"><label for="owner_personal_debts_eur">Owner personal debts <span class="unit">€</span></label><input type="number" id="owner_personal_debts_eur" placeholder="e.g. 1000" min="0" step="1"></div>
+              <div class="field"><label for="external_bureau_score">External bureau score <span class="unit">e.g. SCHUFA</span></label><input type="number" id="external_bureau_score" placeholder="e.g. 97 (100–999 scale)" step="1"></div>
+              <div class="field full"><label for="external_bureau_report">External bureau report summary</label><input type="text" id="external_bureau_report" placeholder="e.g. SCHUFA report, no adverse entries, retrieved 2026-09-01"></div>
+            </div>
+          </div>
+
+          <div class="calc-bar">
+            <p>Merchant activity, data reliability, and financial behaviour (except debt-to-sales) must be filled in to produce a score. Loan request and additional credit information are optional. Submitted profiles are saved to Data records.</p>
+            <button type="submit" class="primary">Generate report</button>
+          </div>
+        </form>
+
+        <div class="report card">
+          <div class="report-header">
+            <h2>Summary report</h2>
+            <p id="reportSubtitle">Fill in the form and generate a report to see results here.</p>
+          </div>
+          <div id="reportBody">
+            <div class="empty-state">No merchant scored yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="model-footnote">
+        <strong>MCBuse Financial Profile Score</strong> (0–100) is a transparent, threshold-based score built ONLY from Merchant Activity and Financial Behaviour fields — it does not use Data Reliability or Application-Specific fields, and it is not a statistical PD model. <strong>Profile Confidence</strong> (Low / Medium / High) reflects how complete the submitted data is and how strong the underlying Data Reliability metrics look — it is a data-quality signal, not a risk signal. <strong>The Probability-of-Default / Experimental Credit Score section is clearly marked experimental</strong>: it is a logistic regression fit on synthetic data only, four of its factors (business age, capture quality, finalized payments, verified sales) carry a capped policy overlay because the fitted model found no reliable statistical relationship for them, and none of it should be treated as validated until real repayment and default outcomes from financial-institution partners are available. Business age is calculated automatically from the commencement date. Transaction-value figures preserve full cent-level decimal precision (e.g. 475 minor units = €4.75, never rounded to €4 or €5) throughout entry, storage, and the Data records export. Additional Credit Information (collateral, inventory, business/personal debts and assets, external bureau score/report) is captured for lender review only and does not feed any score in this prototype. This is a decision-support estimate, not a lending decision.
+      </div>
+    </section>
+
+    <!-- ================= DATA RECORDS ================= -->
+    <section id="view-records" class="view">
+      <header class="masthead">
+        <div>
+          <h1>Data records</h1>
+          <p>Every business profile submitted through Credit assessment on this device, newest first.</p>
+        </div>
+      </header>
+
+      <div class="records-toolbar">
+        <span class="count" id="recordsCount">0 records</span>
+        <div class="btn-row">
+          <button class="secondary" id="downloadBtn">Download as Excel (.csv)</button>
+          <button class="danger" id="clearBtn">Clear all records</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="records" id="recordsTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="recordsEmpty" class="soon-panel" style="display:none; margin-top:14px;">
+        <h3>No records yet</h3>
+        <p>Submit a profile from Credit assessment and it will appear here.</p>
+      </div>
+    </section>
+
+    <!-- ================= PLACEHOLDER VIEWS ================= -->
+    <section id="view-portfolio" class="view">
+      <header class="masthead"><div><h1>Loan portfolio</h1><p>Not built yet.</p></div></header>
+      <div class="soon-panel"><h3>Coming soon</h3><p>This module isn't built yet — tell me what it should track and I'll add it.</p></div>
+    </section>
+    <section id="view-transactions" class="view">
+      <header class="masthead"><div><h1>Transactions</h1><p>Not built yet.</p></div></header>
+      <div class="soon-panel"><h3>Coming soon</h3><p>This module isn't built yet — tell me what it should track and I'll add it.</p></div>
+    </section>
+    <section id="view-settings" class="view">
+      <header class="masthead"><div><h1>Settings</h1><p>Not built yet.</p></div></header>
+      <div class="soon-panel"><h3>Coming soon</h3><p>This module isn't built yet — tell me what it should track and I'll add it.</p></div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// ============================================================================
+// NAVIGATION
+// ============================================================================
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const target = document.getElementById('view-' + name);
+  if (target) target.classList.add('active');
+  document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === name));
+  if (name === 'records') renderRecordsTable();
+  if (name === 'dashboard') renderDashboardStats();
+}
+document.querySelectorAll('.nav-item[data-view]:not(.soon)').forEach(el => {
+  el.addEventListener('click', () => showView(el.dataset.view));
+});
+document.querySelectorAll('.tile[data-view]').forEach(el => {
+  el.addEventListener('click', () => showView(el.dataset.view));
+});
+
+// ============================================================================
+// MODEL CONSTANTS -- German 100-999 scale
+// (fit on 2/3 of synthetic_merchant_credit_data.csv, random_state=42,
+//  median-imputed on train, standardized, PDO=40)
+// ============================================================================
+const INTERCEPT = -1.3929706610286006;
+const FEATURES = {
+  active_day_ratio:          { coef: -0.421664, mean: 0.669948, std: 0.149204 },
+  finalized_payments:        { coef:  0.000000, mean: 275.817500, std: 181.714923 },  // constrained: never allowed to increase risk
+  avg_txn_value_eur:         { coef: -0.019357, mean: 18.558820, std: 10.554707 },
+  cv_txn_value:               { coef:  0.076713, mean: 0.353535, std: 0.147087 },
+  verified_sales_eur:         { coef:  0.000000, mean: 5065.032525, std: 4744.868355 },  // constrained: never allowed to increase risk
+  exception_rate:             { coef:  0.112980, mean: 0.091663, std: 0.061253 },
+  critical_unresolved_ratio:  { coef:  0.151657, mean: 0.056697, std: 0.044020 },
+  retry_success_rate:         { coef: -0.111661, mean: 0.800203, std: 0.120069 },
+  capture_quality:            { coef:  0.000000, mean: 96.731655, std: 2.626255 },  // constrained: never allowed to increase risk
+  finality:                   { coef: -0.082899, mean: 95.613130, std: 3.512492 },
+  capture_quality_trend:      { coef: -0.062508, mean: 0.023795, std: 1.529178 },
+  revenue_trend_slope_pct:    { coef: -0.060372, mean: 0.330560, std: 1.994811 },
+  business_age_months:        { coef:  0.000000, mean: 39.238000, std: 19.903853 },  // constrained: never allowed to increase risk
+  existing_debt_to_sales:     { coef:  0.125581, mean: 0.252737, std: 0.145293 },
+  estimated_margin_pct:       { coef: -0.392684, mean: 27.943575, std: 10.005806 },
+  loan_amount_eur:            { coef: -0.115603, mean: 1680.550000, std: 1700.348993 },
+  loan_term_months:           { coef: -0.015289, mean: 13.810500, std: 6.442173 },
+  merchant_type_grocer:       { coef: -0.014293, mean: 0.243500, std: 0.429194 },
+  merchant_type_kiosk:        { coef: -0.047208, mean: 0.322500, std: 0.467433 },
+  merchant_type_takeaway:     { coef:  0.031632, mean: 0.186000, std: 0.389107 },
+};
+const OPTIONAL_FIELDS = ["loan_amount_eur", "loan_term_months", "existing_debt_to_sales"];
+const PDO = 40, BASE_ODDS = 3.5871559633027523;
+// Scale matches the reference Python pipeline exactly: 300-850, base score 600
+const SCORE_MIN = 300, SCORE_MAX = 850, BASE_SCORE = 600;
+const FACTOR = PDO / Math.log(2);
+const OFFSET = BASE_SCORE - FACTOR * Math.log(BASE_ODDS);
+// Grade bands match the reference Python pipeline's grade() function exactly.
+// Note: since SCORE_MIN clips at 300, the ">= 100" branch (Sufficient) is the
+// effective floor -- "E" is unreachable, exactly as in the Python version.
+function gradeOf(score) {
+  if (score >= 776) return { label: "Excellent", cls: "good" };
+  if (score >= 709) return { label: "Good", cls: "good" };
+  if (score >= 642) return { label: "Acceptable", cls: "warn" };
+  if (score >= 100) return { label: "Sufficient", cls: "bad" };
+  return { label: "E", cls: "bad" };
+}
+
+function num(id) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  const v = el.value;
+  return v === "" ? null : parseFloat(v);
+}
+
+function monthsBetween(startDate, endDate) {
+  let months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth());
+  if (endDate.getDate() < startDate.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+
+// Computed fresh from the input's current value every time it's called --
+// deliberately NOT dependent on the 'change' event having already fired.
+// (Bug fix: the previous version only set business age via a 'change'
+// listener; if that event hadn't fired yet when "Generate report" was
+// clicked -- which happens with some browsers/date pickers, or simply if
+// the field was filled and the report generated in the same interaction --
+// the age silently stayed null, business_age_months got flagged as a
+// missing required field, and the whole report failed to produce a score.)
+function getComputedAgeMonths() {
+  const val = document.getElementById('commencement_date').value;
+  if (!val) return null;
+  const start = new Date(val);
+  const today = new Date();
+  if (start > today) return null;
+  return monthsBetween(start, today);
+}
+
+// live-update hint text only -- cosmetic; NOT relied on for scoring anymore
+const commencementInput = document.getElementById('commencement_date');
+const ageHint = document.getElementById('ageHint');
+commencementInput.addEventListener('change', () => {
+  const months = getComputedAgeMonths();
+  if (!commencementInput.value) { ageHint.textContent = "Business age will be calculated automatically"; return; }
+  if (months === null) { ageHint.textContent = "Commencement date is in the future"; return; }
+  ageHint.textContent = `Business age: ${months} months (auto-calculated)`;
+});
+
+// Policy overlay: explicit business-judgment bonus points on top of the
+// statistical score, for the four features the data itself can't justify
+// rewarding on its own (see script comments). Same floor/ceiling/max-bonus
+// values as the Python pipeline, calibrated on this dataset's 10th/90th
+// percentiles.
+const POLICY_OVERLAY = {
+  business_age_months: { floor: 17, ceiling: 66, maxBonus: 12 },
+  capture_quality:     { floor: 93, ceiling: 100, maxBonus: 12 },
+  finalized_payments:  { floor: 71, ceiling: 538, maxBonus: 12 },
+  verified_sales_eur:  { floor: 859, ceiling: 10558, maxBonus: 12 },
+};
+function policyOverlayPoints(inputs) {
+  let total = 0;
+  const breakdown = {};
+  for (const [feature, { floor, ceiling, maxBonus }] of Object.entries(POLICY_OVERLAY)) {
+    const val = inputs[feature];
+    if (val === null || val === undefined) { breakdown[feature] = 0; continue; }
+    let frac = (val - floor) / (ceiling - floor);
+    frac = Math.max(0, Math.min(1, frac));
+    const pts = frac * maxBonus;
+    breakdown[feature] = pts;
+    total += pts;
+  }
+  return { total, breakdown };
+}
+
+// ============================================================================
+// MCBuse FINANCIAL PROFILE SCORE (0-100) -- transparent, threshold-based,
+// built ONLY from Merchant Activity + Financial Behaviour fields. This is
+// deliberately separate from the statistical PD model below: it does not
+// use Data Reliability or Application-Specific fields, and it makes no
+// claim about default probability -- it is a business-logic profile score.
+// ----------------------------------------------------------------------------
+// Each entry: [fieldKey, floor, ceiling, weight]. floor = worst (0 pts),
+// ceiling = best (100 pts) -- floor can be greater than ceiling for an
+// "inverse" field (e.g. debt-to-sales, where LOWER is better).
+// avg_txn_value_eur is intentionally excluded: for MCBuse's high-frequency,
+// low-ticket model there's no defensible "higher is better" business rule
+// for ticket size, so it is reported descriptively only, never scored.
+const FINANCIAL_PROFILE_FEATURES = [
+  ["active_day_ratio",        30, 90,  15],
+  ["finalized_payments",      20, 500, 10],
+  ["cv_txn_value",             0.60, 0, 10],
+  ["verified_sales_eur",      200, 10000, 15],
+  ["business_age_months",     0, 60,  10],
+  ["revenue_trend_slope_pct", -10, 10, 10],
+  ["existing_debt_to_sales",  60, 0,  10],
+  ["estimated_margin_pct",    0, 50,  20],
+];
+function financialProfileScore(rawInputs) {
+  // rawInputs uses HUMAN units (percentages as 0-100, not 0-1 fractions)
+  let weightedSum = 0, weightPresent = 0;
+  const breakdown = {};
+  for (const [key, floor, ceiling, weight] of FINANCIAL_PROFILE_FEATURES) {
+    const val = rawInputs[key];
+    if (val === null || val === undefined) { breakdown[key] = null; continue; }
+    let frac = (val - floor) / (ceiling - floor);
+    frac = Math.max(0, Math.min(1, frac));
+    const pts = frac * 100;
+    breakdown[key] = Math.round(pts);
+    weightedSum += pts * weight;
+    weightPresent += weight;
+  }
+  // weighted AVERAGE (not sum) so a missing optional field (debt-to-sales)
+  // simply drops out of both numerator and denominator -- no penalty baked
+  // in here, since missing-data penalty belongs to Profile Confidence instead
+  const score = weightPresent > 0 ? weightedSum / weightPresent : null;
+  return { score, breakdown };
+}
+
+// ============================================================================
+// PROFILE CONFIDENCE / DATA COVERAGE (Low / Medium / High) -- a data-quality
+// signal, kept deliberately separate from financial/credit quality. Combines
+// (a) how much of the full field set was actually filled in, and (b) how
+// strong the Data Reliability metrics themselves look.
+// ============================================================================
+const DATA_RELIABILITY_FEATURES = [
+  ["exception_rate",            20, 2,   1],
+  ["critical_unresolved_ratio", 15, 0,   1],
+  ["retry_success_rate",        40, 95,  1],
+  ["capture_quality",           80, 100, 1],
+  ["finality",                  80, 100, 1],
+  ["capture_quality_trend",     -5, 5,   1],
+];
+const ALL_TRACKED_FIELD_IDS = [
+  "merchant_type","commencement_date","active_day_ratio","finalized_payments","avg_txn_value_eur",
+  "cv_txn_value","verified_sales_eur","exception_rate","critical_unresolved_ratio","retry_success_rate",
+  "capture_quality","finality","capture_quality_trend","revenue_trend_slope_pct","estimated_margin_pct",
+  "existing_debt_to_sales","loan_amount_eur","loan_term_months","inventory_value_eur","collateral_value_eur",
+  "business_debts_eur","business_assets_eur","owner_personal_assets_eur","owner_personal_debts_eur",
+  "external_bureau_score","external_bureau_report",
+];
+function profileConfidence(rawInputs) {
+  let filled = 0;
+  for (const id of ALL_TRACKED_FIELD_IDS) {
+    const v = rawInputs[id];
+    if (v !== null && v !== undefined && v !== "") filled++;
+  }
+  const coverage = (filled / ALL_TRACKED_FIELD_IDS.length) * 100;
+
+  let relSum = 0, relCount = 0;
+  for (const [key, floor, ceiling] of DATA_RELIABILITY_FEATURES) {
+    const val = rawInputs[key];
+    if (val === null || val === undefined) continue;
+    let frac = (val - floor) / (ceiling - floor);
+    frac = Math.max(0, Math.min(1, frac));
+    relSum += frac * 100;
+    relCount++;
+  }
+  const reliabilityQuality = relCount > 0 ? relSum / relCount : null;
+
+  const confidenceScore = reliabilityQuality !== null ? (0.5 * coverage + 0.5 * reliabilityQuality) : coverage;
+  let label = "Low", cls = "bad";
+  if (confidenceScore >= 75) { label = "High"; cls = "good"; }
+  else if (confidenceScore >= 45) { label = "Medium"; cls = "warn"; }
+  return { confidenceScore, label, cls, coverage, reliabilityQuality, filled, total: ALL_TRACKED_FIELD_IDS.length };
+}
+
+function computeScore(inputs, merchantType) {
+  const activeCols = {};
+  for (const k of Object.keys(FEATURES)) activeCols[k] = null;
+  for (const k of Object.keys(inputs)) activeCols[k] = inputs[k];
+  activeCols.merchant_type_grocer = merchantType === "grocer" ? 1 : 0;
+  activeCols.merchant_type_kiosk = merchantType === "kiosk" ? 1 : 0;
+  activeCols.merchant_type_takeaway = merchantType === "takeaway" ? 1 : 0;
+
+  let logit = INTERCEPT;
+  for (const [k, val] of Object.entries(activeCols)) {
+    if (val === null) continue; // skip missing OPTIONAL fields entirely -- no imputation
+    const f = FEATURES[k];
+    const z = (val - f.mean) / f.std;
+    logit += z * f.coef;
+  }
+  const pDefault = 1 / (1 + Math.exp(-logit));
+  const oddsGood = (1 - pDefault) / pDefault;
+  let statisticalScore = OFFSET + FACTOR * Math.log(oddsGood);
+  statisticalScore = Math.max(SCORE_MIN, Math.min(SCORE_MAX, statisticalScore));
+
+  const { total: overlayPoints, breakdown: overlayBreakdown } = policyOverlayPoints(inputs);
+  const score = Math.max(SCORE_MIN, Math.min(SCORE_MAX, statisticalScore + overlayPoints));
+
+  return { pDefault, statisticalScore, overlayPoints, overlayBreakdown, score };
+}
+
+function inventoryAssessment(inventoryVal, sales) {
+  if (inventoryVal === null) return { text: "Not provided", tag: "neutral", tagText: "N/A" };
+  if (!sales || sales <= 0) return { text: `€${inventoryVal.toLocaleString()} on hand — no sales figure to compare against`, tag: "neutral", tagText: "N/A" };
+  const ratio = inventoryVal / sales;
+  let tag = "good", label = "Healthy";
+  if (ratio < 0.15) { tag = "warn"; label = "Low / lean stock"; }
+  else if (ratio > 0.40) { tag = "warn"; label = "High / possible overstock"; }
+  return { text: `€${inventoryVal.toLocaleString()} on hand, ${(ratio*100).toFixed(1)}% of verified sales`, tag, tagText: label };
+}
+
+function collateralAssessment(collateralVal, loanAmt) {
+  if (collateralVal === null) return { text: "Not provided", tag: "neutral", tagText: "N/A" };
+  if (loanAmt === null || loanAmt <= 0) return { text: `€${collateralVal.toLocaleString()} offered — no loan amount entered to compare against`, tag: "neutral", tagText: "N/A" };
+  const coverage = collateralVal / loanAmt;
+  let tag = "bad", label = "Under-collateralized";
+  if (coverage >= 1) { tag = "good"; label = "Fully collateralized"; }
+  else if (coverage >= 0.5) { tag = "warn"; label = "Partially collateralized"; }
+  return { text: `€${collateralVal.toLocaleString()} offered against a €${loanAmt.toLocaleString()} loan, ${(coverage*100).toFixed(0)}% coverage`, tag, tagText: label };
+}
+
+// ============================================================================
+// DATA RECORDS (localStorage-backed, private to this browser)
+// ============================================================================
+const STORAGE_KEY = "mcb_merchant_records_v1";
+function loadRecords() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function saveRecords(records) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); } catch (e) { /* storage unavailable */ }
+}
+function addRecord(record) {
+  const records = loadRecords();
+  records.unshift(record);
+  saveRecords(records);
+}
+
+const RECORD_COLUMNS = [
+  ["timestamp", "Submitted"], ["merchant_type", "Type"], ["commencement_date", "Commenced"],
+  ["business_age_months", "Age (mo)"], ["active_day_ratio", "Active-day %"], ["finalized_payments", "Payments"],
+  ["avg_txn_value_eur", "Avg txn €"], ["cv_txn_value", "CV"], ["verified_sales_eur", "Sales €"],
+  ["exception_rate", "Exception %"], ["critical_unresolved_ratio", "Crit. unresolved %"], ["retry_success_rate", "Retry %"],
+  ["capture_quality", "Capture qual."], ["finality", "Finality"], ["capture_quality_trend", "Cap. trend"],
+  ["revenue_trend_slope_pct", "Rev. trend %"], ["estimated_margin_pct", "Margin %"], ["existing_debt_to_sales", "Debt/sales %"],
+  ["loan_amount_eur", "Loan €"], ["loan_term_months", "Term (mo)"],
+  ["financial_profile_score", "Financial Profile Score"], ["profile_confidence", "Profile Confidence"],
+  ["probability_of_default", "P(default) [Experimental]"], ["statistical_score", "Statistical score [Experimental]"],
+  ["policy_overlay_points", "Overlay pts [Experimental]"], ["credit_score", "Experimental credit score"], ["credit_grade", "Experimental grade"],
+  ["inventory_value_eur", "Inventory €"], ["inventory_status", "Inventory status"],
+  ["collateral_value_eur", "Collateral €"], ["collateral_status", "Collateral status"],
+  ["business_debts_eur", "Business debts €"], ["business_assets_eur", "Business assets €"],
+  ["owner_personal_assets_eur", "Owner personal assets €"], ["owner_personal_debts_eur", "Owner personal debts €"],
+  ["external_bureau_score", "External bureau score"], ["external_bureau_report", "External bureau report"],
+];
+
+function renderRecordsTable() {
+  const records = loadRecords();
+  const thead = document.querySelector('#recordsTable thead');
+  const tbody = document.querySelector('#recordsTable tbody');
+  const empty = document.getElementById('recordsEmpty');
+  const wrap = document.querySelector('.table-wrap');
+  document.getElementById('recordsCount').textContent = `${records.length} record${records.length === 1 ? '' : 's'}`;
+
+  if (records.length === 0) {
+    wrap.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  wrap.style.display = 'block';
+  empty.style.display = 'none';
+
+  thead.innerHTML = '<tr>' + RECORD_COLUMNS.map(([k, label]) => `<th>${label}</th>`).join('') + '</tr>';
+  tbody.innerHTML = records.map(r => {
+    return '<tr>' + RECORD_COLUMNS.map(([k]) => `<td>${r[k] === null || r[k] === undefined || r[k] === '' ? '—' : r[k]}</td>`).join('') + '</tr>';
+  }).join('');
+}
+
+function recordsToCSV(records) {
+  const header = RECORD_COLUMNS.map(([k, label]) => label).join(',');
+  const rows = records.map(r => RECORD_COLUMNS.map(([k]) => {
+    let v = r[k] === null || r[k] === undefined ? '' : String(r[k]);
+    if (v.includes(',') || v.includes('"') || v.includes('\n')) v = '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  }).join(','));
+  return [header, ...rows].join('\n');
+}
+
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const records = loadRecords();
+  if (records.length === 0) { alert('No records to download yet.'); return; }
+  const csv = recordsToCSV(records);
+  // Standard browser download (Blob + temporary link) -- works on any static
+  // host, no platform-specific API required.
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'merchant_data_records.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (!confirm('Delete all stored merchant records from this browser? This cannot be undone.')) return;
+  saveRecords([]);
+  renderRecordsTable();
+  renderDashboardStats();
+});
+
+function renderDashboardStats() {
+  const records = loadRecords();
+  document.getElementById('statCount').textContent = records.length;
+  const scored = records.filter(r => typeof r.financial_profile_score === 'number');
+  document.getElementById('statScored').textContent = scored.length;
+  document.getElementById('statNA').textContent = records.length - scored.length;
+  document.getElementById('statAvgScore').textContent = scored.length
+    ? Math.round(scored.reduce((s, r) => s + r.financial_profile_score, 0) / scored.length)
+    : '—';
+}
+
+// ============================================================================
+// FORM SUBMIT
+// ============================================================================
+document.getElementById("entryForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+
+  // Computed fresh right now, not from a possibly-stale event-driven variable
+  const computedAgeMonths = getComputedAgeMonths();
+
+  const merchantType = document.getElementById("merchant_type").value;
+
+  const requiredRaw = {
+    active_day_ratio: num("active_day_ratio"),
+    finalized_payments: num("finalized_payments"),
+    avg_txn_value_eur: num("avg_txn_value_eur"),
+    cv_txn_value: num("cv_txn_value"),
+    verified_sales_eur: num("verified_sales_eur"),
+    exception_rate: num("exception_rate"),
+    critical_unresolved_ratio: num("critical_unresolved_ratio"),
+    retry_success_rate: num("retry_success_rate"),
+    capture_quality: num("capture_quality"),
+    finality: num("finality"),
+    capture_quality_trend: num("capture_quality_trend"),
+    revenue_trend_slope_pct: num("revenue_trend_slope_pct"),
+    business_age_months: computedAgeMonths,
+    estimated_margin_pct: num("estimated_margin_pct"),
+  };
+  const optionalRaw = {
+    existing_debt_to_sales: num("existing_debt_to_sales"),
+    loan_amount_eur: num("loan_amount_eur"),
+    loan_term_months: num("loan_term_months"),
+  };
+  // Additional Credit Information -- captured for lender review only, never scored
+  const inventoryVal = num("inventory_value_eur");
+  const collateralVal = num("collateral_value_eur");
+  const businessDebtsVal = num("business_debts_eur");
+  const businessAssetsVal = num("business_assets_eur");
+  const ownerPersonalAssetsVal = num("owner_personal_assets_eur");
+  const ownerPersonalDebtsVal = num("owner_personal_debts_eur");
+  const externalBureauScoreVal = num("external_bureau_score");
+  const externalBureauReportVal = document.getElementById("external_bureau_report").value || null;
+  const commencementDate = document.getElementById('commencement_date').value;
+
+  const missingRequired = Object.entries(requiredRaw).filter(([k,v]) => v === null).map(([k]) => k === 'business_age_months' ? 'commencement_date' : k);
+  if (!merchantType) missingRequired.push("merchant_type");
+  const missingOptional = Object.entries(optionalRaw).filter(([k,v]) => v === null).map(([k]) => k);
+
+  const inv = inventoryAssessment(inventoryVal, requiredRaw.verified_sales_eur);
+  const col = collateralAssessment(collateralVal, optionalRaw.loan_amount_eur);
+
+  // avg_txn_value_eur: preserve full cent-level precision everywhere it's
+  // displayed or stored -- never round to whole euros (MCBuse's typical
+  // ticket size is €0.10-€10.00, where a whole-euro rounding would destroy
+  // the signal entirely).
+  const avgTxnDisplay = requiredRaw.avg_txn_value_eur === null ? null : Number(requiredRaw.avg_txn_value_eur.toFixed(2));
+
+  const reportBody = document.getElementById("reportBody");
+  const reportSubtitle = document.getElementById("reportSubtitle");
+  const merchantLabel = merchantType ? merchantType.replace("_", " / ") : "merchant";
+  reportSubtitle.textContent = `Report for this ${merchantLabel} entry`;
+
+  // Confidence and coverage can be computed even with required fields missing --
+  // it is precisely the tool for telling you how incomplete a submission is.
+  const rawForConfidence = Object.assign({ merchant_type: merchantType, commencement_date: commencementDate },
+    requiredRaw, optionalRaw,
+    { inventory_value_eur: inventoryVal, collateral_value_eur: collateralVal,
+      business_debts_eur: businessDebtsVal, business_assets_eur: businessAssetsVal,
+      owner_personal_assets_eur: ownerPersonalAssetsVal, owner_personal_debts_eur: ownerPersonalDebtsVal,
+      external_bureau_score: externalBureauScoreVal, external_bureau_report: externalBureauReportVal });
+  const confidence = profileConfidence(rawForConfidence);
+
+  let html = "";
+  let record = {
+    timestamp: new Date().toLocaleString(),
+    merchant_type: merchantType || '',
+    commencement_date: commencementDate || '',
+    business_age_months: computedAgeMonths ?? '',
+    active_day_ratio: requiredRaw.active_day_ratio ?? '',
+    finalized_payments: requiredRaw.finalized_payments ?? '',
+    avg_txn_value_eur: avgTxnDisplay ?? '',
+    cv_txn_value: requiredRaw.cv_txn_value ?? '',
+    verified_sales_eur: requiredRaw.verified_sales_eur ?? '',
+    exception_rate: requiredRaw.exception_rate ?? '',
+    critical_unresolved_ratio: requiredRaw.critical_unresolved_ratio ?? '',
+    retry_success_rate: requiredRaw.retry_success_rate ?? '',
+    capture_quality: requiredRaw.capture_quality ?? '',
+    finality: requiredRaw.finality ?? '',
+    capture_quality_trend: requiredRaw.capture_quality_trend ?? '',
+    revenue_trend_slope_pct: requiredRaw.revenue_trend_slope_pct ?? '',
+    estimated_margin_pct: requiredRaw.estimated_margin_pct ?? '',
+    existing_debt_to_sales: optionalRaw.existing_debt_to_sales ?? '',
+    loan_amount_eur: optionalRaw.loan_amount_eur ?? '',
+    loan_term_months: optionalRaw.loan_term_months ?? '',
+    financial_profile_score: 'Not available',
+    profile_confidence: confidence.label,
+    probability_of_default: 'Not available',
+    statistical_score: 'Not available',
+    policy_overlay_points: 'Not available',
+    credit_score: 'Not available',
+    credit_grade: 'Not available',
+    inventory_value_eur: inventoryVal ?? '',
+    inventory_status: inv.tagText,
+    collateral_value_eur: collateralVal ?? '',
+    collateral_status: col.tagText,
+    business_debts_eur: businessDebtsVal ?? '',
+    business_assets_eur: businessAssetsVal ?? '',
+    owner_personal_assets_eur: ownerPersonalAssetsVal ?? '',
+    owner_personal_debts_eur: ownerPersonalDebtsVal ?? '',
+    external_bureau_score: externalBureauScoreVal ?? '',
+    external_bureau_report: externalBureauReportVal ?? '',
+  };
+
+  // ---- Profile Confidence block (always shown, even on incomplete data) ----
+  html += `
+    <div class="report-row">
+      <span class="rl">Profile confidence</span>
+      <span class="tag ${confidence.cls}">${confidence.label}</span>
+    </div>
+    <div class="report-row"><span class="rl">Data coverage</span><span class="rv dim">${confidence.filled}/${confidence.total} fields (${confidence.coverage.toFixed(0)}%)</span></div>`;
+
+  if (missingRequired.length > 0) {
+    html += `
+      <div class="missing-note">
+        <strong>Financial Profile Score not available</strong>
+        A required field is missing, so no score is calculated (only debt-to-sales, loan request, and additional credit information fields are allowed to be blank).
+        Missing: ${missingRequired.join(", ")}
+      </div>`;
+  } else {
+    // ---- Financial Profile Score (0-100) -- Merchant Activity + Financial Behaviour ONLY ----
+    const fpRaw = {
+      active_day_ratio: requiredRaw.active_day_ratio,
+      finalized_payments: requiredRaw.finalized_payments,
+      cv_txn_value: requiredRaw.cv_txn_value,
+      verified_sales_eur: requiredRaw.verified_sales_eur,
+      business_age_months: computedAgeMonths,
+      revenue_trend_slope_pct: requiredRaw.revenue_trend_slope_pct,
+      existing_debt_to_sales: optionalRaw.existing_debt_to_sales,
+      estimated_margin_pct: requiredRaw.estimated_margin_pct,
+    };
+    const { score: fpScore } = financialProfileScore(fpRaw);
+
+    html += `
+      <div class="score-block">
+        <div class="score-number">${Math.round(fpScore)}</div>
+        <div class="score-scale">Financial Profile Score, of 100</div>
+      </div>
+      <div class="report-row"><span class="rl">Avg. transaction value</span><span class="rv">€${avgTxnDisplay.toFixed(2)}</span></div>`;
+    record.financial_profile_score = Math.round(fpScore);
+
+    // ---- Experimental PD / credit score (statistical model + policy overlay) ----
+    const modelInputs = {
+      active_day_ratio: requiredRaw.active_day_ratio / 100,
+      finalized_payments: requiredRaw.finalized_payments,
+      avg_txn_value_eur: requiredRaw.avg_txn_value_eur,
+      cv_txn_value: requiredRaw.cv_txn_value,
+      verified_sales_eur: requiredRaw.verified_sales_eur,
+      exception_rate: requiredRaw.exception_rate / 100,
+      critical_unresolved_ratio: requiredRaw.critical_unresolved_ratio / 100,
+      retry_success_rate: requiredRaw.retry_success_rate / 100,
+      capture_quality: requiredRaw.capture_quality,
+      finality: requiredRaw.finality,
+      capture_quality_trend: requiredRaw.capture_quality_trend,
+      revenue_trend_slope_pct: requiredRaw.revenue_trend_slope_pct,
+      business_age_months: computedAgeMonths,
+      estimated_margin_pct: requiredRaw.estimated_margin_pct,
+      existing_debt_to_sales: optionalRaw.existing_debt_to_sales === null ? null : optionalRaw.existing_debt_to_sales / 100,
+      loan_amount_eur: optionalRaw.loan_amount_eur,
+      loan_term_months: optionalRaw.loan_term_months,
+    };
+
+    const { pDefault, statisticalScore, overlayPoints, score } = computeScore(modelInputs, merchantType);
+    const g = gradeOf(score);
+    const pct = (score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN) * 100;
+    const meterColor = g.cls === "good" ? "var(--accent)" : g.cls === "warn" ? "var(--amber)" : "var(--risk)";
+
+    html += `
+      <div class="subreport">
+        <h3>Probability of default &amp; experimental credit score <span class="tag warn" style="margin-left:6px;">Experimental</span></h3>
+        <div class="score-block" style="padding:14px 0;">
+          <div class="score-number" style="font-size:36px;">${Math.round(score)}</div>
+          <div class="score-scale">of 300–850 · not validated against real outcomes</div>
+          <div class="score-meter"><div class="score-meter-fill" style="width:${pct.toFixed(1)}%; background:${meterColor};"></div></div>
+          <span class="score-band tag ${g.cls}">${g.label}</span>
+        </div>
+        <div class="line"><span>Probability of default</span><span class="lv">${(pDefault*100).toFixed(2)}%</span></div>
+        <div class="line"><span>Statistical score</span><span class="lv">${Math.round(statisticalScore)}</span></div>
+        <div class="line"><span>Policy overlay (age / capture / payments)</span><span class="lv">+${overlayPoints.toFixed(1)}</span></div>
+      </div>`;
+
+    if (missingOptional.length > 0) {
+      html += `<div class="report-row"><span class="rl">Computed without</span><span class="rv dim">${missingOptional.join(", ")}</span></div>`;
+    }
+
+    record.probability_of_default = (pDefault*100).toFixed(2) + '%';
+    record.statistical_score = Math.round(statisticalScore);
+    record.policy_overlay_points = overlayPoints.toFixed(1);
+    record.credit_score = Math.round(score);
+    record.credit_grade = g.label;
+  }
+
+  html += `
+    <div class="subreport">
+      <h3>Inventory</h3>
+      <div class="line"><span>${inv.text}</span></div>
+      <span class="tag ${inv.tag}">${inv.tagText}</span>
+    </div>
+    <div class="subreport">
+      <h3>Collateral</h3>
+      <div class="line"><span>${col.text}</span></div>
+      <span class="tag ${col.tag}">${col.tagText}</span>
+    </div>
+    <div class="subreport">
+      <h3>Additional credit information</h3>
+      <div class="line"><span>Business debts</span><span class="lv">${businessDebtsVal !== null ? '€'+businessDebtsVal.toLocaleString() : '—'}</span></div>
+      <div class="line"><span>Business assets</span><span class="lv">${businessAssetsVal !== null ? '€'+businessAssetsVal.toLocaleString() : '—'}</span></div>
+      <div class="line"><span>Owner personal assets</span><span class="lv">${ownerPersonalAssetsVal !== null ? '€'+ownerPersonalAssetsVal.toLocaleString() : '—'}</span></div>
+      <div class="line"><span>Owner personal debts</span><span class="lv">${ownerPersonalDebtsVal !== null ? '€'+ownerPersonalDebtsVal.toLocaleString() : '—'}</span></div>
+      <div class="line"><span>External bureau score</span><span class="lv">${externalBureauScoreVal !== null ? externalBureauScoreVal : '—'}</span></div>
+      <div class="line"><span>External bureau report</span><span class="lv">${externalBureauReportVal || '—'}</span></div>
+    </div>`;
+
+  reportBody.innerHTML = html;
+
+  addRecord(record);
+  renderDashboardStats();
+});
+
+renderDashboardStats();
+</script>
+</body>
+</html>

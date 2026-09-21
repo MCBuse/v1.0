@@ -1,3 +1,8 @@
+import { ScoringClient } from '../credit-assessment/scoring-client';
+import { CreditEvidenceService } from '../credit-assessment/credit-evidence.service';
+import { CreditAccessService, CreditAnalystGuard } from '../credit-assessment/credit-access.service';
+import { StaffCreditService } from '../credit-assessment/staff-credit.service';
+import { MerchantCreditController, StaffCreditController } from '../credit-assessment/credit.controller';
 import { Module } from '@nestjs/common';
 import { RatesModule } from '../rates/rates.module';
 import { MerchantController } from './merchant.controller';
@@ -14,8 +19,9 @@ import { MerchantAssessmentService } from './assessment/merchant-assessment.serv
 
 @Module({
   imports: [RatesModule, AnalyticsIntelligenceModule],
-  controllers: [MerchantController],
+  controllers: [MerchantController, MerchantCreditController, StaffCreditController],
   providers: [
+    ScoringClient, CreditEvidenceService, CreditAccessService, CreditAnalystGuard, StaffCreditService,
     GeneralAnalyticsService,
     MerchantAssessmentService,
     MerchantService,

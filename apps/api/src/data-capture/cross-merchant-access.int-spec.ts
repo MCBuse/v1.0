@@ -1,3 +1,5 @@
+import { CreditEvidenceService } from '../credit-assessment/credit-evidence.service';
+import { ScoringClient } from '../credit-assessment/scoring-client';
 import { ConfigService } from '@nestjs/config';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
@@ -101,9 +103,9 @@ describe('cross-merchant access (integration)', () => {
       activity,
       imports,
       config,
-      new MerchantAssessmentService(db, merchants),
+      new MerchantAssessmentService(db, merchants, new CreditEvidenceService(db, new ScoringClient(new ConfigService({})))),
     );
-    assessments = new MerchantAssessmentService(db, merchants);
+    assessments = new MerchantAssessmentService(db, merchants, new CreditEvidenceService(db, new ScoringClient(new ConfigService({}))));
 
     alpha = await createMerchantFixture(db, 'Alpha');
     beta = await createMerchantFixture(db, 'Beta');

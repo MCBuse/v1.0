@@ -1,0 +1,291 @@
+{
+  "scope": "User-approved clearing of legacy sandbox balances and transaction records while preserving all eight wallets and addresses",
+  "cutoff": "2026-09-21T00:00:00.000Z",
+  "committedAt": "2026-09-21T14:32:09.752Z",
+  "auditId": "02015c2f-6b3d-4aaf-82dc-58052e6d989f",
+  "deleted": {
+    "onramp_transactions": 18,
+    "merchant_invoice_items": 2,
+    "merchant_payment_attempts": 1,
+    "merchant_transactions": 1,
+    "ledger_entries": 14,
+    "payment_requests": 31
+  },
+  "deletedRecordIds": {
+    "ledger_entries": [
+      "05f912c9-0d5b-417e-aaa1-3b414c24f129",
+      "145e58dc-67e2-4f31-b833-b7399545d68b",
+      "1762bd6b-4130-4cad-b637-65364c78dcb6",
+      "255b1d1d-b39b-482b-b143-5f8cc7bc9e0e",
+      "41968156-2165-4b05-89c2-434d7271d5bc",
+      "5e985dcc-ed67-4d8f-a640-397f57535a96",
+      "6fc80656-1505-4c59-b7fd-2a9ace146205",
+      "892b9d5c-7337-4bca-b374-e8bcf452dada",
+      "90dc47a9-fab4-4ddc-b1fa-ab129ed13a5f",
+      "914bf75f-9fcc-433f-81fc-35170ef822c8",
+      "9fb74fe4-10c9-4af0-a18e-fcf62141582b",
+      "a220f8f0-ed8f-4817-890d-6c5b8381ec84",
+      "e4ecdb8e-ed17-4721-a498-8e6e355778f3",
+      "edb6963d-7cdc-49db-9dc8-7f0e05530454"
+    ],
+    "onramp_transactions": [
+      "0636bc9b-29ba-4010-8f19-d639e745f737",
+      "0a6a279b-1f65-4e71-907a-a2232711c675",
+      "0ac60028-e2c5-45f3-a813-f9c4bb615edf",
+      "0f42fabe-e35e-4238-994d-5009864987fa",
+      "15f7f101-8a23-4c7c-b640-95543abb4801",
+      "26227821-c5c4-4fc2-8a94-07048365affd",
+      "43f1fc5c-4cd3-45e6-a3cb-ad093ea9fae1",
+      "52cc6430-1ad4-4cba-8d1e-15247add849a",
+      "6b3d7477-7100-44b1-86d0-abaf8318bcdb",
+      "6fee790c-1a73-49cc-a8a5-8899646aee2c",
+      "9f692b39-c310-410f-a29e-982422b63da5",
+      "abf2cb3b-4de0-42ac-a3e4-7a07ea4abe60",
+      "cd4ff1ac-39d5-4c35-bfce-186b4a40cdcf",
+      "d18696e1-bf94-4cc7-a3d6-1a4e3ce62628",
+      "e332e607-9ae3-4096-ba57-37adea33b48d",
+      "e62f5c38-520f-44a2-9d9a-d4768cfb0db0",
+      "ef394646-2c3b-4afe-9a71-33132644604f",
+      "fc216cb1-03e2-46eb-8ae6-3d1388af58b6"
+    ],
+    "payment_requests": [
+      "105d627f-8f1b-4138-aca9-8f4c50dec9c8",
+      "1a763295-26e8-4fdc-baf8-98d8b8ffc6b4",
+      "1f2fd89b-44d9-476d-a665-9bf96ca2f3c1",
+      "23b82412-5853-495a-91ee-27765064729e",
+      "3d1774ec-fd91-4240-8f2a-b9d56f2e9b24",
+      "4388f466-3216-46fc-a498-222dd6f635f7",
+      "49dd5dca-2260-4899-8192-4f305e14829c",
+      "5b494e3d-5117-43bb-b80b-9fe080e566d4",
+      "60bc8aa0-c9ea-4c5b-9dac-1105b14b4209",
+      "73e2626d-d537-4104-aa4a-0b426379dca9",
+      "77de1774-e52c-4c9f-a95c-0f6d6ce2b408",
+      "79c2c4bd-25d5-4d90-80cb-070405d61241",
+      "7b1b86a0-7545-4ade-bdda-9581e19187ba",
+      "8b12495f-a825-4b49-be15-fca7cb1bbeba",
+      "936b35a0-e431-441a-96bb-cbfd825a18eb",
+      "95dc931d-d0c0-40ad-9cb9-2dc3fcd341f9",
+      "9b56021f-6bc9-4cd9-88cd-2512336d53a1",
+      "9c62345f-bb32-4805-bb1d-fd10a69123fc",
+      "9f95ae88-2ae2-4c91-91c7-0b53ce27267f",
+      "b2e71d08-5ab1-4b0b-b49c-708ef3894f09",
+      "bd45fd8d-1b6a-4c22-9203-bded29be2796",
+      "c15177f9-2574-43b2-abd7-a889af77fea0",
+      "c43bc6d8-fcc2-42d2-b664-29f75cc06528",
+      "c68637bd-d792-4513-8421-fb4d3f29d6f9",
+      "ca9ea6fb-ecff-4548-a2fb-b7f8b63c0af9",
+      "d98288ca-4a22-4afa-9471-ae594dc6bb50",
+      "ee726c87-1ccf-4a7b-9064-f2f1135e0e07",
+      "ee88dfdb-ccbb-42ea-870c-a5336fdf3e09",
+      "efd80bd0-bdf3-472e-8e22-6ee9e0a07540",
+      "f86a7bd8-5ca7-48ed-9c53-df0e962d1437",
+      "fc446bc9-8caa-4276-936f-aa489a8f10db"
+    ],
+    "merchant_invoice_items": [
+      "15a74ceb-1cde-4c1e-af82-97ab04ec9e47",
+      "7cbcdc5f-5e90-49be-95eb-219743166448"
+    ],
+    "merchant_payment_attempts": [
+      "05f8ed9d-a05e-40f7-905e-29ecac6fddcc"
+    ],
+    "merchant_transactions": [
+      "e70c887a-e360-49d5-9c57-23b7a940745e"
+    ]
+  },
+  "balancesReset": 16,
+  "walletsPreserved": 8,
+  "preservedCurrentAcceptanceRequests": 41,
+  "preservedInventorySourceReferences": [
+    {
+      "id": "8cf7275a-5d23-4e39-87b7-65198c49f8a6",
+      "kind": "digital_sale",
+      "reference_type": "invoice",
+      "reference_id": "9b56021f-6bc9-4cd9-88cd-2512336d53a1",
+      "on_hand_change": -2,
+      "reserved_change": -2
+    }
+  ],
+  "inventoryNote": "Stock quantities and movements remain unchanged. The preserved digital-sale movement refers to an invoice retained in the verified full backup. The reset audit records that provenance.",
+  "backupSha256": "e6379871f622e2717066f6876970186906cb74a86dbfd55effb481902d457b62",
+  "backupDirectory": "/private/tmp/mcbuse-legacy-removal-backup-20260921",
+  "localRestoreRehearsalPassed": true,
+  "scriptSha256": "8fe22191b2dab9276c60443318fb5079fe67691b3e840876fdbbaa8bd2a08f5c",
+  "providerMutations": false,
+  "chainMutations": false,
+  "moneyInitiationEnabled": false,
+  "merchantAnalyticsRefreshQueued": 1,
+  "verification": {
+    "checkedAt": "2026-09-21T14:32:55.817Z",
+    "resetAuditId": "02015c2f-6b3d-4aaf-82dc-58052e6d989f",
+    "db": {
+      "walletCount": 8,
+      "walletRecordsIdentical": true,
+      "balances": [
+        {
+          "currency": "EURC",
+          "rows": 8,
+          "available": "0",
+          "pending": "0"
+        },
+        {
+          "currency": "USDC",
+          "rows": 8,
+          "available": "0",
+          "pending": "0"
+        }
+      ],
+      "remainingDeletedRecords": {
+        "ledger_entries": 0,
+        "onramp_transactions": 0,
+        "payment_requests": 0,
+        "merchant_invoice_items": 0,
+        "merchant_payment_attempts": 0,
+        "merchant_transactions": 0
+      },
+      "protectedTables": {
+        "wallets": {
+          "count": 8,
+          "identical": true
+        },
+        "wallet_encryption_key_versions": {
+          "count": 0,
+          "identical": true
+        },
+        "merchants": {
+          "count": 1,
+          "identical": true
+        },
+        "merchant_memberships": {
+          "count": 1,
+          "identical": true
+        },
+        "merchant_products": {
+          "count": 2,
+          "identical": true
+        },
+        "merchant_stock_movements": {
+          "count": 4,
+          "identical": true
+        },
+        "merchant_assessments": {
+          "count": 2,
+          "identical": true
+        },
+        "merchant_finance_packages": {
+          "count": 6,
+          "identical": true
+        },
+        "merchant_finance_package_artifacts": {
+          "count": 10,
+          "identical": true
+        },
+        "merchant_finance_package_assessments": {
+          "count": 2,
+          "identical": true
+        },
+        "merchant_finance_email_attempts": {
+          "count": 1,
+          "identical": true
+        },
+        "merchant_cash_sales": {
+          "count": 1,
+          "identical": true
+        },
+        "merchant_cash_sale_items": {
+          "count": 1,
+          "identical": true
+        },
+        "merchant_import_batches": {
+          "count": 0,
+          "identical": true
+        },
+        "merchant_product_source_mappings": {
+          "count": 0,
+          "identical": true
+        }
+      },
+      "auditRecorded": true,
+      "remainingPaymentRequests": 41,
+      "unresolvedFinancialOperations": 0,
+      "analyticsWork": []
+    },
+    "api": [
+      {
+        "username": "e_aci",
+        "path": "/accounts",
+        "status": 200,
+        "accountCount": 2,
+        "zeroBalances": true,
+        "noLegacyActivity": true
+      },
+      {
+        "username": "e_aci",
+        "path": "/wallets",
+        "status": 200,
+        "walletCount": 2,
+        "zeroBalances": true
+      },
+      {
+        "username": "fred",
+        "path": "/accounts",
+        "status": 200,
+        "accountCount": 2,
+        "zeroBalances": true,
+        "noLegacyActivity": true
+      },
+      {
+        "username": "fred",
+        "path": "/wallets",
+        "status": 200,
+        "walletCount": 2,
+        "zeroBalances": true
+      },
+      {
+        "username": "kabe",
+        "path": "/accounts",
+        "status": 200,
+        "accountCount": 2,
+        "zeroBalances": true,
+        "noLegacyActivity": true
+      },
+      {
+        "username": "kabe",
+        "path": "/wallets",
+        "status": 200,
+        "walletCount": 2,
+        "zeroBalances": true
+      },
+      {
+        "username": "theody",
+        "path": "/accounts",
+        "status": 200,
+        "accountCount": 2,
+        "zeroBalances": true,
+        "noLegacyActivity": true
+      },
+      {
+        "username": "theody",
+        "path": "/wallets",
+        "status": 200,
+        "walletCount": 2,
+        "zeroBalances": true
+      }
+    ],
+    "portal": {
+      "path": "/api/accounts",
+      "status": 200,
+      "zeroBalances": true
+    },
+    "insights": {
+      "status": 200,
+      "freshness": {
+        "generatedAt": "2026-09-21T14:32:43.427Z",
+        "ageSeconds": 25,
+        "stale": false,
+        "staleAfterMinutes": 375
+      }
+    },
+    "passed": true
+  },
+  "acceptanceBoundary": "This sandbox reset is complete. It does not establish provider refunds, historical chain delivery, new settlement flows or completion of the remaining hosted acceptance gates."
+}

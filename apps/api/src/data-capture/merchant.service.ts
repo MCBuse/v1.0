@@ -16,7 +16,7 @@ import type {
   MerchantTransactionPage,
 } from '@repo/shared';
 import { randomUUID } from 'crypto';
-import { and, count, desc, eq, gte, ilike, inArray, isNull, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lte, ilike, inArray, isNull, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
@@ -532,8 +532,10 @@ export class MerchantService {
     };
   }
 
-  async getReadiness(userId: string) {
+  async getReadiness(userId: string, window?: {from: Date; to: Date}) {
     const merchant = await this.requireMerchant(userId);
+    const to = window?.to ?? new Date();
+    const from = window?.from ?? new Date(to.getTime() - 90 * 86_400_000);
     const [transactions, attempts, exceptions, consent] = await Promise.all([
       this.db
         .select({ occurredAt: schema.merchantTransactions.occurredAt })
@@ -542,6 +544,8 @@ export class MerchantService {
           and(
             eq(schema.merchantTransactions.merchantId, merchant.merchantId),
             eq(schema.merchantTransactions.status, 'finalized'),
+            gte(schema.merchantTransactions.occurredAt, from),
+            lte(schema.merchantTransactions.occurredAt, to),
           ),
         )
         .orderBy(schema.merchantTransactions.occurredAt),
@@ -555,16 +559,17 @@ export class MerchantService {
             schema.merchantPaymentAttempts.paymentRequestId,
           ),
         )
-        .where(eq(schema.paymentRequests.merchantId, merchant.merchantId)),
+        .where(and(eq(schema.paymentRequests.merchantId, merchant.merchantId), gte(schema.merchantPaymentAttempts.claimedAt, from), lte(schema.merchantPaymentAttempts.claimedAt, to))),
       this.db
         .select({
           reasonCode: schema.merchantCaptureExceptions.reasonCode,
+          createdAt: schema.merchantCaptureExceptions.createdAt,
           severity: schema.merchantCaptureExceptions.severity,
           status: schema.merchantCaptureExceptions.status,
         })
         .from(schema.merchantCaptureExceptions)
         .where(
-          eq(schema.merchantCaptureExceptions.merchantId, merchant.merchantId),
+          and(eq(schema.merchantCaptureExceptions.merchantId, merchant.merchantId), or(gte(schema.merchantCaptureExceptions.createdAt, from), and(eq(schema.merchantCaptureExceptions.severity, "critical"), eq(schema.merchantCaptureExceptions.status, "open"))), lte(schema.merchantCaptureExceptions.createdAt, to)),
         ),
       this.latestConsent(merchant.merchantId),
     ]);
@@ -577,7 +582,7 @@ export class MerchantService {
     const observedDays = transactions[0]
       ? merchantCalendarDaySpan(
           transactions[0].occurredAt,
-          new Date(),
+          to,
           merchant.timezone,
         )
       : 0;
@@ -590,7 +595,7 @@ export class MerchantService {
       finalizedPayments: transactions.length,
       captureQualityPercent: calculateCaptureQualityPercent(
         transactions.length,
-        exceptions.map((exception) => exception.reasonCode),
+        exceptions.filter((exception) => exception.createdAt >= from).map((exception) => exception.reasonCode),
       ),
       finalityPercent: attempts.length
         ? Math.round((finalizedAttempts / attempts.length) * 10_000) / 100

@@ -1,0 +1,2 @@
+# Preserve the supplied CSV's original bytes for its recorded source hash.
+merchant_credit_data.csv -text whitespace=cr-at-eol

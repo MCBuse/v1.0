@@ -9,6 +9,8 @@ import {
 } from "@/lib/server/session";
 
 const allowed = [
+  /^me\/credit-profile$/,
+  /^me\/credit-pilot-consent$/,
   /^me$/,
   /^me\/summary$/,
   /^me\/transactions$/,

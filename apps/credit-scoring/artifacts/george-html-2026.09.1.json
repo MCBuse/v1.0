@@ -1,0 +1,257 @@
+{
+  "modelVersion": "george-html-2026.09.1",
+  "validationStatus": "experimental_synthetic_only",
+  "predictionHorizon": null,
+  "intercept": -1.3929706610286006,
+  "features": {
+    "active_day_ratio": {
+      "coef": -0.421664,
+      "mean": 0.669948,
+      "std": 0.149204
+    },
+    "finalized_payments": {
+      "coef": 0.0,
+      "mean": 275.8175,
+      "std": 181.714923
+    },
+    "avg_txn_value_eur": {
+      "coef": -0.019357,
+      "mean": 18.55882,
+      "std": 10.554707
+    },
+    "cv_txn_value": {
+      "coef": 0.076713,
+      "mean": 0.353535,
+      "std": 0.147087
+    },
+    "verified_sales_eur": {
+      "coef": 0.0,
+      "mean": 5065.032525,
+      "std": 4744.868355
+    },
+    "exception_rate": {
+      "coef": 0.11298,
+      "mean": 0.091663,
+      "std": 0.061253
+    },
+    "critical_unresolved_ratio": {
+      "coef": 0.151657,
+      "mean": 0.056697,
+      "std": 0.04402
+    },
+    "retry_success_rate": {
+      "coef": -0.111661,
+      "mean": 0.800203,
+      "std": 0.120069
+    },
+    "capture_quality": {
+      "coef": 0.0,
+      "mean": 96.731655,
+      "std": 2.626255
+    },
+    "finality": {
+      "coef": -0.082899,
+      "mean": 95.61313,
+      "std": 3.512492
+    },
+    "capture_quality_trend": {
+      "coef": -0.062508,
+      "mean": 0.023795,
+      "std": 1.529178
+    },
+    "revenue_trend_slope_pct": {
+      "coef": -0.060372,
+      "mean": 0.33056,
+      "std": 1.994811
+    },
+    "business_age_months": {
+      "coef": 0.0,
+      "mean": 39.238,
+      "std": 19.903853
+    },
+    "existing_debt_to_sales": {
+      "coef": 0.125581,
+      "mean": 0.252737,
+      "std": 0.145293
+    },
+    "estimated_margin_pct": {
+      "coef": -0.392684,
+      "mean": 27.943575,
+      "std": 10.005806
+    },
+    "loan_amount_eur": {
+      "coef": -0.115603,
+      "mean": 1680.55,
+      "std": 1700.348993
+    },
+    "loan_term_months": {
+      "coef": -0.015289,
+      "mean": 13.8105,
+      "std": 6.442173
+    },
+    "merchant_type_grocer": {
+      "coef": -0.014293,
+      "mean": 0.2435,
+      "std": 0.429194
+    },
+    "merchant_type_kiosk": {
+      "coef": -0.047208,
+      "mean": 0.3225,
+      "std": 0.467433
+    },
+    "merchant_type_takeaway": {
+      "coef": 0.031632,
+      "mean": 0.186,
+      "std": 0.389107
+    }
+  },
+  "baseOdds": 3.5871559633027523,
+  "pdo": 40,
+  "baseScore": 600,
+  "scoreRange": [
+    300,
+    850
+  ],
+  "gradeBands": [
+    [
+      "Excellent",
+      776
+    ],
+    [
+      "Good",
+      709
+    ],
+    [
+      "Acceptable",
+      642
+    ],
+    [
+      "Sufficient",
+      100
+    ]
+  ],
+  "financialFactors": [
+    [
+      "active_day_ratio",
+      30.0,
+      90.0,
+      15.0
+    ],
+    [
+      "finalized_payments",
+      20.0,
+      500.0,
+      10.0
+    ],
+    [
+      "cv_txn_value",
+      0.6,
+      0.0,
+      10.0
+    ],
+    [
+      "verified_sales_eur",
+      200.0,
+      10000.0,
+      15.0
+    ],
+    [
+      "business_age_months",
+      0.0,
+      60.0,
+      10.0
+    ],
+    [
+      "revenue_trend_slope_pct",
+      -10.0,
+      10.0,
+      10.0
+    ],
+    [
+      "existing_debt_to_sales",
+      60.0,
+      0.0,
+      10.0
+    ],
+    [
+      "estimated_margin_pct",
+      0.0,
+      50.0,
+      20.0
+    ]
+  ],
+  "reliabilityFactors": [
+    [
+      "exception_rate",
+      20.0,
+      2.0,
+      1.0
+    ],
+    [
+      "critical_unresolved_ratio",
+      15.0,
+      0.0,
+      1.0
+    ],
+    [
+      "retry_success_rate",
+      40.0,
+      95.0,
+      1.0
+    ],
+    [
+      "capture_quality",
+      80.0,
+      100.0,
+      1.0
+    ],
+    [
+      "finality",
+      80.0,
+      100.0,
+      1.0
+    ],
+    [
+      "capture_quality_trend",
+      -5.0,
+      5.0,
+      1.0
+    ]
+  ],
+  "policyOverlay": {
+    "business_age_months": [
+      17,
+      66,
+      12
+    ],
+    "capture_quality": [
+      93,
+      100,
+      12
+    ],
+    "finalized_payments": [
+      71,
+      538,
+      12
+    ],
+    "verified_sales_eur": [
+      859,
+      10558,
+      12
+    ]
+  },
+  "sources": {
+    "george-assessment.html": "3d03b9c46f7216a5df8b26656eb23d9756dde619ec286456f7063a33217dab35",
+    "george-api.yaml": "abeb546e7adc820cd34c66aa9bbb830072933e5addb453313bfa559683563f9b",
+    "merchant_credit_data.csv": "d1f3e419ad7be786025920d08329f166e012545d6d1ecee1f7f97a295a4fa66c",
+    "george-training.ipynb": "45ba131fe1440025080c34ca199e4e147fc02e67e6245400e045925166efaeff"
+  },
+  "reproductionStatus": "reproduced_with_four_constraints_within_rounded_coefficient_precision",
+  "limitations": [
+    "Synthetic training data only; not validated against real repayment outcomes.",
+    "Default prediction horizon is unspecified.",
+    "Policy bonuses are judgement rules, not changes to default probability.",
+    "Training observation windows vary from 30 to 399 days; the product uses 90 days."
+  ],
+  "reproductionReport": "reproduction-report.json"
+}

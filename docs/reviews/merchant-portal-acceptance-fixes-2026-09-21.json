@@ -1,0 +1,80 @@
+{
+  "checkedAt": "2026-09-21T14:04:30.831Z",
+  "revision": "mcbuse-portal-00028-t7n",
+  "checks": [
+    {
+      "path": "/api/accounts",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "frameOptions": "DENY",
+      "csp": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      "accounts": [
+        {
+          "name": "Holding"
+        },
+        {
+          "name": "Routine"
+        }
+      ],
+      "validSummary": true
+    },
+    {
+      "path": "/api/accounts/day-end",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "frameOptions": "DENY",
+      "csp": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    },
+    {
+      "path": "/api/merchant/me/finance-packages/7fbc41db-9e7b-4f9b-8190-f820ad908b76/pdf?preview=true",
+      "status": 200,
+      "contentType": "application/pdf",
+      "frameOptions": "SAMEORIGIN",
+      "csp": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
+      "sha256": "79778e257c52bf510d5076a347839088fc5e092015ed793e07ceef10bc77a18d",
+      "inline": true
+    },
+    {
+      "path": "/payment",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "frameOptions": "DENY",
+      "csp": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    }
+  ],
+  "passed": true,
+  "sourceCommit": "afacbba03a62bc9d2e6ee26162691119a8ef41c6",
+  "uncommittedFixes": [
+    "apps/portal/app/api/accounts/route.ts",
+    "apps/portal/next.config.ts",
+    "apps/portal/lib/server/csrf-session.test.ts",
+    "apps/portal/tests/assessment-finance.spec.ts"
+  ],
+  "buildId": "58a85e3c-7b74-43a7-a809-2bb5685802a1",
+  "validation": {
+    "portalUnitTests": 31,
+    "portalTypeCheck": "passed"
+  },
+  "observedFixes": [
+    "Account root endpoint previously returned 404; now returns Routine and Holding.",
+    "Global framing denial blocked embedded PDFs; package PDF alone now permits same-origin framing and rendered in Chrome."
+  ],
+  "build": {
+    "finishTime": "2026-09-21T13:57:37.086431Z",
+    "id": "58a85e3c-7b74-43a7-a809-2bb5685802a1",
+    "results": {
+      "images": [
+        {
+          "artifactRegistryPackage": "projects/mcbuse-hackathon-2026-fno/locations/europe-west1/repositories/mcbuse/packages/portal/versions/sha256:53b2f436809d2a9a6c151c3b9de853cf8cde35195091000a622103555a4a8276",
+          "digest": "sha256:53b2f436809d2a9a6c151c3b9de853cf8cde35195091000a622103555a4a8276",
+          "name": "europe-west1-docker.pkg.dev/mcbuse-hackathon-2026-fno/mcbuse/portal:20260921T135353Z-afacbba0",
+          "pushTiming": {
+            "endTime": "2026-09-21T13:57:35.544429062Z",
+            "startTime": "2026-09-21T13:57:16.223945159Z"
+          }
+        }
+      ]
+    },
+    "status": "SUCCESS"
+  }
+}

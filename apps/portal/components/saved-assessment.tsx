@@ -1,3 +1,4 @@
+import { CreditResult } from './credit-result';
 import type { SavedMerchantAssessment } from "@repo/shared";
 export function SavedAssessmentDetail({
   assessment: a,
@@ -57,6 +58,7 @@ export function SavedAssessmentDetail({
         Business profile and consent at assessment
       </h3>
       <EvidenceFields value={a.businessProfile} />
+      {a.credit ? <CreditResult credit={a.credit}/> : null}
       <p>{a.disclaimer}</p>
       <ul className="list-disc pl-5 text-slate-600">
         {a.limitations.map((x) => (

@@ -12,6 +12,7 @@ import {
 } from "@/lib/server/session";
 
 const destinations = new Set([
+  "/staff/credit-assessments",
   "/overview",
   "/transactions",
   "/business-profile",
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     ? requestOrigin
     : PORTAL_ORIGIN;
   try {
-    const { upstream, rotatedTokens } = await remoteRequest("/merchants/me");
+    const { upstream, rotatedTokens } = await remoteRequest(destination.startsWith("/staff/") ? "/staff/me" : "/merchants/me");
     if (upstream.ok) {
       const response = NextResponse.redirect(
         new URL(destination, responseOrigin),

@@ -12,7 +12,8 @@ import {
 import { merchantEventsRepository } from './repository';
 import { openMerchantEventStream } from './sse-client';
 
-const POLL_INTERVAL_MS = 3_000;
+// Leave time for the hosted request and rendering within the two-second target.
+const POLL_INTERVAL_MS = 1_000;
 const STREAM_FAILURES_BEFORE_POLLING = 3;
 
 /**
@@ -51,8 +52,9 @@ export function useMerchantCounter({ enabled }: { enabled: boolean }) {
     }
   }, []);
 
-  const catchUp = useCallback(async () => {
+  const catchUp = useCallback(async (isCurrent: () => boolean) => {
     const page = await merchantEventsRepository.since(cursor.current);
+    if (!isCurrent()) return;
     for (const event of page.events) applyEvent(event);
     if (!cursor.current && page.latestSequence)
       cursor.current = page.latestSequence;
@@ -63,13 +65,24 @@ export function useMerchantCounter({ enabled }: { enabled: boolean }) {
     let cancelled = false;
     let closeStream: (() => void) | null = null;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let pollInFlight = false;
+
+    async function poll() {
+      if (cancelled || pollInFlight) return;
+      pollInFlight = true;
+      try {
+        await catchUp(() => !cancelled);
+      } catch {
+        // The next tick resumes from the last successfully applied event.
+      } finally {
+        pollInFlight = false;
+      }
+    }
 
     function startPolling() {
       if (cancelled || pollTimer) return;
       setStatus('polling');
-      pollTimer = setInterval(() => {
-        void catchUp().catch(() => undefined);
-      }, POLL_INTERVAL_MS);
+      pollTimer = setInterval(() => void poll(), POLL_INTERVAL_MS);
     }
 
     function stopPolling() {
@@ -130,7 +143,7 @@ export function useMerchantCounter({ enabled }: { enabled: boolean }) {
             failures.current += 1;
             if (failures.current >= STREAM_FAILURES_BEFORE_POLLING) {
               startPolling();
-              void catchUp().catch(() => undefined);
+              void poll();
               return;
             }
             setStatus('reconnecting');

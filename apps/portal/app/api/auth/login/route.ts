@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { API_URL } from "@/lib/server/config";
+import { API_URL, COOKIE_SECURE } from "@/lib/server/config";
 import { hasTrustedOrigin } from "@/lib/server/request-security";
-import { setSessionCookies } from "@/lib/server/session";
+import { setSessionCookies, WORKSPACE_COOKIE } from "@/lib/server/session";
 
 export async function POST(request: NextRequest) {
   if (!hasTrustedOrigin(request))
@@ -71,7 +71,12 @@ export async function POST(request: NextRequest) {
         Authorization: `Bearer ${tokens.accessToken}`,
       },
     });
-    if (!membership.ok) {
+    let staffAccess = false;
+    if (!membership.ok && [403,404].includes(membership.status)) {
+      const staff = await fetch(`${API_URL}/staff/me`, { cache: "no-store", signal: AbortSignal.timeout(12_000), headers: { Authorization: `Bearer ${tokens.accessToken}` } });
+      staffAccess = staff.ok;
+    }
+    if (!membership.ok && !staffAccess) {
       await fetch(`${API_URL}/auth/logout`, {
         method: "POST",
         cache: "no-store",
@@ -85,7 +90,7 @@ export async function POST(request: NextRequest) {
       }).catch(() => undefined);
       if (membership.status === 403 || membership.status === 404)
         return NextResponse.json(
-          { message: "This account does not have merchant portal access" },
+          { message: "This account does not have portal access" },
           { status: 403 },
         );
       return NextResponse.json(
@@ -94,7 +99,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const response = NextResponse.json({ ok: true });
+    const response = NextResponse.json({ ok: true, destination: staffAccess ? "/staff/credit-assessments" : "/overview" });
+    response.cookies.set(WORKSPACE_COOKIE, staffAccess ? "staff" : "merchant", {httpOnly:true, sameSite:"lax", secure:COOKIE_SECURE, path:"/", maxAge:7*24*60*60});
     setSessionCookies(response, {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
