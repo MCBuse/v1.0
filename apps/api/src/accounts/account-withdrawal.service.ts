@@ -16,6 +16,7 @@ import {
   type FinancialOperation,
 } from '../financial-operations/financial-operations.service';
 import { OperationLedgerService } from '../financial-operations/operation-ledger.service';
+import { MoneyAuditService } from '../financial-operations/money-audit.service';
 import {
   usdCentsToUsdcBaseUnits,
   usdcBaseUnitsToUsdCents,
@@ -45,6 +46,7 @@ export class AccountWithdrawalService {
     private readonly ledger: OperationLedgerService,
     private readonly wallets: AccountWalletsService,
     private readonly destinations: PayoutDestinationsService,
+    private readonly audit: MoneyAuditService,
   ) {}
 
   private get stripe(): Stripe.Stripe {
@@ -76,6 +78,16 @@ export class AccountWithdrawalService {
         params.destinationId,
       );
     } catch (error) {
+      await this.audit.authorization({
+        userId: params.userId,
+        operationKind: 'withdrawal',
+        decision: 'refused',
+        subjectType: 'payout_destination',
+        subjectId: params.destinationId,
+        reason: 'destination_ineligible',
+        amountBaseUnits: usdCentsToUsdcBaseUnits(params.amountCents),
+        currency: 'USDC',
+      });
       // A real provider state, surfaced as one.
       throw new BadRequestException(
         error instanceof Error
@@ -110,6 +122,16 @@ export class AccountWithdrawalService {
     });
 
     if (!replayed) {
+      await this.audit.authorization({
+        userId: params.userId,
+        operationKind: operation.kind,
+        decision: 'granted',
+        subjectType: 'payout_destination',
+        subjectId: params.destinationId,
+        operationId: operation.id,
+        amountBaseUnits,
+        currency: 'USDC',
+      });
       await this.reserve(operation);
     }
 
@@ -161,11 +183,13 @@ export class AccountWithdrawalService {
 
     const source = await this.wallets.signingRecord(operation.sourceWalletId!);
     if (source.userId !== operation.userId) {
+      await this.refuseSigning(operation, source.id, 'owner_mismatch');
       throw new Error('Source account does not belong to the operation owner');
     }
 
     const keypair = this.solana.decryptKeypair(source.encryptedKeypair);
     if (keypair.publicKey.toBase58() !== source.solanaPubkey) {
+      await this.refuseSigning(operation, source.id, 'address_mismatch');
       throw new Error('Decrypted key does not match the stored wallet address');
     }
 
@@ -187,6 +211,18 @@ export class AccountWithdrawalService {
           },
           { signature },
         );
+        await this.audit.signature({
+          userId: operation.userId,
+          operationId: operation.id,
+          operationKind: operation.kind,
+          walletId: source.id,
+          walletAddress: source.solanaPubkey,
+          keyVersion: source.encryptionKeyVersion,
+          chainSignature: signature,
+          amountBaseUnits: operation.amountBaseUnits,
+          currency: operation.currency,
+          feePayerAddress: this.treasury.address,
+        });
       },
     });
 
@@ -293,6 +329,25 @@ export class AccountWithdrawalService {
       await this.operations.beginCompensation(operation.id, 'payout_failed');
       await this.operations.note(operation.id, 'payout_error', { message });
     }
+  }
+
+  /** A refused signing attempt is a fact worth keeping, not just an exception. */
+  private async refuseSigning(
+    operation: FinancialOperation,
+    walletId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.audit.authorization({
+      userId: operation.userId,
+      operationKind: operation.kind,
+      decision: 'refused',
+      subjectType: 'wallet',
+      subjectId: walletId,
+      reason,
+      operationId: operation.id,
+      amountBaseUnits: operation.amountBaseUnits,
+      currency: operation.currency,
+    });
   }
 
   async applyPayoutEvent(params: {
@@ -420,6 +475,19 @@ export class AccountWithdrawalService {
         onSignaturePrepared: async (signature) => {
           await this.operations.note(operation.id, 'compensation_prepared', {
             signature,
+          });
+          await this.audit.signature({
+            userId: operation.userId,
+            operationId: operation.id,
+            operationKind: `${operation.kind}_compensation`,
+            walletId: operation.sourceWalletId!,
+            walletAddress,
+            // The treasury signs the return; the user's key is not involved.
+            keyVersion: 'treasury',
+            chainSignature: signature,
+            amountBaseUnits: operation.amountBaseUnits,
+            currency: operation.currency,
+            feePayerAddress: this.treasury.address,
           });
         },
       },

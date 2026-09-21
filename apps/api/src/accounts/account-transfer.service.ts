@@ -9,6 +9,7 @@ import {
   type FinancialOperation,
 } from '../financial-operations/financial-operations.service';
 import { OperationLedgerService } from '../financial-operations/operation-ledger.service';
+import { MoneyAuditService } from '../financial-operations/money-audit.service';
 import { usdCentsToUsdcBaseUnits } from '../financial-operations/operation-money';
 import {
   AccountWalletsService,
@@ -34,6 +35,7 @@ export class AccountTransferService {
     private readonly operations: FinancialOperationsService,
     private readonly ledger: OperationLedgerService,
     private readonly wallets: AccountWalletsService,
+    private readonly audit: MoneyAuditService,
   ) {}
 
   async startTransfer(params: {
@@ -85,6 +87,16 @@ export class AccountTransferService {
     });
 
     if (!replayed) {
+      await this.audit.authorization({
+        userId: params.userId,
+        operationKind: operation.kind,
+        decision: 'granted',
+        subjectType: 'wallet',
+        subjectId: source.id,
+        operationId: operation.id,
+        amountBaseUnits: amountBaseUnits,
+        currency: 'USDC',
+      });
       await this.reserve(operation);
     }
 
@@ -147,14 +159,17 @@ export class AccountTransferService {
     // Everything the signature authorises is checked against the operation
     // before the key is ever decrypted.
     if (source.userId !== operation.userId) {
+      await this.refuseSigning(operation, source.id, 'owner_mismatch');
       throw new Error('Source account does not belong to the operation owner');
     }
     if (operation.amountBaseUnits <= 0n) {
+      await this.refuseSigning(operation, source.id, 'non_positive_amount');
       throw new Error('Refusing to sign a non-positive transfer');
     }
 
     const keypair = this.solana.decryptKeypair(source.encryptedKeypair);
     if (keypair.publicKey.toBase58() !== source.solanaPubkey) {
+      await this.refuseSigning(operation, source.id, 'address_mismatch');
       throw new Error('Decrypted key does not match the stored wallet address');
     }
 
@@ -177,6 +192,18 @@ export class AccountTransferService {
           },
           { signature },
         );
+        await this.audit.signature({
+          userId: operation.userId,
+          operationId: operation.id,
+          operationKind: operation.kind,
+          walletId: source.id,
+          walletAddress: source.solanaPubkey,
+          keyVersion: source.encryptionKeyVersion,
+          chainSignature: signature,
+          amountBaseUnits: operation.amountBaseUnits,
+          currency: operation.currency,
+          feePayerAddress: this.treasury.address,
+        });
       },
     });
 
@@ -255,6 +282,25 @@ export class AccountTransferService {
         operation.currency,
         operation.amountBaseUnits,
       );
+    });
+  }
+
+  /** A refused signing attempt is a fact worth keeping, not just an exception. */
+  private async refuseSigning(
+    operation: FinancialOperation,
+    walletId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.audit.authorization({
+      userId: operation.userId,
+      operationKind: operation.kind,
+      decision: 'refused',
+      subjectType: 'wallet',
+      subjectId: walletId,
+      reason,
+      operationId: operation.id,
+      amountBaseUnits: operation.amountBaseUnits,
+      currency: operation.currency,
     });
   }
 

@@ -22,6 +22,7 @@ import { SolanaService } from '../solana/solana.service';
 import { TreasuryService } from '../treasury/treasury.service';
 import { FinancialOperationsService } from '../financial-operations/financial-operations.service';
 import { OperationLedgerService } from '../financial-operations/operation-ledger.service';
+import { MoneyAuditService } from '../financial-operations/money-audit.service';
 import { AccountWalletsService } from './account-wallets.service';
 import { AccountTransferService } from './account-transfer.service';
 import { sweepBackToTreasury } from './testing/devnet-sweep';
@@ -74,6 +75,7 @@ describe('account transfer on devnet', () => {
       operations,
       ledger,
       wallets,
+      new MoneyAuditService(db),
     );
 
     // Two genuinely new wallets, sealed the same way the platform seals them.

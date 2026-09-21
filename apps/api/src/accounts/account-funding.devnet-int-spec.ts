@@ -21,6 +21,7 @@ import { TreasuryService } from '../treasury/treasury.service';
 import { StripeClient } from '../stripe/stripe.client';
 import { FinancialOperationsService } from '../financial-operations/financial-operations.service';
 import { OperationLedgerService } from '../financial-operations/operation-ledger.service';
+import { MoneyAuditService } from '../financial-operations/money-audit.service';
 import { AccountWalletsService } from './account-wallets.service';
 import { AccountFundingService } from './account-funding.service';
 import { sweepBackToTreasury } from './testing/devnet-sweep';
@@ -64,6 +65,7 @@ describe('account funding settlement on devnet', () => {
       operations,
       ledger,
       wallets,
+      new MoneyAuditService(db),
     );
 
     const suffix = randomUUID().slice(0, 8);

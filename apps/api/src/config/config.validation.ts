@@ -9,6 +9,7 @@ import {
   MinLength,
   validateSync,
 } from 'class-validator';
+import { assertEnvironmentSeparation } from './environment-separation';
 
 export enum Environment {
   Development = 'development',
@@ -318,6 +319,10 @@ export function validate(config: Record<string, unknown>) {
       }
     }
   }
+
+  // Devnet credentials must not be reachable from production, and production
+  // credentials must not be reachable from anywhere else.
+  assertEnvironmentSeparation(config as Parameters<typeof assertEnvironmentSeparation>[0]);
 
   return validatedConfig;
 }

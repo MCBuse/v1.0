@@ -4,7 +4,10 @@ import { transferResponse, type TransferInput, type TransferResponse } from './m
 
 export const transferRepository = {
   async transfer(input: TransferInput): Promise<TransferResponse> {
-    const raw = await http.post<unknown>('/wallets/transfer', input);
+    const { idempotencyKey, ...body } = input;
+    const raw = await http.post<unknown>('/wallets/transfer', body, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
     return transferResponse.parse(raw);
   },
 };

@@ -12,6 +12,7 @@ import {
   type FinancialOperation,
 } from '../financial-operations/financial-operations.service';
 import { OperationLedgerService } from '../financial-operations/operation-ledger.service';
+import { MoneyAuditService } from '../financial-operations/money-audit.service';
 import { usdCentsToUsdcBaseUnits } from '../financial-operations/operation-money';
 import { AccountWalletsService } from './account-wallets.service';
 
@@ -49,6 +50,7 @@ export class AccountFundingService {
     private readonly operations: FinancialOperationsService,
     private readonly ledger: OperationLedgerService,
     private readonly wallets: AccountWalletsService,
+    private readonly audit: MoneyAuditService,
   ) {}
 
   private get stripe() {
@@ -86,6 +88,16 @@ export class AccountFundingService {
     // plan forbids.
     const readiness = await this.treasury.readiness(amountBaseUnits);
     if (!readiness.configured || !readiness.canPayFees || !readiness.canCover) {
+      await this.audit.authorization({
+        userId: params.userId,
+        operationKind: OPERATION_KIND[params.method],
+        decision: 'refused',
+        subjectType: 'wallet',
+        subjectId: holding.id,
+        reason: 'treasury_cannot_deliver',
+        amountBaseUnits,
+        currency: 'USDC',
+      });
       throw new ServiceUnavailableException(
         `Funding is unavailable: ${readiness.problems.join('; ')}`,
       );
@@ -116,6 +128,17 @@ export class AccountFundingService {
         replayed: true,
       };
     }
+
+    await this.audit.authorization({
+      userId: params.userId,
+      operationKind: operation.kind,
+      decision: 'granted',
+      subjectType: 'wallet',
+      subjectId: holding.id,
+      operationId: operation.id,
+      amountBaseUnits,
+      currency: 'USDC',
+    });
 
     const session = await this.stripe.checkout.sessions.create(
       {
@@ -278,6 +301,19 @@ export class AccountFundingService {
             },
             { signature },
           );
+          await this.audit.signature({
+            userId: operation.userId,
+            operationId: operation.id,
+            operationKind: operation.kind,
+            // The treasury signs the delivery; the user's wallet only receives.
+            walletId: operation.destinationWalletId!,
+            walletAddress: destination,
+            keyVersion: 'treasury',
+            chainSignature: signature,
+            amountBaseUnits: operation.amountBaseUnits,
+            currency: operation.currency,
+            feePayerAddress: this.treasury.address,
+          });
         },
         onSubmitted: async (signature) => {
           await this.operations.note(operation.id, 'chain_broadcast', {
