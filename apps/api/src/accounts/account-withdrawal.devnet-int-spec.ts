@@ -29,6 +29,7 @@ import { AccountWalletsService } from './account-wallets.service';
 import { AccountWithdrawalService } from './account-withdrawal.service';
 import { PayoutDestinationsService } from './payout-destinations.service';
 import { sweepBackToTreasury } from './testing/devnet-sweep';
+import { assertNoCompetingRunner } from './testing/assert-exclusive-runner';
 
 const CONNECTED_ACCOUNT = 'acct_1UHr638OsVu9qy2o';
 const GOOD_BANK = 'ba_1UHr6e8OsVu9qy2oahQAuKmk';
@@ -54,6 +55,7 @@ describe('account withdrawal on devnet and Stripe sandbox', () => {
   const throwawayKeypairs: Keypair[] = [];
 
   beforeAll(async () => {
+    await assertNoCompetingRunner();
     const connection = await connectTestDatabase();
     db = connection.db;
     pool = connection.pool;

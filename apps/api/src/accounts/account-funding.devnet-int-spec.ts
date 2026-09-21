@@ -24,6 +24,7 @@ import { OperationLedgerService } from '../financial-operations/operation-ledger
 import { AccountWalletsService } from './account-wallets.service';
 import { AccountFundingService } from './account-funding.service';
 import { sweepBackToTreasury } from './testing/devnet-sweep';
+import { assertNoCompetingRunner } from './testing/assert-exclusive-runner';
 
 const FUNDING_CENTS = 30n; // 0.30 USD
 
@@ -42,6 +43,7 @@ describe('account funding settlement on devnet', () => {
   const throwawayKeypairs: Keypair[] = [];
 
   beforeAll(async () => {
+    await assertNoCompetingRunner();
     const connection = await connectTestDatabase();
     db = connection.db;
     pool = connection.pool;

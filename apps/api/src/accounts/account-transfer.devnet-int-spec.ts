@@ -25,6 +25,7 @@ import { OperationLedgerService } from '../financial-operations/operation-ledger
 import { AccountWalletsService } from './account-wallets.service';
 import { AccountTransferService } from './account-transfer.service';
 import { sweepBackToTreasury } from './testing/devnet-sweep';
+import { assertNoCompetingRunner } from './testing/assert-exclusive-runner';
 
 const TRANSFER_USD_CENTS = 25n; // 0.25 USDC — small enough to repeat cheaply
 
@@ -46,6 +47,7 @@ describe('account transfer on devnet', () => {
   const throwawayKeypairs: Keypair[] = [];
 
   beforeAll(async () => {
+    await assertNoCompetingRunner();
     const connection = await connectTestDatabase();
     db = connection.db;
     pool = connection.pool;
