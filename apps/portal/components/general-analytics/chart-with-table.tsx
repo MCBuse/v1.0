@@ -42,14 +42,18 @@ export function ChartWithTable({
   const [open, setOpen] = useState(false);
   const max = Math.max(...bars.map((bar) => bar.value), 1);
   const tableId = `chart-table-${label.replace(/\W+/g, "-").toLowerCase()}`;
+  // A fixed gap between 365 daily bars alone is ~2,200px, which pushed the
+  // whole page sideways. Tighten the gap as the bar count grows.
+  const gap =
+    bars.length > 60 ? "gap-0" : bars.length > 31 ? "gap-px" : "gap-1.5";
 
   if (!bars.length)
     return <p className="py-6 text-sm text-slate-500">{emptyMessage}</p>;
 
   return (
-    <div>
+    <div className="min-w-0">
       <div
-        className={`flex ${height} items-end gap-1.5`}
+        className={`flex w-full ${height} items-end overflow-hidden ${gap}`}
         role="img"
         aria-label={label}
       >

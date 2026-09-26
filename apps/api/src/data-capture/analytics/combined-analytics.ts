@@ -20,7 +20,7 @@ export interface CombinedAnalyticsInput {
   transactions: TransactionAnalytics;
   inventory: InventoryAnalytics;
   timezone: string;
-  /** True when the sales figures were narrowed by a source or environment filter. */
+  /** True when the sales figures were narrowed by a source filter. */
   salesFilterApplied?: boolean;
 }
 

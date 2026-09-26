@@ -8,11 +8,6 @@
 
 export type AnalyticsGrouping = "day" | "week" | "month";
 export type AnalyticsSourceFilter = "mcbuse_payment" | "merchant_cash";
-export type AnalyticsEnvironmentFilter =
-  | "live"
-  | "test"
-  | "synthetic"
-  | "unknown";
 
 export type AnalyticsSourceBreakdown = {
   amountMinor: string;
@@ -196,7 +191,6 @@ export type GeneralAnalyticsResponse = {
   combined: CombinedAnalytics;
   filters: {
     source: AnalyticsSourceFilter | "all";
-    environment: AnalyticsEnvironmentFilter | "all";
     applied: boolean;
   };
 };

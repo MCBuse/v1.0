@@ -17,8 +17,4 @@ export class GeneralAnalyticsQueryDto {
   @IsOptional()
   @IsIn(['mcbuse_payment', 'merchant_cash'])
   source?: 'mcbuse_payment' | 'merchant_cash';
-
-  @IsOptional()
-  @IsIn(['live', 'test', 'synthetic', 'unknown'])
-  environment?: 'live' | 'test' | 'synthetic' | 'unknown';
 }

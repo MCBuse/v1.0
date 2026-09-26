@@ -218,11 +218,6 @@ test("merchant credit profile preserves cents and exposes separate pilot consent
   await page.route("**/api/merchant/me/imports", (r) =>
     r.fulfill({ json: { items: [] } }),
   );
-  let pilotConsent = false;
-  await page.route('**/api/merchant/me/credit-pilot-consent', async r => {
-    if(r.request().method()==='POST')pilotConsent = r.request().postDataJSON().active === true;
-    await r.fulfill({json:{active:pilotConsent,purpose:'credit_pilot_assessment',version:'2026-09-credit-pilot-v1',recordedAt:null}});
-  });
   await page.route("**/api/merchant/me/assessments", (r) =>
     r.fulfill({ json: { assessments: [] } }),
   );
@@ -251,20 +246,9 @@ test("merchant credit profile preserves cents and exposes separate pilot consent
     .click();
   expect((await savedRequest).postDataJSON().data.loanAmountMinor).toBe("10");
   await expect(page.getByRole("status").filter({hasText:"Credit profile saved"})).toBeVisible();
-  // Pilot consent is kept separate, inside a collapsed disclosure.
-  await page
-    .getByText("Internal pilot consent (optional)", { exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Give pilot consent", exact: true })
-    .click();
   await expect(
-    page.getByRole("button", { name: "Withdraw pilot consent" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Withdraw pilot consent" }).click();
-  await expect(
-    page.getByRole("button", { name: "Give pilot consent" }),
-  ).toBeVisible();
+    page.getByText("Internal pilot consent (optional)"),
+  ).toHaveCount(0);
   await expect(
     page.getByText("Default probability", { exact: true }),
   ).toHaveCount(0);

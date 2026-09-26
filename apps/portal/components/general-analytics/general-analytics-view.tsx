@@ -1,9 +1,6 @@
 "use client";
 
-import type {
-  AnalyticsGrouping,
-  GeneralAnalyticsResponse,
-} from "@repo/shared";
+import type { AnalyticsGrouping, GeneralAnalyticsResponse } from "@repo/shared";
 import { Alert } from "@repo/ui/alert";
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
@@ -11,25 +8,56 @@ import { Card, CardContent, CardHeader } from "@repo/ui/card";
 import { Skeleton } from "@repo/ui/skeleton";
 import { RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
+import {
+  FacetFilter,
+  ResetFilters,
+  SOURCE_OPTIONS,
+} from "@/components/analytics-toolbar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ChartWithTable } from "./chart-with-table";
 import { SortableTable } from "./sortable-table";
 
 const PERIODS = ["today", "7d", "30d", "90d", "180d", "365d"] as const;
 const GROUPINGS: AnalyticsGrouping[] = ["day", "week", "month"];
-const SOURCES = [
-  { value: "all", label: "All sources" },
-  { value: "mcbuse_payment", label: "Digital" },
-  { value: "merchant_cash", label: "Cash" },
+const GROUPING_LABELS: Record<AnalyticsGrouping, string> = {
+  day: "Daily",
+  week: "Weekly",
+  month: "Monthly",
+};
+
+const TABS = [
+  {
+    id: "transactions",
+    label: "Transaction analytics",
+    legacyHash: "#transaction-analytics",
+  },
+  {
+    id: "inventory",
+    label: "Inventory analytics",
+    legacyHash: "#inventory-analytics",
+  },
+  {
+    id: "combined",
+    label: "Combined analytics",
+    legacyHash: "#combined-analytics",
+  },
 ] as const;
-const ENVIRONMENTS = [
-  { value: "all", label: "All records" },
-  { value: "live", label: "Live" },
-  { value: "test", label: "Test" },
-  { value: "synthetic", label: "Synthetic" },
-  { value: "unknown", label: "Unclassified" },
-] as const;
+type TabId = (typeof TABS)[number]["id"];
+const DEFAULT_TAB: TabId = "transactions";
+
+function tabFrom(value: string | null): TabId {
+  return TABS.find((tab) => tab.id === value)?.id ?? DEFAULT_TAB;
+}
 
 function euros(minor: string) {
   const negative = minor.startsWith("-");
@@ -53,30 +81,53 @@ function hour(value: number) {
 }
 
 /**
- * General Analytics: transactions, inventory and the combined readings.
+ * General Analytics: transactions, inventory and the combined readings, one
+ * tab each. The selected tab lives in the URL (`?tab=inventory|combined`,
+ * omitted for transactions); the filters and the single data read are shared
+ * by all three tabs, so switching tabs neither refetches nor resets them.
  *
  * Every chart carries its numbers, every detail table sorts and pages, and
  * every figure the calculation refused to produce says why rather than showing
  * a zero.
  */
 export function GeneralAnalyticsView() {
-  const [period, setPeriod] =
-    useState<(typeof PERIODS)[number]>("30d");
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const activeTab = tabFrom(search.get("tab"));
+
+  /** Swaps the tab in place: other query params stay, no scroll, no history entry. */
+  function selectTab(next: TabId) {
+    const updated = new URLSearchParams(search.toString());
+    if (next === DEFAULT_TAB) updated.delete("tab");
+    else updated.set("tab", next);
+    const query = updated.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+  }
+
+  // Links written before the tabs existed point at section anchors; honour
+  // them once on arrival and rewrite them into the `?tab=` form.
+  useEffect(() => {
+    const legacy = TABS.find((tab) => tab.legacyHash === window.location.hash);
+    if (legacy) selectTab(legacy.id);
+    // Only the address the page was opened with matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [period, setPeriod] = useState<(typeof PERIODS)[number]>("30d");
   const [grouping, setGrouping] = useState<AnalyticsGrouping>("day");
   const [source, setSource] = useState<string>("all");
-  const [environment, setEnvironment] = useState<string>("all");
 
   const path = useMemo(() => {
     const params = new URLSearchParams({ period, grouping });
     if (source !== "all") params.set("source", source);
-    if (environment !== "all") params.set("environment", environment);
     return `me/analytics/general?${params.toString()}`;
-  }, [environment, grouping, period, source]);
+  }, [grouping, period, source]);
 
   const resource = usePortalResource<GeneralAnalyticsResponse>(path, 60_000);
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6 [&>*]:min-w-0">
       <div>
         <p className="text-sm font-medium text-blue-700">Analytics</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
@@ -89,115 +140,158 @@ export function GeneralAnalyticsView() {
 
       <nav aria-label="Analytics views" className="flex flex-wrap gap-2">
         <Button aria-current="page">General analytics</Button>
-        <Button asChild variant="secondary"><Link href="/analytics">Deep analytics</Link></Button>
-      </nav>
-      <nav aria-label="General analytics sections" className="flex flex-wrap gap-2 text-sm">
-        <a className="rounded-md border border-slate-200 bg-white px-3 py-2 font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700" href="#transaction-analytics">Transaction analytics</a>
-        <a className="rounded-md border border-slate-200 bg-white px-3 py-2 font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700" href="#inventory-analytics">Inventory analytics</a>
-        <a className="rounded-md border border-slate-200 bg-white px-3 py-2 font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700" href="#combined-analytics">Combined transaction and inventory analytics</a>
-      </nav>
-
-      <Card>
-        <CardContent className="grid gap-3 py-4">
-          <Filters
-            legend="Period"
-            options={PERIODS.map((value) => ({
-              value,
-              label: value === "today" ? "Today" : value,
-            }))}
-            value={period}
-            onChange={(value) =>
-              setPeriod(value as (typeof PERIODS)[number])
-            }
-          />
-          <Filters
-            legend="Group by"
-            options={GROUPINGS.map((value) => ({ value, label: value }))}
-            value={grouping}
-            onChange={(value) => setGrouping(value as AnalyticsGrouping)}
-          />
-          <Filters
-            legend="Source"
-            options={SOURCES.map((entry) => ({ ...entry }))}
-            value={source}
-            onChange={setSource}
-          />
-          <Filters
-            legend="Records"
-            options={ENVIRONMENTS.map((entry) => ({ ...entry }))}
-            value={environment}
-            onChange={setEnvironment}
-          />
-        </CardContent>
-      </Card>
-
-      {resource.loading && !resource.data ? <Skeleton className="h-96" /> : null}
-
-      {!resource.data && resource.error ? (
-        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
-          <p className="font-semibold">Analytics could not be loaded.</p>
-          <p className="mt-1">
-            {resource.offline
-              ? "You appear to be offline. The figures will return when the connection does."
-              : resource.error.message}
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="mt-3"
-            onClick={() => void resource.refresh()}
-          >
-            <RefreshCw className="size-4" aria-hidden /> Try again
-          </Button>
-        </Alert>
-      ) : null}
-
-      {resource.data ? (
-        <>
-          {resource.error ? (
-            <Alert className="border-amber-200 bg-amber-50 text-amber-900">
-              These are the last figures that loaded; the most recent refresh
-              failed.
-            </Alert>
-          ) : null}
-          <TransactionsSection data={resource.data} />
-          <InventorySection data={resource.data} />
-          <CombinedSection data={resource.data} />
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function Filters({
-  legend,
-  options,
-  value,
-  onChange,
-}: {
-  legend: string;
-  options: ReadonlyArray<{ value: string; label: string }>;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <fieldset className="flex flex-wrap items-center gap-2">
-      <legend className="sr-table">{legend}</legend>
-      <span className="text-xs uppercase tracking-wide text-slate-500">
-        {legend}
-      </span>
-      {options.map((option) => (
-        <Button
-          key={option.value}
-          size="sm"
-          variant={value === option.value ? "primary" : "secondary"}
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
-        >
-          {option.label}
+        <Button asChild variant="secondary">
+          <Link href="/analytics/deep">Deep analytics</Link>
         </Button>
-      ))}
-    </fieldset>
+      </nav>
+
+      <div
+        role="group"
+        aria-label="Analytics filters"
+        className="flex flex-wrap items-center gap-2"
+      >
+        <ToggleGroup
+          type="single"
+          aria-label="Period"
+          value={period}
+          onValueChange={(value) => {
+            if (value) setPeriod(value as (typeof PERIODS)[number]);
+          }}
+        >
+          {PERIODS.map((value) => (
+            <ToggleGroupItem key={value} value={value}>
+              {value === "today" ? "Today" : value}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <Select
+          value={grouping}
+          onValueChange={(value) => setGrouping(value as AnalyticsGrouping)}
+        >
+          <SelectTrigger>
+            <span className="text-slate-500">Group by</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {GROUPINGS.map((value) => (
+              <SelectItem key={value} value={value}>
+                {GROUPING_LABELS[value]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <FacetFilter
+          title="Source"
+          options={SOURCE_OPTIONS}
+          value={source === "all" ? null : source}
+          onChange={(value) => setSource(value ?? "all")}
+        />
+        {period !== "30d" || grouping !== "day" || source !== "all" ? (
+          <ResetFilters
+            onReset={() => {
+              setPeriod("30d");
+              setGrouping("day");
+              setSource("all");
+            }}
+          />
+        ) : null}
+      </div>
+
+      <div
+        role="tablist"
+        aria-label="General analytics"
+        className="flex gap-4 border-b border-slate-200 sm:gap-6"
+      >
+        {TABS.map((tab, index) => {
+          const selected = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              id={`general-analytics-tab-${tab.id}`}
+              aria-selected={selected}
+              aria-controls="general-analytics-panel"
+              tabIndex={selected ? 0 : -1}
+              onClick={() => selectTab(tab.id)}
+              onKeyDown={(event) => {
+                let target: number;
+                if (event.key === "ArrowRight")
+                  target = (index + 1) % TABS.length;
+                else if (event.key === "ArrowLeft")
+                  target = (index - 1 + TABS.length) % TABS.length;
+                else if (event.key === "Home") target = 0;
+                else if (event.key === "End") target = TABS.length - 1;
+                else return;
+                event.preventDefault();
+                const next = TABS[target]!.id;
+                selectTab(next);
+                document
+                  .getElementById(`general-analytics-tab-${next}`)
+                  ?.focus();
+              }}
+              className={`-mb-px min-h-11 border-b-2 text-left text-sm leading-tight font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${
+                selected
+                  ? "border-blue-600 text-slate-950"
+                  : "border-transparent text-slate-500 hover:text-slate-950"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        id="general-analytics-panel"
+        role="tabpanel"
+        aria-labelledby={`general-analytics-tab-${activeTab}`}
+        className="grid min-w-0 gap-4 [&>*]:min-w-0"
+      >
+        {resource.loading && !resource.data ? (
+          <Skeleton className="h-96" />
+        ) : null}
+
+        {!resource.data && resource.error ? (
+          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+            <p className="font-semibold">Analytics could not be loaded.</p>
+            <p className="mt-1">
+              {resource.offline
+                ? "You appear to be offline. The figures will return when the connection does."
+                : resource.error.message}
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() => void resource.refresh()}
+            >
+              <RefreshCw className="size-4" aria-hidden /> Try again
+            </Button>
+          </Alert>
+        ) : null}
+
+        {resource.data ? (
+          <>
+            {resource.error ? (
+              <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+                These are the last figures that loaded; the most recent refresh
+                failed.
+              </Alert>
+            ) : null}
+            {activeTab === "transactions" ? (
+              <TransactionsSection data={resource.data} />
+            ) : null}
+            {activeTab === "inventory" ? (
+              <InventorySection data={resource.data} />
+            ) : null}
+            {activeTab === "combined" ? (
+              <CombinedSection data={resource.data} />
+            ) : null}
+          </>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -221,74 +315,60 @@ function Stat({
   );
 }
 
+/** One figure per card, so each reading stands on its own. */
+function StatCard(props: { label: string; value: string; hint?: string }) {
+  return (
+    <Card className="h-full">
+      <CardContent className="py-5">
+        <Stat {...props} />
+      </CardContent>
+    </Card>
+  );
+}
+
 function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
   const t = data.transactions;
   return (
-    <section id="transaction-analytics" className="grid scroll-mt-24 gap-4 rounded-xl border border-slate-200 p-4 sm:p-6" aria-label="Transaction analytics">
-      <h2 className="border-b border-slate-200 pb-3 text-xl font-semibold tracking-tight text-slate-950">Transaction analytics</h2>
+    <div className="grid min-w-0 gap-4 [&>*]:min-w-0">
+      {t.labels.notes.length ? <Alert>{t.labels.notes.join(" ")}</Alert> : null}
 
-      {t.labels.notes.length ? (
-        <Alert>{t.labels.notes.join(" ")}</Alert>
-      ) : null}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Recorded sales"
+          value={euros(t.totals.salesMinor)}
+          hint={`${t.totals.transactionCount} transactions`}
+        />
+        <StatCard
+          label="Average transaction"
+          value={euros(t.totals.averageTransactionMinor)}
+        />
+        <StatCard
+          label="Sales trend"
+          value={percent(t.trends.sales.changePercent)}
+          hint={
+            t.trends.sales.baselineAvailable
+              ? `against ${euros(t.trends.sales.previousMinor)} before`
+              : "No comparable preceding period"
+          }
+        />
+      </div>
 
-      <Card>
-        <CardContent className="grid gap-4 py-5 sm:grid-cols-3">
-          <Stat
-            label="Recorded sales"
-            value={euros(t.totals.salesMinor)}
-            hint={`${t.totals.transactionCount} transactions`}
-          />
-          <Stat
-            label="Average transaction"
-            value={euros(t.totals.averageTransactionMinor)}
-          />
-          <Stat
-            label="Sales trend"
-            value={percent(t.trends.sales.changePercent)}
-            hint={
-              t.trends.sales.baselineAvailable
-                ? `against ${euros(t.trends.sales.previousMinor)} before`
-                : "No comparable preceding period"
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h3 className="font-semibold">Cash and digital</h3>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <p className="text-sm font-medium text-slate-800">Digital</p>
-            <p className="font-mono text-lg tabular-nums">
-              {euros(t.bySource.digital.amountMinor)}
-            </p>
-            <p className="text-xs text-slate-500">
-              {t.bySource.digital.count} sales ·{" "}
-              {t.bySource.digital.amountSharePercent}% of value ·{" "}
-              {t.bySource.digital.countSharePercent}% of count
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-800">Cash</p>
-            <p className="font-mono text-lg tabular-nums">
-              {euros(t.bySource.cash.amountMinor)}
-            </p>
-            <p className="text-xs text-slate-500">
-              {t.bySource.cash.count} sales ·{" "}
-              {t.bySource.cash.amountSharePercent}% of value ·{" "}
-              {t.bySource.cash.countSharePercent}% of count
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatCard
+          label="Digital sales"
+          value={euros(t.bySource.digital.amountMinor)}
+          hint={`${t.bySource.digital.count} sales · ${t.bySource.digital.amountSharePercent}% of value · ${t.bySource.digital.countSharePercent}% of count`}
+        />
+        <StatCard
+          label="Cash sales"
+          value={euros(t.bySource.cash.amountMinor)}
+          hint={`${t.bySource.cash.count} sales · ${t.bySource.cash.amountSharePercent}% of value · ${t.bySource.cash.countSharePercent}% of count`}
+        />
+      </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <h3 className="font-semibold">
-            Sales by {t.range.grouping}
-          </h3>
+          <h2 className="font-semibold">Sales by {t.range.grouping}</h2>
           {t.labels.partialPeriod ? (
             <Badge tone="warning">Partial reporting periods</Badge>
           ) : null}
@@ -305,7 +385,12 @@ function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
                 euros(point.amountMinor),
                 String(point.count),
                 euros(point.averageMinor),
-                point.partial ? (point.partialReasons?.includes("range_start") || point.partialReasons?.includes("range_end") ? "Clipped by selected range" : "Still running") : "Complete",
+                point.partial
+                  ? point.partialReasons?.includes("range_start") ||
+                    point.partialReasons?.includes("range_end")
+                    ? "Clipped by selected range"
+                    : "Still running"
+                  : "Complete",
               ],
             }))}
           />
@@ -314,9 +399,9 @@ function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
 
       <Card>
         <CardHeader>
-          <h3 className="font-semibold">When the day trades</h3>
+          <h2 className="font-semibold">When the day trades</h2>
         </CardHeader>
-        <CardContent className="grid gap-4">
+        <CardContent className="grid gap-4 [&>*]:min-w-0">
           <ChartWithTable
             label="Sales by hour of day"
             height="h-28"
@@ -369,7 +454,7 @@ function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
 
       <Card>
         <CardHeader>
-          <h3 className="font-semibold">Payment methods</h3>
+          <h2 className="font-semibold">Payment methods</h2>
         </CardHeader>
         <CardContent>
           <SortableTable
@@ -409,37 +494,63 @@ function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
           />
         </CardContent>
       </Card>
-    </section>
+    </div>
   );
 }
 
 function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
   const v = data.inventory;
   return (
-    <section id="inventory-analytics" className="grid scroll-mt-24 gap-4 rounded-xl border border-slate-200 p-4 sm:p-6" aria-label="Inventory analytics">
-      <h2 className="border-b border-slate-200 pb-3 text-xl font-semibold tracking-tight text-slate-950">Inventory analytics</h2>
-
+    <div className="grid min-w-0 gap-4 [&>*]:min-w-0">
       {v.notes.length ? <Alert>{v.notes.join(" ")}</Alert> : null}
 
-      <Card>
-        <CardContent className="grid gap-4 py-5 sm:grid-cols-4">
-          <Stat label="Current on hand" value={String(v.position.onHandQuantity)} />
-          <Stat label="Reserved" value={String(v.position.reservedQuantity)} />
-          <Stat label="Available" value={String(v.position.availableQuantity)} />
-          <Stat
-            label="Value at selling price"
-            value={euros(v.valuation.atSellingPriceMinor)}
-            hint={v.valuation.note}
-          />
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Current on hand"
+          value={String(v.position.onHandQuantity)}
+        />
+        <StatCard
+          label="Reserved"
+          value={String(v.position.reservedQuantity)}
+        />
+        <StatCard
+          label="Available"
+          value={String(v.position.availableQuantity)}
+        />
+        <StatCard
+          label="Value at selling price"
+          value={euros(v.valuation.atSellingPriceMinor)}
+          hint={v.valuation.note}
+        />
+      </div>
 
-      <Card><CardHeader><h3 className="font-semibold">Selected-period stock position</h3></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">
-        {v.periodPosition?.eligible ? <><Stat label="Opening on hand" value={String(v.periodPosition.openingOnHand)} /><Stat label="Closing on hand" value={String(v.periodPosition.closingOnHand)} /></> : <p>{v.periodPosition?.reason ?? 'Reliable stock history is unavailable for this period.'}</p>}
-      </CardContent></Card>
       <Card>
         <CardHeader>
-          <h3 className="font-semibold">Products</h3>
+          <h2 className="font-semibold">Selected-period stock position</h2>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          {v.periodPosition?.eligible ? (
+            <>
+              <Stat
+                label="Opening on hand"
+                value={String(v.periodPosition.openingOnHand)}
+              />
+              <Stat
+                label="Closing on hand"
+                value={String(v.periodPosition.closingOnHand)}
+              />
+            </>
+          ) : (
+            <p>
+              {v.periodPosition?.reason ??
+                "Reliable stock history is unavailable for this period."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <h2 className="font-semibold">Products</h2>
         </CardHeader>
         <CardContent>
           <SortableTable
@@ -490,7 +601,7 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
 
       <Card>
         <CardHeader>
-          <h3 className="font-semibold">Categories</h3>
+          <h2 className="font-semibold">Categories</h2>
         </CardHeader>
         <CardContent>
           <SortableTable
@@ -533,7 +644,9 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
                 sortValue: (row) => row.categorySource,
                 render: (row) => (
                   <Badge
-                    tone={row.categorySource === "recorded" ? "success" : "warning"}
+                    tone={
+                      row.categorySource === "recorded" ? "success" : "warning"
+                    }
                   >
                     {row.categorySource === "recorded"
                       ? "recorded at sale"
@@ -551,7 +664,7 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h3 className="font-semibold">Needs attention</h3>
+            <h2 className="font-semibold">Needs attention</h2>
           </CardHeader>
           <CardContent className="grid gap-4 text-sm">
             <List
@@ -587,7 +700,7 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
 
         <Card>
           <CardHeader>
-            <h3 className="font-semibold">Stock-out history</h3>
+            <h2 className="font-semibold">Stock-out history</h2>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
             {v.historicalStockOuts.length ? (
@@ -620,7 +733,7 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
 
       <Card>
         <CardHeader>
-          <h3 className="font-semibold">Turnover</h3>
+          <h2 className="font-semibold">Turnover</h2>
         </CardHeader>
         <CardContent>
           <SortableTable
@@ -649,7 +762,9 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
                 numeric: true,
                 sortValue: (row) => row.averageDailyOnHand ?? -1,
                 render: (row) =>
-                  row.averageDailyOnHand === null ? "—" : row.averageDailyOnHand,
+                  row.averageDailyOnHand === null
+                    ? "—"
+                    : row.averageDailyOnHand,
               },
               {
                 key: "ratio",
@@ -678,7 +793,7 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
           />
         </CardContent>
       </Card>
-    </section>
+    </div>
   );
 }
 
@@ -714,16 +829,13 @@ function List({
 
 function CombinedSection({ data }: { data: GeneralAnalyticsResponse }) {
   return (
-    <section id="combined-analytics" className="grid scroll-mt-24 gap-4 rounded-xl border border-slate-200 p-4 sm:p-6" aria-label="Combined analytics">
-      <h2 className="border-b border-slate-200 pb-3 text-xl font-semibold tracking-tight text-slate-950">
-        Combined transaction and inventory analytics
-      </h2>
+    <div className="grid min-w-0 gap-4 [&>*]:min-w-0">
       <Alert>{data.combined.stockScopeNote}</Alert>
       <div className="grid gap-4 lg:grid-cols-2">
         {data.combined.analyses.map((analysis) => (
           <Card key={analysis.id}>
             <CardHeader className="flex flex-row items-start justify-between gap-3">
-              <h3 className="font-semibold text-slate-950">{analysis.title}</h3>
+              <h2 className="font-semibold text-slate-950">{analysis.title}</h2>
               {analysis.reliable ? null : (
                 <Badge tone="warning">Not enough data</Badge>
               )}
@@ -756,9 +868,9 @@ function CombinedSection({ data }: { data: GeneralAnalyticsResponse }) {
         ))}
       </div>
       <p className="text-xs text-slate-400">
-        These readings are produced by fixed rules from the figures above, not
-        by a model.
+        These readings are produced by fixed rules from the transaction and
+        inventory figures, not by a model.
       </p>
-    </section>
+    </div>
   );
 }

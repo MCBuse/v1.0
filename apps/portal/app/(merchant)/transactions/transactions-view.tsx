@@ -31,10 +31,9 @@ export function TransactionsView() {
   const search = useSearchParams();
   const page = Math.max(1, Number(search.get("page") ?? 1) || 1);
   const source = search.get("source") ?? "all";
-  const environment = search.get("environment") ?? "all";
   const [voiding, setVoiding] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState("");
-  const params = new URLSearchParams({ page: String(page), pageSize: "20" }); if (source !== "all") params.set("source", source); if (environment !== "all") params.set("environment", environment);
+  const params = new URLSearchParams({ page: String(page), pageSize: "20" }); if (source !== "all") params.set("source", source);
   const resource = usePortalResource<MerchantActivityPage>(
     `me/activity?${params.toString()}`,
   );
@@ -65,7 +64,7 @@ export function TransactionsView() {
           Verified MCBuse payments and merchant-recorded cash sales retain their evidence sources.
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2"><label htmlFor="activity-source" className="text-sm text-slate-600">Source</label><select id="activity-source" value={source} onChange={(event) => navigate({ source: event.target.value === "all" ? null : event.target.value, page: null })} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="all">All recorded activity</option><option value="mcbuse_payment">Verified MCBuse payments</option><option value="merchant_cash">Merchant-recorded cash</option></select><label htmlFor="activity-environment" className="ml-2 text-sm text-slate-600">Environment</label><select id="activity-environment" value={environment} onChange={(event) => navigate({ environment: event.target.value === "all" ? null : event.target.value, page: null })} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="all">All environments</option><option value="live">Live</option><option value="test">Test</option><option value="synthetic">Synthetic</option><option value="unknown">Unknown</option></select></div>
+      <div className="flex flex-wrap items-center gap-2"><label htmlFor="activity-source" className="text-sm text-slate-600">Source</label><select id="activity-source" value={source} onChange={(event) => navigate({ source: event.target.value === "all" ? null : event.target.value, page: null })} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="all">All recorded activity</option><option value="mcbuse_payment">Verified MCBuse payments</option><option value="merchant_cash">Merchant-recorded cash</option></select></div>
       {mutationError ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{mutationError}</div> : null}
       <Card className="overflow-hidden">
         <CardContent className="p-0">

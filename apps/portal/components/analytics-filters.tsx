@@ -1,8 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/field";
+import {
+  FacetFilter,
+  ResetFilters,
+  SOURCE_OPTIONS,
+} from "@/components/analytics-toolbar";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 type Preset = "7d" | "30d" | "90d" | "custom";
 export function useAnalyticsFilters() {
@@ -10,7 +15,6 @@ export function useAnalyticsFilters() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [source, setSource] = useState("all");
-  const [environment, setEnvironment] = useState("all");
   const path = useMemo(() => {
     const params = new URLSearchParams();
     if (preset === "custom" && from && to) {
@@ -18,9 +22,8 @@ export function useAnalyticsFilters() {
       params.set("to", new Date(`${to}T23:59:59`).toISOString());
     } else params.set("period", preset === "custom" ? "30d" : preset);
     if (source !== "all") params.set("source", source);
-    if (environment !== "all") params.set("environment", environment);
     return `me/analytics?${params.toString()}`;
-  }, [preset, from, to, source, environment]);
+  }, [preset, from, to, source]);
   return {
     path,
     preset,
@@ -31,8 +34,6 @@ export function useAnalyticsFilters() {
     setTo,
     source,
     setSource,
-    environment,
-    setEnvironment,
   };
 }
 
@@ -41,37 +42,29 @@ export function AnalyticsFilters({
 }: {
   filters: ReturnType<typeof useAnalyticsFilters>;
 }) {
-  const {
-    preset,
-    setPreset,
-    from,
-    setFrom,
-    to,
-    setTo,
-    source,
-    setSource,
-    environment,
-    setEnvironment,
-  } = filters;
+  const { preset, setPreset, from, setFrom, to, setTo, source, setSource } =
+    filters;
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {(["7d", "30d", "90d"] as const).map((value) => (
-        <Button
-          key={value}
-          size="sm"
-          variant={preset === value ? "primary" : "secondary"}
-          onClick={() => setPreset(value)}
-        >
-          {value.replace("d", " days")}
-        </Button>
-      ))}
-      <Button
-        size="sm"
-        variant={preset === "custom" ? "primary" : "secondary"}
-        onClick={() => setPreset("custom")}
+    <div
+      role="group"
+      aria-label="Analytics filters"
+      className="flex flex-wrap items-center gap-2"
+    >
+      <ToggleGroup
+        type="single"
+        aria-label="Period"
+        value={preset}
+        onValueChange={(value) => {
+          if (value) setPreset(value as Preset);
+        }}
       >
-        Custom
-      </Button>
+        {(["7d", "30d", "90d"] as const).map((value) => (
+          <ToggleGroupItem key={value} value={value}>
+            {value.replace("d", " days")}
+          </ToggleGroupItem>
+        ))}
+        <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
+      </ToggleGroup>
       {preset === "custom" ? (
         <>
           <Input
@@ -79,48 +72,33 @@ export function AnalyticsFilters({
             type="date"
             value={from}
             onChange={(event) => setFrom(event.target.value)}
-            className="w-auto"
+            className="h-9 min-h-9 w-auto"
           />
           <Input
             aria-label="Analytics end date"
             type="date"
             value={to}
             onChange={(event) => setTo(event.target.value)}
-            className="w-auto"
+            className="h-9 min-h-9 w-auto"
           />
         </>
       ) : null}
-      <label htmlFor="analytics-source" className="ml-2 text-sm text-slate-600">
-        Source
-      </label>
-      <select
-        id="analytics-source"
-        value={source}
-        onChange={(event) => setSource(event.target.value)}
-        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
-      >
-        <option value="all">All activity</option>
-        <option value="mcbuse_payment">MCBuse payments</option>
-        <option value="merchant_cash">Merchant cash</option>
-      </select>
-      <label
-        htmlFor="analytics-environment"
-        className="ml-2 text-sm text-slate-600"
-      >
-        Environment
-      </label>
-      <select
-        id="analytics-environment"
-        value={environment}
-        onChange={(event) => setEnvironment(event.target.value)}
-        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
-      >
-        <option value="all">All environments</option>
-        <option value="live">Live</option>
-        <option value="test">Test</option>
-        <option value="synthetic">Synthetic</option>
-        <option value="unknown">Unknown</option>
-      </select>
+      <FacetFilter
+        title="Source"
+        options={SOURCE_OPTIONS}
+        value={source === "all" ? null : source}
+        onChange={(value) => setSource(value ?? "all")}
+      />
+      {preset !== "30d" || source !== "all" ? (
+        <ResetFilters
+          onReset={() => {
+            setPreset("30d");
+            setFrom("");
+            setTo("");
+            setSource("all");
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -21,7 +21,6 @@ import {
   type CombinedAnalytics,
 } from './combined-analytics';
 
-export type EvidenceEnvironment = 'live' | 'test' | 'synthetic' | 'unknown';
 export type SourceFilter = 'mcbuse_payment' | 'merchant_cash';
 
 export type NamedPeriod = 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
@@ -33,7 +32,6 @@ export interface GeneralAnalyticsQuery {
   period?: NamedPeriod;
   grouping?: Grouping;
   source?: SourceFilter;
-  environment?: EvidenceEnvironment;
   now?: Date;
 }
 
@@ -50,7 +48,6 @@ export interface GeneralAnalytics extends GeneralAnalyticsContract {
   combined: CombinedAnalytics;
   filters: {
     source: SourceFilter | 'all';
-    environment: EvidenceEnvironment | 'all';
     applied: boolean;
   };
 }
@@ -59,10 +56,8 @@ export interface GeneralAnalytics extends GeneralAnalyticsContract {
  * Gathers the records the three analytics calculators need and hands them
  * over. All the arithmetic lives in the pure modules; this only reads.
  *
- * Cash sales carry no evidence environment of their own, so an environment
- * filter excludes them unless it is explicitly `unknown` — which is what they
- * are. Guessing otherwise would quietly move merchant-entered money into a
- * bucket it was never recorded in.
+ * Every record is included irrespective of its evidence environment; only the
+ * source (digital or cash) can narrow the figures.
  */
 @Injectable()
 export class GeneralAnalyticsService {
@@ -87,10 +82,6 @@ export class GeneralAnalyticsService {
 
     const includesDigital = !query.source || query.source === 'mcbuse_payment';
     const includesCash = !query.source || query.source === 'merchant_cash';
-    const environmentAllows = (environment: string) =>
-      !query.environment || environment === query.environment;
-    // Cash is only ever `unknown`, so any other environment filter excludes it.
-    const cashAllowed = includesCash && environmentAllows('unknown');
 
     const [
       digitalRows,
@@ -106,7 +97,6 @@ export class GeneralAnalyticsService {
         .select({
           amount: schema.merchantTransactions.displayAmountMinor,
           occurredAt: schema.merchantTransactions.occurredAt,
-          environment: schema.merchantTransactions.evidenceEnvironment,
         })
         .from(schema.merchantTransactions)
         .where(
@@ -135,7 +125,6 @@ export class GeneralAnalyticsService {
         .select({
           amount: schema.merchantTransactions.displayAmountMinor,
           occurredAt: schema.merchantTransactions.occurredAt,
-          environment: schema.merchantTransactions.evidenceEnvironment,
         })
         .from(schema.merchantTransactions)
         .where(
@@ -190,7 +179,6 @@ export class GeneralAnalyticsService {
           amount: schema.merchantInvoiceItems.lineTotalMinor,
           category: schema.merchantInvoiceItems.category,
           occurredAt: schema.merchantTransactions.occurredAt,
-          environment: schema.merchantTransactions.evidenceEnvironment,
         })
         .from(schema.merchantInvoiceItems)
         .innerJoin(
@@ -248,22 +236,18 @@ export class GeneralAnalyticsService {
 
     const sales: AnalyticsSale[] = [
       ...(includesDigital
-        ? digitalRows
-            .filter((row) => environmentAllows(row.environment))
-            .map((row) => toSale(row, 'mcbuse_payment'))
+        ? digitalRows.map((row) => toSale(row, 'mcbuse_payment'))
         : []),
-      ...(cashAllowed
+      ...(includesCash
         ? cashRows.map((row) => toSale(row, 'merchant_cash'))
         : []),
     ];
 
     const previousSales: AnalyticsSale[] = [
       ...(includesDigital
-        ? previousDigitalRows
-            .filter((row) => environmentAllows(row.environment))
-            .map((row) => toSale(row, 'mcbuse_payment'))
+        ? previousDigitalRows.map((row) => toSale(row, 'mcbuse_payment'))
         : []),
-      ...(cashAllowed
+      ...(includesCash
         ? previousCashRows.map((row) => toSale(row, 'merchant_cash'))
         : []),
     ];
@@ -271,20 +255,18 @@ export class GeneralAnalyticsService {
     const productById = new Map(products.map((p) => [p.id, p]));
     const soldLines: SoldLine[] = [
       ...(includesDigital
-        ? digitalLines
-            .filter((line) => environmentAllows(line.environment))
-            .map((line) => ({
-              productId: line.productId!,
-              quantity: line.quantity,
-              amountMinor: line.amount,
-              // Captured on the line since migration 0028. Rows written before
-              // it stay null and fall back to the product's current category,
-              // labelled as such rather than presented as recorded history.
-              category: line.category,
-              occurredAt: line.occurredAt,
-            }))
+        ? digitalLines.map((line) => ({
+            productId: line.productId!,
+            quantity: line.quantity,
+            amountMinor: line.amount,
+            // Captured on the line since migration 0028. Rows written before
+            // it stay null and fall back to the product's current category,
+            // labelled as such rather than presented as recorded history.
+            category: line.category,
+            occurredAt: line.occurredAt,
+          }))
         : []),
-      ...(cashAllowed
+      ...(includesCash
         ? cashLines.map((line) => ({
             productId: line.productId!,
             quantity: line.quantity,
@@ -312,7 +294,7 @@ export class GeneralAnalyticsService {
       timezone: merchant.timezone,
     });
 
-    const applied = Boolean(query.source || query.environment);
+    const applied = Boolean(query.source);
 
     return {
       transactions,
@@ -325,7 +307,6 @@ export class GeneralAnalyticsService {
       }),
       filters: {
         source: query.source ?? 'all',
-        environment: query.environment ?? 'all',
         applied,
       },
     };

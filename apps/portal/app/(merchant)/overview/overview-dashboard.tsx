@@ -23,7 +23,6 @@ import {
 import { AlertTriangle, Clock3 } from "lucide-react";
 import { SalesBars, HourlyRhythm } from "@/components/charts";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
-import { MerchantInsightsPanel } from "@/components/merchant-insights";
 import { PageSection } from "@/components/page-section";
 
 /** The only tile on the Overview: label, one value, an optional detail line. */
@@ -60,6 +59,7 @@ export function OverviewDashboard() {
   );
   const assessments = usePortalResource<{ assessments: SavedMerchantAssessment[] }>("me/assessments");
   const packages = usePortalResource<{ items: Array<{ id: string; createdAt: string }> }>("me/finance-packages");
+  const emails = usePortalResource<{ items: EmailAttempt[] }>("me/finance-packages/email-attempts");
   if (summary.loading && !summary.data)
     return (
       <div className="grid gap-6" aria-label="Loading overview">
@@ -87,6 +87,8 @@ export function OverviewDashboard() {
     (bucket) => bucket.paymentCount > 0,
   );
   const latestAssessment = assessments.data?.assessments[0];
+  const latestCredit = latestAssessment?.credit;
+  const latestEmail = emails.data?.items[0];
   return (
     <div className="grid gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -236,7 +238,7 @@ export function OverviewDashboard() {
         </Card>
       </PageSection>
 
-      <PageSection id="overview-analytics" title="Analytics" href="/analytics" framed>
+      <PageSection id="overview-analytics" title="Analytics" href="/analytics/general" framed>
         <TileRow>
           <Metric
             label="Recorded sales · 30 days"
@@ -290,11 +292,45 @@ export function OverviewDashboard() {
             </CardContent>
           </Card>
         </div>
-        <MerchantInsightsPanel limit={3} />
       </PageSection>
 
       <PageSection id="overview-credit" title="Credit Assessment" href="/credit-assessment" framed>
         <TileRow>
+          <Metric
+            label="Latest financial profile"
+            value={
+              !latestAssessment ? (
+                assessments.loading ? "…" : "No assessment yet"
+              ) : latestCredit?.financialProfile ? (
+                <span className="font-mono tabular-nums">
+                  {latestCredit.financialProfile.score.toFixed(1)} / 100
+                </span>
+              ) : (
+                "Not available"
+              )
+            }
+            detail={
+              !latestAssessment
+                ? undefined
+                : latestCredit?.financialProfile
+                  ? `Saved ${DATE_TIME.format(new Date(latestAssessment.createdAt))}`
+                  : latestCredit?.unavailableFields.length
+                    ? `${latestCredit.unavailableFields.length} required ${latestCredit.unavailableFields.length === 1 ? "input" : "inputs"} missing`
+                    : "No profile result saved"
+            }
+          />
+          {latestCredit?.profileConfidence ? (
+            <Metric
+              label="Profile confidence"
+              value={latestCredit.profileConfidence.label}
+              detail={`Coverage ${latestCredit.profileConfidence.coveragePct.toFixed(1)}%`}
+            />
+          ) : null}
+          <Metric
+            label="Evidence readiness"
+            value={<span className="capitalize">{data.readinessStage.replaceAll("_", " ")}</span>}
+            detail="Not a credit decision"
+          />
           <Metric
             label="Saved assessments"
             value={
@@ -303,11 +339,6 @@ export function OverviewDashboard() {
               </span>
             }
             detail={latestAssessment ? `Latest ${DATE_TIME.format(new Date(latestAssessment.createdAt))}` : undefined}
-          />
-          <Metric
-            label="Evidence readiness"
-            value={<span className="capitalize">{data.readinessStage.replaceAll("_", " ")}</span>}
-            detail="Not a credit decision"
           />
         </TileRow>
       </PageSection>
@@ -323,11 +354,33 @@ export function OverviewDashboard() {
             }
             detail={packages.data?.items[0] ? `Latest ${DATE_TIME.format(new Date(packages.data.items[0].createdAt))}` : undefined}
           />
+          {latestEmail ? (
+            <Metric
+              label="Latest email"
+              value={EMAIL_STATUS[latestEmail.status] ?? latestEmail.status.replaceAll("_", " ")}
+              detail={`${latestEmail.recipientEmail} · ${DATE_TIME.format(new Date(latestEmail.createdAt))}`}
+            />
+          ) : null}
         </TileRow>
       </PageSection>
     </div>
   );
 }
+
+type EmailAttempt = {
+  id: string;
+  recipientEmail: string;
+  status: string;
+  createdAt: string;
+};
+
+/** SMTP acceptance is not inbox delivery; say only what the server reported. */
+const EMAIL_STATUS: Record<string, string> = {
+  sending: "Sending",
+  accepted_by_smtp: "Accepted by mail server",
+  failed: "Not sent",
+  unknown: "Outcome unknown",
+};
 
 const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
   dateStyle: "medium",

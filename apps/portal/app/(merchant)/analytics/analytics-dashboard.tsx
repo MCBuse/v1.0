@@ -1,86 +1,37 @@
 "use client";
 
 import type { MerchantAnalytics } from "@repo/shared";
+import { Alert } from "@repo/ui/alert";
+import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardHeader } from "@repo/ui/card";
 import { Money } from "@repo/ui/money";
-import { Button } from "@repo/ui/button";
-import Link from "next/link";
-import { ErrorState } from "@repo/ui/empty-state";
 import { Skeleton } from "@repo/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@repo/ui/table";
+import { RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
 import {
   AnalyticsFilters,
   useAnalyticsFilters,
 } from "@/components/analytics-filters";
-import { InventoryAnalyticsCards } from "@/components/inventory-analytics-cards";
 import { MerchantInsightsPanel } from "@/components/merchant-insights";
+import { PageSection } from "@/components/page-section";
 
+/**
+ * Deep analytics: only what General analytics does not already show.
+ *
+ * Business insights (forecasts, stock risk, anomalies) are fetched on their
+ * own, so a failed `me/analytics` request can only ever affect the recorded
+ * patterns section below them, never the insights.
+ */
 export function AnalyticsDashboard() {
-  const filters = useAnalyticsFilters();
-  const path = filters.path;
-  const resource = usePortalResource<MerchantAnalytics>(path);
-  if (resource.loading && !resource.data) return <Skeleton className="h-96" />;
-  if (!resource.data)
-    return (
-      <ErrorState
-        retry={
-          <Button onClick={() => void resource.refresh()}>Try again</Button>
-        }
-      />
-    );
-  const data = resource.data;
-  const patterns = (() => {
-    const weekdays = Array.from({ length: 7 }, (_, day) => ({
-      label: new Intl.DateTimeFormat("en-GB", {
-        weekday: "short",
-        timeZone: "UTC",
-      }).format(new Date(Date.UTC(2024, 0, 7 + day))),
-      sales: 0,
-      amount: 0n,
-    }));
-    for (const item of data.dailyTrend) {
-      const weekday = new Date(`${item.start}T00:00:00.000Z`).getUTCDay();
-      const day = weekdays[weekday];
-      if (day) {
-        day.sales += item.paymentCount;
-        day.amount += BigInt(item.amountMinor);
-      }
-    }
-    const peakHour = [...data.hourlyRhythm].sort(
-      (a, b) => b.paymentCount - a.paymentCount,
-    )[0];
-    return { weekdays, peakHour: peakHour?.paymentCount ? peakHour : null };
-  })();
-  const trend = (() => {
-    const days = data.dailyTrend.length;
-    const grouping = days > 180 ? "month" : days > 31 ? "week" : "day";
-    const buckets = new Map<
-      string,
-      { amountMinor: bigint; paymentCount: number }
-    >();
-    for (const item of data.dailyTrend) {
-      const date = new Date(`${item.start}T00:00:00.000Z`);
-      let key = item.start;
-      if (grouping === "month") key = item.start.slice(0, 7);
-      if (grouping === "week") {
-        const mondayOffset = (date.getUTCDay() + 6) % 7;
-        date.setUTCDate(date.getUTCDate() - mondayOffset);
-        key = date.toISOString().slice(0, 10);
-      }
-      const bucket = buckets.get(key) ?? { amountMinor: 0n, paymentCount: 0 };
-      bucket.amountMinor += BigInt(item.amountMinor);
-      bucket.paymentCount += item.paymentCount;
-      buckets.set(key, bucket);
-    }
-    return {
-      grouping,
-      items: [...buckets.entries()].map(([start, item]) => ({
-        start,
-        amountMinor: item.amountMinor.toString(),
-        paymentCount: item.paymentCount,
-      })),
-    };
-  })();
   return (
     <div className="grid gap-6">
       <div>
@@ -89,202 +40,219 @@ export function AnalyticsDashboard() {
           Deep analytics
         </h1>
         <p className="mt-2 text-sm text-slate-500">
-          Recorded activity only. Payment-method shares do not establish
-          complete business turnover.
+          Signals drawn from your recorded activity: forecasts, stock risks and
+          unusual patterns worth reviewing. They are prompts for review, not
+          established facts about turnover, profit or cause.
         </p>
       </div>
       <nav aria-label="Analytics views" className="flex flex-wrap gap-2">
-        <Button asChild variant="secondary"><Link href="/analytics/general">General analytics</Link></Button>
+        <Button asChild variant="secondary">
+          <Link href="/analytics/general">General analytics</Link>
+        </Button>
         <Button aria-current="page">Deep analytics</Button>
       </nav>
-      <AnalyticsFilters filters={filters} />
-      <p className="text-xs text-slate-500">
-        {new Intl.DateTimeFormat("en-GB", {
-          dateStyle: "medium",
-          timeZone: data.period.timezone,
-        }).format(new Date(data.period.from))}{" "}
-        –{" "}
-        {new Intl.DateTimeFormat("en-GB", {
-          dateStyle: "medium",
-          timeZone: data.period.timezone,
-        }).format(new Date(data.period.to))}{" "}
-        · {data.period.timezone}
-        {data.period.partialCurrentDay ? " · current day is partial" : ""}
-      </p>
-      <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-6">
-        <Metric
-          label="Recorded sales"
-          value={<Money value={data.totalRecordedSales} />}
-        />
-        <Metric label="Transactions" value={data.saleCount} />
-        <Metric
-          label="Average transaction"
-          value={<Money value={data.averageSale} />}
-        />
-        <Metric
-          label="Sales change"
-          value={
-            data.comparisons?.salesPercent == null
-              ? "Unavailable"
-              : `${data.comparisons.salesPercent > 0 ? "+" : ""}${data.comparisons.salesPercent.toFixed(1)}%`
-          }
-        />
-        <Metric
-          label="Transaction change"
-          value={
-            data.comparisons?.transactionCountPercent == null
-              ? "Unavailable"
-              : `${data.comparisons.transactionCountPercent > 0 ? "+" : ""}${data.comparisons.transactionCountPercent.toFixed(1)}%`
-          }
-        />
-        <Metric
-          label="Average change"
-          value={
-            data.comparisons?.averageSalePercent == null
-              ? "Unavailable"
-              : `${data.comparisons.averageSalePercent > 0 ? "+" : ""}${data.comparisons.averageSalePercent.toFixed(1)}%`
-          }
-        />
-      </div>
       <MerchantInsightsPanel />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold">Payment method split</h2>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm">
-            <div className="flex justify-between">
-              <span>Verified MCBuse payments</span>
-              <Money value={data.digitalSales} />
-            </div>
-            <div className="flex justify-between">
-              <span>Merchant-recorded cash</span>
-              <Money value={data.cashSales} />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold">Evidence coverage</h2>
-          </CardHeader>
-          <CardContent className="grid gap-2 text-sm text-slate-600">
-            <p>
-              {data.sourceCoverage.mcbuse_payment} verified payment record(s)
-            </p>
-            <p>
-              {data.sourceCoverage.merchant_cash} merchant-recorded cash sale(s)
-            </p>
-            <p className="text-xs">
-              Generated{" "}
-              {new Intl.DateTimeFormat("en-GB", {
-                dateStyle: "medium",
-                timeStyle: "short",
-              }).format(new Date(data.generatedAt))}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold">
-              {trend.grouping === "day"
-                ? "Daily"
-                : trend.grouping === "week"
-                  ? "Weekly"
-                  : "Monthly"}{" "}
-              recorded sales
-            </h2>
-          </CardHeader>
-          <CardContent>
-            {trend.items.length ? (
-              <div className="grid gap-2">
-                {trend.items.slice(-14).map((item) => (
-                  <div
-                    key={item.start}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span>
-                      {trend.grouping === "week"
-                        ? `Week of ${item.start}`
-                        : item.start}
-                    </span>
-                    <span>
-                      {item.paymentCount} sale(s) · €
-                      {(Number(item.amountMinor) / 100).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">
-                No recorded sales in this period.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold">Selling patterns</h2>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm">
-            <p>
-              {patterns.peakHour ? (
-                <>
-                  Peak selling hour:{" "}
-                  <span className="font-medium text-slate-950">
-                    {patterns.peakHour.start}
-                  </span>{" "}
-                  ({patterns.peakHour.paymentCount} sale
-                  {patterns.peakHour.paymentCount === 1 ? "" : "s"})
-                </>
-              ) : (
-                "No selling-hour pattern yet."
-              )}
-            </p>
-            <div className="grid grid-cols-7 gap-1">
-              {patterns.weekdays.map((day) => (
-                <div
-                  key={day.label}
-                  className="rounded bg-slate-50 p-2 text-center"
-                >
-                  <p className="text-xs text-slate-500">{day.label}</p>
-                  <p className="mt-1 font-medium text-slate-950">{day.sales}</p>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-slate-500">
-              Days show the number of recorded sales in this period, including
-              days with no sales.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      <InventoryAnalyticsCards data={data} />
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold">Actions</h2>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Button asChild>
-            <Link href="/analytics/general">General analytics</Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href="/analytics/transactions">Transactions</Link>
-          </Button>
-          <Button asChild variant="secondary"><Link href="/analytics/general#inventory-analytics">Inventory analytics</Link></Button>
-        </CardContent>
-      </Card>
+      <RecordedPatterns />
     </div>
   );
 }
-function Metric({ label, value }: { label: string; value: React.ReactNode }) {
+
+const WEEKDAYS = Array.from({ length: 7 }, (_, index) =>
+  // 1 January 2024 was a Monday, so index 0 is Monday.
+  new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" }).format(
+    new Date(Date.UTC(2024, 0, 1 + index)),
+  ),
+);
+
+function weekdayPattern(data: MerchantAnalytics) {
+  const rows = WEEKDAYS.map((label) => ({
+    label,
+    days: 0,
+    sales: 0,
+    amountMinor: 0n,
+  }));
+  for (const item of data.dailyTrend) {
+    // `start` is a calendar date in the merchant's timezone; reading it as UTC
+    // only recovers its weekday, it does not shift the day.
+    const sundayFirst = new Date(`${item.start}T00:00:00.000Z`).getUTCDay();
+    const row = rows[(sundayFirst + 6) % 7];
+    if (!row) continue;
+    row.days += 1;
+    row.sales += item.paymentCount;
+    row.amountMinor += BigInt(item.amountMinor);
+  }
+  return rows;
+}
+
+function RecordedPatterns() {
+  const filters = useAnalyticsFilters();
+  const resource = usePortalResource<MerchantAnalytics>(filters.path);
+  const data = resource.data;
+
   return (
-    <Card>
-      <CardContent className="pt-5">
-        <p className="text-sm text-slate-500">{label}</p>
-        <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
-      </CardContent>
-    </Card>
+    <PageSection id="recorded-patterns" title="Recorded activity patterns" framed>
+      <p className="text-sm text-slate-500">
+        The filters below apply to this section only. Business insights above
+        are calculated from all recorded activity.
+      </p>
+      <AnalyticsFilters filters={filters} />
+      {resource.loading && !data ? (
+        <Skeleton className="h-64" />
+      ) : !data ? (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          <p className="font-semibold">
+            Recorded activity patterns could not be loaded.
+          </p>
+          <p className="mt-1">
+            {resource.offline
+              ? "You appear to be offline. They will return when the connection does."
+              : (resource.error?.message ?? "The request failed.")}
+          </p>
+          <p className="mt-1 text-xs">
+            This is a problem reading your records, not a finding that there
+            were no sales.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-3"
+            onClick={() => void resource.refresh()}
+          >
+            <RefreshCw className="size-4" aria-hidden /> Try again
+          </Button>
+        </Alert>
+      ) : (
+        <PatternsContent data={data} refreshFailed={Boolean(resource.error)} />
+      )}
+    </PageSection>
+  );
+}
+
+function PatternsContent({
+  data,
+  refreshFailed,
+}: {
+  data: MerchantAnalytics;
+  refreshFailed: boolean;
+}) {
+  const weekdays = weekdayPattern(data);
+  const hasSales = weekdays.some((row) => row.sales > 0);
+  const unassignedItems = data.unassignedItems ?? [];
+  const date = new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeZone: data.period.timezone,
+  });
+
+  return (
+    <>
+      <p className="font-mono text-xs text-slate-500">
+        {date.format(new Date(data.period.from))} –{" "}
+        {date.format(new Date(data.period.to))} · {data.period.timezone}
+        {data.period.partialCurrentDay ? " · current day is partial" : ""}
+      </p>
+      {refreshFailed ? (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          These figures are the last ones that loaded; the most recent refresh
+          failed.
+        </Alert>
+      ) : null}
+      <Card>
+        <CardHeader>
+          <h3 className="font-semibold text-slate-950">Sales by weekday</h3>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {hasSales ? (
+            <Table>
+              <caption className="sr-only">
+                Recorded sales by weekday in the selected period
+              </caption>
+              <TableHeader>
+                <tr>
+                  <TableHead scope="col">Weekday</TableHead>
+                  <TableHead scope="col" className="px-4 py-3 text-right font-semibold">
+                    Days in period
+                  </TableHead>
+                  <TableHead scope="col" className="px-4 py-3 text-right font-semibold">
+                    Sales
+                  </TableHead>
+                  <TableHead scope="col" className="px-4 py-3 text-right font-semibold">
+                    Amount
+                  </TableHead>
+                </tr>
+              </TableHeader>
+              <TableBody>
+                {weekdays.map((row) => (
+                  <TableRow key={row.label}>
+                    <th
+                      scope="row"
+                      className="px-4 py-3 font-medium text-slate-950"
+                    >
+                      {row.label}
+                    </th>
+                    <TableCell className="py-3 text-right font-mono tabular-nums">
+                      {row.days}
+                    </TableCell>
+                    <TableCell className="py-3 text-right font-mono tabular-nums">
+                      {row.sales}
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <Money
+                        value={{
+                          ...data.totalRecordedSales,
+                          minor: row.amountMinor.toString(),
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-slate-500">
+              No recorded sales in this period, so there is no weekday pattern
+              to show.
+            </p>
+          )}
+          <p className="text-xs text-slate-500">
+            Recorded sales on each weekday of the selected period, including
+            days with none. A weekday that occurs more often in the period will
+            show more sales for that reason alone.
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <h3 className="font-semibold text-slate-950">
+            Sale lines without a product
+          </h3>
+        </CardHeader>
+        <CardContent className="grid gap-2 text-sm">
+          {unassignedItems.length ? (
+            unassignedItems.map((item) => (
+              <div
+                key={item.name}
+                className="flex items-center justify-between gap-3"
+              >
+                <span className="truncate">{item.name}</span>
+                <span className="whitespace-nowrap text-slate-600">
+                  <span className="font-mono tabular-nums">
+                    {item.quantitySold}
+                  </span>{" "}
+                  units · <Money value={item.totalSales} />
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-slate-500">
+              No custom sale lines in this period.
+            </p>
+          )}
+          <p className="pt-1 text-xs text-slate-500">
+            These recorded lines have no product ID, so they are not assigned
+            to a catalogue product.
+          </p>
+        </CardContent>
+      </Card>
+    </>
   );
 }

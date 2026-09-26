@@ -170,7 +170,7 @@ export function StaffCreditWorkspace() {
             </div>
           </CardHeader>
           <CardContent className="grid min-w-0 grid-cols-1 gap-6">
-            <CreditResult credit={selected.result} />
+            <CreditResult credit={selected.result} showModelDetails />
             {selected.result.experimentalCredit ? (
               <div className="rounded-xl border border-amber-300 bg-amber-50 p-5">
                 <h3 className="font-semibold">Experimental credit risk</h3>

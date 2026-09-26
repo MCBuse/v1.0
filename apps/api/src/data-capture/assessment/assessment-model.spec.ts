@@ -136,7 +136,7 @@ describe('George financial profile', () => {
     expect(missing.score).toBeNull();
     expect(missing.stage).toBe('missing_model_inputs');
     expect(missing.missingRequirements).toContain(
-      'George model input: estimated margin pct',
+      'Estimated margin (%)',
     );
     expect(
       model.assess({

@@ -326,7 +326,7 @@ test("separates manual and imported inventory and keeps analytics in Analytics",
   await expect(page.getByRole("button", { name: "Import inventory" })).toBeVisible();
   await page.screenshot({ path: `/tmp/mcbuse-demo-inventory-${testInfo.project.name}.png`, fullPage: true });
   await nav.getByRole("link", { name: "Analytics", exact: true }).click();
-  await expect(page).toHaveURL("/analytics");
+  await expect(page).toHaveURL("/analytics/general");
   await expect(nav.getByRole("link", { name: "Analytics", exact: true })).toHaveAttribute("aria-current", "page");
 });
 

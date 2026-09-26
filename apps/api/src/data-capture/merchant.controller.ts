@@ -297,27 +297,15 @@ export class MerchantController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('source') source?: string,
-    @Query('environment') environment?: string,
   ) {
     if (source && source !== 'mcbuse_payment' && source !== 'merchant_cash')
       throw new BadRequestException('Unsupported activity source');
-    if (
-      environment &&
-      !['live', 'test', 'synthetic', 'unknown'].includes(environment)
-    )
-      throw new BadRequestException('Unsupported activity environment');
     return this.activity.listActivity(
       user.id,
       Math.max(1, Number(page) || 1),
       Math.min(100, Math.max(1, Number(pageSize) || 20)),
       {
         source: source as 'mcbuse_payment' | 'merchant_cash' | undefined,
-        environment: environment as
-          | 'live'
-          | 'test'
-          | 'synthetic'
-          | 'unknown'
-          | undefined,
       },
     );
   }
@@ -401,7 +389,6 @@ export class MerchantController {
       throw new BadRequestException('Invalid analytics period');
     return this.activity.analytics(user.id, from, to, {
       source: query.source,
-      environment: query.environment,
     });
   }
 
@@ -441,7 +428,6 @@ export class MerchantController {
       period: query.period,
       grouping: query.grouping,
       source: query.source,
-      environment: query.environment,
       now,
     });
   }

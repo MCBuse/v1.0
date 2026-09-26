@@ -37,6 +37,8 @@ const BASE = {
   lastFailure: null,
 };
 
+const ZERO = { minor: "0", currency: "EUR", estimated: false, rateTimestamp: null };
+
 test.beforeEach(async ({ context, page }) => {
   await context.addCookies([
     {
@@ -47,6 +49,38 @@ test.beforeEach(async ({ context, page }) => {
       sameSite: "Lax",
     },
   ]);
+  // Business insights live on Deep analytics, not on the Overview.
+  await page.route("**/api/merchant/me/analytics?*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        period: { from: "2026-08-22T00:00:00.000Z", to: "2026-09-21T06:00:00.000Z", timezone: "UTC", partialCurrentDay: false },
+        generatedAt: "2026-09-21T06:00:00.000Z",
+        today: { sales: ZERO, saleCount: 0, averageSale: ZERO, topProduct: null, peakSellingHour: null },
+        sourceCoverage: { mcbuse_payment: 0, merchant_cash: 0, external_import: 0 },
+        totalRecordedSales: ZERO,
+        saleCount: 0,
+        averageSale: ZERO,
+        comparisonPercent: null,
+        comparisons: { salesPercent: null, transactionCountPercent: null, averageSalePercent: null },
+        digitalSales: ZERO,
+        cashSales: ZERO,
+        dailyTrend: [],
+        hourlyRhythm: [],
+        productPerformance: [],
+        categoryPerformance: [],
+        inventory: {
+          stockValueAtSellingPrices: ZERO,
+          availableValueAtSellingPrices: ZERO,
+          reservedValueAtSellingPrices: ZERO,
+          lowStockProductCount: 0,
+          zeroStockProductCount: 0,
+          valuationBasis: "current_selling_price",
+        },
+        unassignedItems: [],
+      }),
+    }),
+  );
   await page.route("**/api/merchant/me/summary**", (route) =>
     route.fulfill({
       contentType: "application/json",
@@ -102,7 +136,7 @@ test("N.14 — a refused insights route says so instead of showing nothing", asy
     }),
   );
 
-  await page.goto("/overview");
+  await page.goto("/analytics/deep");
   await expect(page.getByText("Insights could not be loaded.")).toBeVisible();
   await expect(
     page.getByText("not a finding that there is nothing to report", {
@@ -127,7 +161,7 @@ test("N.14 — a server error is reported rather than swallowed", async ({
     }),
   );
 
-  await page.goto("/overview");
+  await page.goto("/analytics/deep");
   await expect(page.getByText("Insights could not be loaded.")).toBeVisible();
   await expect(page.getByText("Service unavailable")).toBeVisible();
 });
@@ -141,7 +175,7 @@ test("N.13 — freshness is shown on a current calculation", async ({
     route.fulfill({ contentType: "application/json", body: JSON.stringify(BASE) }),
   );
 
-  await page.goto("/overview");
+  await page.goto("/analytics/deep");
   await expect(page.getByText("Current")).toBeVisible();
   await expect(page.getByText("Last updated", { exact: false })).toBeVisible();
   await expect(
@@ -170,7 +204,7 @@ test("N.13 — a failed recalculation is reported alongside the figures", async 
     }),
   );
 
-  await page.goto("/overview");
+  await page.goto("/analytics/deep");
   await expect(page.getByText("Update delayed")).toBeVisible();
   await expect(
     page.getByText("The last recalculation failed", { exact: false }),
@@ -204,7 +238,7 @@ test("a delayed refresh keeps the last good insights on screen", async ({
     });
   });
 
-  await page.goto("/overview");
+  await page.goto("/analytics/deep");
   await expect(
     page.getByText("Coffee may reach its minimum stock level soon"),
   ).toBeVisible();
@@ -218,4 +252,42 @@ test("a delayed refresh keeps the last good insights on screen", async ({
   await expect(
     page.getByText("Coffee may reach its minimum stock level soon"),
   ).toBeVisible();
+});
+
+test("Deep analytics shows every insight with freshness and evidence", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one rendered insights proof is enough");
+    await page.route("**/api/merchant/me/insights**", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({
+      status: "ready",
+      calculationVersion: "merchant-intelligence-v1",
+      generatedAt: "2026-09-18T10:00:00.000Z",
+      stale: true,
+      snapshot: { metrics: { forecastEligible: true } },
+      scope: {
+        label: "all_recorded_activity",
+        periodFrom: "2026-06-20T00:00:00.000Z",
+        periodTo: "2026-09-18T10:00:00.000Z",
+        mixedData: true,
+        sourceCoverage: { live: 20, test: 1 },
+      },
+      insights: [
+        { id: "one", code: "stock.one", kind: "stock_risk", priority: 10, title: "Coffee may reach minimum stock", summary: "Recorded demand suggests stock review.", recommendation: "Review replenishment timing.", evidence: [{ id: "product:p1", label: "Coffee", value: "8 units" }], limitations: ["Incoming orders are unavailable."], narrationSource: "deterministic" },
+        { id: "two", code: "stock.two", kind: "discrepancy", priority: 20, title: "Stock movement needs review", summary: "Recorded changes differ.", recommendation: "Review source records.", evidence: [], limitations: [], narrationSource: "deterministic" },
+        { id: "three", code: "volume", kind: "anomaly", priority: 30, title: "Volume was unusual", summary: "This is a signal for review.", recommendation: null, evidence: [], limitations: ["This is not evidence of wrongdoing."], narrationSource: "groq" },
+        { id: "four", code: "performance", kind: "performance", priority: 40, title: "Fourth insight", summary: "Lower priority.", recommendation: null, evidence: [], limitations: [], narrationSource: "deterministic" },
+      ],
+      message: "Mixed recorded activity—included test or unclassified records.",
+    }),
+  }));
+  await page.goto("/analytics/deep");
+  await expect(page.getByRole("heading", { name: "Business insights" })).toBeVisible();
+  await expect(page.getByText("Update delayed")).toBeVisible();
+  await expect(page.getByText("Last updated", { exact: false })).toBeVisible();
+  await expect(page.getByText("Mixed recorded activity—included test or unclassified records.")).toBeVisible();
+  await expect(page.getByText("Coffee may reach minimum stock")).toBeVisible();
+  await expect(page.getByText("Coffee:")).toBeVisible();
+  await expect(page.getByText("Review replenishment timing.")).toBeVisible();
+  await expect(page.getByText("Incoming orders are unavailable.")).toBeVisible();
+  await expect(page.getByText("Fourth insight")).toBeVisible();
 });

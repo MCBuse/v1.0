@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   CREDIT_MONEY_FIELDS,
   type CreditProfile,
-  type MerchantConsent,
 } from "@repo/shared";
 import { Alert } from "@repo/ui/alert";
 import { Button } from "@repo/ui/button";
@@ -37,7 +36,6 @@ export function creditMinorInput(value: string) {
 }
 export function CreditProfileForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean) => void }) {
   const profile = usePortalResource<CreditProfile>("me/credit-profile");
-  const consent = usePortalResource<MerchantConsent>("me/credit-pilot-consent");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -76,21 +74,6 @@ export function CreditProfileForm({ onDirtyChange }: { onDirtyChange?: (dirty: b
       setBusy(false);
     }
   }
-  async function changeConsent() {
-    setBusy(true);
-    setError("");
-    try {
-      await portalApi("me/credit-pilot-consent", {
-        method: "POST",
-        body: JSON.stringify({ active: !consent.data?.active }),
-      });
-      await consent.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save consent");
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <Card>
       <CardHeader>
@@ -102,9 +85,9 @@ export function CreditProfileForm({ onDirtyChange }: { onDirtyChange?: (dirty: b
         </div>
       </CardHeader>
       <CardContent className="grid gap-6">
-        {error || profile.error || consent.error ? (
+        {error || profile.error ? (
           <Alert>
-            {error || profile.error?.message || consent.error?.message}
+            {error || profile.error?.message}
           </Alert>
         ) : null}
         {saved ? (
@@ -211,29 +194,6 @@ export function CreditProfileForm({ onDirtyChange }: { onDirtyChange?: (dirty: b
               : "Credit profile unavailable."}
           </p>
         )}
-        <details className="border-t pt-5">
-          <summary className="cursor-pointer font-medium text-slate-950 focus-visible:outline-2 focus-visible:outline-blue-700">Internal pilot consent (optional)</summary>
-          <p className="my-3 text-sm leading-6 text-slate-600">
-            Allow authorized MCBuse credit analysts to review your business
-            evidence and declared credit profile in the internal experimental
-            scoring pilot. The model uses synthetic training data and does not
-            make lending decisions. You can withdraw consent here; withdrawal
-            blocks further staff access but does not erase retained audit
-            records.
-          </p>
-          <p className="mb-3 text-sm">
-            Consent: {consent.data?.active ? "Active" : "Not active"}
-          </p>
-          <Button
-            variant="secondary"
-            disabled={busy || !consent.data}
-            onClick={() => void changeConsent()}
-          >
-            {consent.data?.active
-              ? "Withdraw pilot consent"
-              : "Give pilot consent"}
-          </Button>
-        </details>
       </CardContent>
     </Card>
   );

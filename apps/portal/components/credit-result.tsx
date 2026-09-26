@@ -1,21 +1,30 @@
 import type { CreditPublicResult } from "@repo/shared";
-export function CreditResult({ credit: c }: { credit: CreditPublicResult }) {
+import { fieldLabel } from "./assessment-labels";
+
+/** `showModelDetails` is for staff views; merchants see plain-language labels only. */
+export function CreditResult({
+  credit: c,
+  showModelDetails = false,
+}: {
+  credit: CreditPublicResult;
+  showModelDetails?: boolean;
+}) {
   return (
     <section className="grid gap-4 text-sm">
       <div>
-        <h3 className="font-semibold">George&apos;s business financial profile</h3>
-        <p className="mt-1 text-xs text-slate-500">Model {c.modelVersion}</p>
+        <h3 className="font-semibold">{showModelDetails ? "George’s business financial profile" : "Financial profile"}</h3>
+        {showModelDetails ? <p className="mt-1 text-xs text-slate-500">Model {c.modelVersion}</p> : null}
       </div>
       {c.status !== "ready" ? (
         <p role="status">
           {c.status === "consent_required"
-            ? "Give evidence-assessment consent to calculate profile results."
-            : "Scoring is temporarily unavailable. Your evidence-readiness result is still saved."}
+            ? "Give consent to use your business records so we can calculate your score."
+            : "Scoring is temporarily unavailable. Your assessment has still been saved — please try again later."}
         </p>
       ) : null}
       <dl className="grid gap-4 sm:grid-cols-2">
         <div>
-          <dt>Financial Profile Score</dt>
+          <dt>Financial profile score</dt>
           <dd className="mt-1 text-xl font-semibold">
             {c.financialProfile
               ? `${c.financialProfile.score.toFixed(1)} / 100`
@@ -23,14 +32,14 @@ export function CreditResult({ credit: c }: { credit: CreditPublicResult }) {
           </dd>
         </div>
         <div>
-          <dt>Profile Confidence</dt>
+          <dt>Confidence</dt>
           <dd className="mt-1 text-xl font-semibold">
             {c.profileConfidence?.label ?? "Not available"}
           </dd>
           {c.profileConfidence ? (
             <p className="mt-1 text-xs text-slate-500">
               Coverage {c.profileConfidence.coveragePct.toFixed(1)}% ·
-              Processing quality{" "}
+              Data quality{" "}
               {c.profileConfidence.dataReliabilityQualityPct?.toFixed(1) ??
                 "unavailable"}
               {c.profileConfidence.dataReliabilityQualityPct !== null
@@ -42,16 +51,16 @@ export function CreditResult({ credit: c }: { credit: CreditPublicResult }) {
       </dl>
       {c.status === "ready" && !c.financialProfile ? (
         <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
-          A financial profile score cannot be calculated yet. George&apos;s model requires the missing inputs listed below; unavailable values have not been filled in.
+          We can’t calculate a score yet. Add the missing information listed below, then run a new assessment.
         </p>
       ) : null}
       <p className="text-xs leading-5 text-slate-500">
-        Confidence describes field completeness and processing quality. Declared
-        information is not independently verified. These results are not a
+        Confidence reflects how complete and reliable your records are.
+        Information you declare is not independently verified. This is not a
         lending decision.
       </p>
       <div>
-        <h4 className="font-medium">Merchant integrity summary</h4>
+        <h4 className="font-medium">{showModelDetails ? "Merchant integrity summary" : "Record summary"}</h4>
         <ul className="mt-2 grid gap-2">
           {c.integritySummary.map((line, i) => (
             <li key={i}>{line}</li>
@@ -64,7 +73,7 @@ export function CreditResult({ credit: c }: { credit: CreditPublicResult }) {
           <ul className="mt-2 grid gap-2">
             {Object.entries(c.missingReasons).map(([key, reason]) => (
               <li key={key}>
-                <span className="font-medium">{key.replaceAll("_", " ")}:</span>{" "}
+                <span className="font-medium">{showModelDetails ? key.replaceAll("_", " ") : fieldLabel(key)}:</span>{" "}
                 {reason}
               </li>
             ))}

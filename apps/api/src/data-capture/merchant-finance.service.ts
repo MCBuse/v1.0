@@ -961,7 +961,7 @@ export class MerchantFinanceService {
       if (snapshot.assessment?.credit) {
         if (document.y > 650) document.addPage();
         const credit = snapshot.assessment.credit;
-        document.moveDown().fontSize(14).text("George's business financial profile");
+        document.moveDown().fontSize(14).text('Business financial profile');
         document.fontSize(10).text(`Model: ${credit.modelVersion} | Status: ${credit.status}`);
         document.text(`Financial profile: ${credit.financialProfile ? credit.financialProfile.score.toFixed(1) + ' / 100' : 'Not available'}`);
         if (credit.status === 'ready' && !credit.financialProfile) document.text('A score cannot be calculated while required inputs are missing. No missing values were filled in.');

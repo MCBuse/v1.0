@@ -13,6 +13,7 @@ import {
   finishOperationIntent,
 } from "@/lib/client/operation-intent";
 import { SavedAssessmentDetail } from "@/components/saved-assessment";
+import { stageLabel } from "@/components/assessment-labels";
 type Package = {
   id: string;
   periodFrom: string;
@@ -161,7 +162,7 @@ export default function FinanceMatchPage() {
             <ul className="divide-y divide-slate-100">
               {history.data.items.slice(0, 10).map((item) => (
                 <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0">
-                  <div><p className="text-sm font-medium text-slate-950">{new Date(item.createdAt).toLocaleString()}</p><p className="text-xs text-slate-600">{item.assessmentBinding === "verified" ? `Saved assessment · ${item.assessment?.stage.replaceAll("_", " ") ?? "stage unavailable"}` : "Legacy package · assessment link unverified"}</p></div>
+                  <div><p className="text-sm font-medium text-slate-950">{new Date(item.createdAt).toLocaleString()}</p><p className="text-xs text-slate-600">{item.assessmentBinding === "verified" ? `Saved assessment · ${stageLabel(item.assessment?.stage)}` : "Legacy package · assessment link unverified"}</p></div>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="secondary" onClick={() => void preview(item.id)}>Preview / email</Button>
                     <Button asChild variant="secondary"><a href={`/api/merchant/me/finance-packages/${item.id}/pdf`} target="_blank" rel="noreferrer">Download PDF</a></Button>
@@ -190,7 +191,7 @@ export default function FinanceMatchPage() {
                   <option key={a.id} value={a.id}>
                     {index === 0 ? "Latest · " : ""}
                     {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(a.createdAt))} ·{" "}
-                    {a.stage.replaceAll("_", " ")}
+                    {stageLabel(a.stage)}
                   </option>
                 ))}
               </select>

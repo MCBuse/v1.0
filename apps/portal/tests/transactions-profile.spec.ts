@@ -42,7 +42,8 @@ test("preserves old-bookmark query parameters when moving to a pillar route", as
 }) => {
   const redirects: Array<[string, string]> = [
     ["/transactions?source=merchant_cash&page=2", "/analytics/transactions?source=merchant_cash&page=2"],
-    ["/analytics/inventory?query=tea", "/analytics/general?query=tea#inventory-analytics"],
+    ["/analytics/inventory?query=tea", "/analytics/general?query=tea&tab=inventory"],
+    ["/analytics?period=7d", "/analytics/general?period=7d"],
     ["/invoices?status=history", "/payment/invoices?status=history"],
     ["/business-profile?section=consent", "/credit-assessment/business-profile?section=consent"],
   ];
@@ -95,7 +96,7 @@ test("lists fast payment requests separately from itemised invoices", async ({
   await expect(requests.getByText("€18.50")).toBeVisible();
 });
 
-test("keeps activity provenance filters and pagination in the URL", async ({
+test("keeps the source filter and pagination in the URL, with no environment filter", async ({
   page,
 }) => {
   const requested: string[] = [];
@@ -128,12 +129,14 @@ test("keeps activity provenance filters and pagination in the URL", async ({
   await expect(page.getByText("Counter sale")).toBeVisible();
   await page.getByLabel("Source").selectOption("merchant_cash");
   await expect(page).toHaveURL(/source=merchant_cash/);
-  await page.getByLabel("Environment").selectOption("unknown");
-  await expect(page).toHaveURL(/environment=unknown/);
+  await expect(page.getByLabel("Environment")).toHaveCount(0);
+  // Provenance stays visible per record even though it is no longer a filter.
+  await expect(page.getByText("Unknown", { exact: false }).first()).toBeVisible();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page).toHaveURL(/page=2/);
   await expect(page.getByText("Page 2 of 2 · 21 records")).toBeVisible();
-  expect(requested.some((search) => search.includes("source=merchant_cash") && search.includes("environment=unknown"))).toBe(true);
+  expect(requested.some((search) => search.includes("source=merchant_cash"))).toBe(true);
+  expect(requested.every((search) => !search.includes("environment="))).toBe(true);
 });
 
 test("shows transaction empty and error states without leaking technical data", async ({

@@ -5,5 +5,4 @@ export class ListMerchantAnalyticsDto {
   @IsOptional() @IsISO8601() from?: string;
   @IsOptional() @IsISO8601() to?: string;
   @IsOptional() @IsIn(['mcbuse_payment', 'merchant_cash']) source?: 'mcbuse_payment' | 'merchant_cash';
-  @IsOptional() @IsIn(['live', 'test', 'synthetic', 'unknown']) environment?: 'live' | 'test' | 'synthetic' | 'unknown';
 }

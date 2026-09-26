@@ -172,31 +172,13 @@ test.beforeEach(async ({ context, page }) => {
       }),
     }),
   );
-  await page.route("**/api/merchant/me/insights**", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        status: "disabled",
-        calculationVersion: "merchant-intelligence-v1",
-        generatedAt: null,
-        stale: false,
-        snapshot: null,
-        scope: {
-          label: "all_recorded_activity",
-          periodFrom: null,
-          periodTo: null,
-          mixedData: false,
-          sourceCoverage: {},
-        },
-        insights: [],
-        message: "Business intelligence is not enabled for this merchant.",
-      }),
-    }),
-  );
   await page.route("**/api/merchant/me/assessments", (route) =>
     route.fulfill({ json: { assessments: [] } }),
   );
   await page.route("**/api/merchant/me/finance-packages", (route) =>
+    route.fulfill({ json: { items: [] } }),
+  );
+  await page.route("**/api/merchant/me/finance-packages/email-attempts", (route) =>
     route.fulfill({ json: { items: [] } }),
   );
 });
@@ -253,44 +235,85 @@ test("overview renders money records and responsive navigation", async ({
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("shows the three highest-priority insights with freshness and evidence", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "one rendered insights proof is enough");
-  await page.unroute("**/api/merchant/me/insights**");
-  await page.route("**/api/merchant/me/insights**", (route) => route.fulfill({
-    contentType: "application/json",
-    body: JSON.stringify({
-      status: "ready",
-      calculationVersion: "merchant-intelligence-v1",
-      generatedAt: "2026-09-18T10:00:00.000Z",
-      stale: true,
-      snapshot: { metrics: { forecastEligible: true } },
-      scope: {
-        label: "all_recorded_activity",
-        periodFrom: "2026-06-20T00:00:00.000Z",
-        periodTo: "2026-09-18T10:00:00.000Z",
-        mixedData: true,
-        sourceCoverage: { live: 20, test: 1 },
+test("summarises the latest assessment and email without a Business insights panel", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one rendered summary proof is enough");
+  let insightsRequested = false;
+  await page.route("**/api/merchant/me/insights**", (route) => {
+    insightsRequested = true;
+    return route.fulfill({ status: 500, json: { message: "Overview must not request insights" } });
+  });
+  await page.unroute("**/api/merchant/me/assessments");
+  await page.route("**/api/merchant/me/assessments", (route) =>
+    route.fulfill({ json: { assessments: [assessment({ score: 64.25 })] } }),
+  );
+  await page.unroute("**/api/merchant/me/finance-packages/email-attempts");
+  await page.route("**/api/merchant/me/finance-packages/email-attempts", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          { id: "e1", packageId: "p1", recipientEmail: "loans@bank.example", status: "accepted_by_smtp", createdAt: "2026-09-25T09:30:00.000Z" },
+        ],
       },
-      insights: [
-        { id: "one", code: "stock.one", kind: "stock_risk", priority: 10, title: "Coffee may reach minimum stock", summary: "Recorded demand suggests stock review.", recommendation: "Review replenishment timing.", evidence: [{ id: "product:p1", label: "Coffee", value: "8 units" }], limitations: ["Incoming orders are unavailable."], narrationSource: "deterministic" },
-        { id: "two", code: "stock.two", kind: "discrepancy", priority: 20, title: "Stock movement needs review", summary: "Recorded changes differ.", recommendation: "Review source records.", evidence: [], limitations: [], narrationSource: "deterministic" },
-        { id: "three", code: "volume", kind: "anomaly", priority: 30, title: "Volume was unusual", summary: "This is a signal for review.", recommendation: null, evidence: [], limitations: ["This is not evidence of wrongdoing."], narrationSource: "groq" },
-        { id: "four", code: "performance", kind: "performance", priority: 40, title: "Fourth insight", summary: "Lower priority.", recommendation: null, evidence: [], limitations: [], narrationSource: "deterministic" },
-      ],
-      message: "Mixed recorded activity—included test or unclassified records.",
     }),
-  }));
+  );
   await page.goto("/overview");
-  await expect(page.getByRole("heading", { name: "Business insights" })).toBeVisible();
-  await expect(page.getByText("Update delayed")).toBeVisible();
-  await expect(page.getByText("Last updated", { exact: false })).toBeVisible();
-  await expect(page.getByText("Mixed recorded activity—included test or unclassified records.")).toBeVisible();
-  await expect(page.getByText("Coffee may reach minimum stock")).toBeVisible();
-  await expect(page.getByText("Coffee:")).toBeVisible();
-  await expect(page.getByText("Review replenishment timing.")).toBeVisible();
-  await expect(page.getByText("Incoming orders are unavailable.")).toBeVisible();
-  await expect(page.getByText("Fourth insight")).toHaveCount(0);
+  const credit = page.locator("#overview-credit");
+  await expect(credit.getByText("64.3 / 100")).toBeVisible();
+  await expect(credit.getByText("Medium")).toBeVisible();
+  await expect(credit.getByText("Coverage 80.0%")).toBeVisible();
+  const finance = page.locator("#overview-finance");
+  await expect(finance.getByText("Accepted by mail server")).toBeVisible();
+  await expect(finance.getByText("loans@bank.example", { exact: false })).toBeVisible();
+  await expect(page.getByText("Delivered", { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Business insights" })).toHaveCount(0);
+  expect(insightsRequested).toBe(false);
 });
+
+test("names missing inputs instead of showing a profile score", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one rendered summary proof is enough");
+  await page.unroute("**/api/merchant/me/assessments");
+  await page.route("**/api/merchant/me/assessments", (route) =>
+    route.fulfill({ json: { assessments: [assessment({ score: null, unavailableFields: ["loanAmountMinor", "commencementDate"] })] } }),
+  );
+  await page.goto("/overview");
+  const credit = page.locator("#overview-credit");
+  await expect(credit.getByText("Not available")).toBeVisible();
+  await expect(credit.getByText("2 required inputs missing")).toBeVisible();
+  await expect(credit.getByText("Profile confidence")).toHaveCount(0);
+  await expect(credit.getByText("/ 100")).toHaveCount(0);
+});
+
+function assessment({ score, unavailableFields = [] }: { score: number | null; unavailableFields?: string[] }) {
+  return {
+    id: "a1",
+    modelId: "george-financial-profile-v1",
+    modelVersion: "2026.09.1",
+    stage: "building_history",
+    score: null,
+    evidenceWindow: { from: "2026-08-26T00:00:00.000Z", to: "2026-09-25T00:00:00.000Z", days: 30 },
+    passedRequirements: [],
+    missingRequirements: [],
+    reliability: {},
+    sourceCoverage: {},
+    limitations: [],
+    disclaimer: "Not a lending decision.",
+    businessProfile: {},
+    createdAt: "2026-09-25T09:00:00.000Z",
+    actorUserId: "u1",
+    credit: {
+      status: "ready",
+      modelVersion: "2026.09.1",
+      businessAgeMonths: 18,
+      unavailableFields,
+      financialProfile: score === null ? null : { score, scale: "0-100", breakdown: {} },
+      profileConfidence: score === null ? null : { label: "Medium", confidenceScore: 0.7, coveragePct: 80, dataReliabilityQualityPct: 90, fieldsFilled: 8, fieldsTotal: 10 },
+      missingReasons: {},
+      indicators: {},
+      provenance: {},
+      integritySummary: [],
+    },
+  };
+}
 
 test("validates the receive drawer and restores trigger focus", async ({
   page,

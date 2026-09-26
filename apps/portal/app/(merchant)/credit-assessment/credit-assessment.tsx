@@ -11,6 +11,7 @@ import { portalApi } from "@/lib/client/api";
 import { operationIntent, finishOperationIntent } from "@/lib/client/operation-intent";
 import { CreditProfileForm } from "@/components/credit-profile-form";
 import { SavedAssessmentDetail } from "@/components/saved-assessment";
+import { stageLabel } from "@/components/assessment-labels";
 
 type SavedPdf = {
   id: string;
@@ -96,8 +97,7 @@ export function CreditAssessment() {
         <p className="text-sm font-medium text-blue-700">Credit Assessment</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">Business assessment</h1>
         <p className="mt-2 max-w-prose text-sm text-slate-600">
-          Review the saved business details, add missing information, then run George&apos;s financial profile model and generate a dated PDF.
-          The result shows a financial profile score only when its required inputs are available. Evidence readiness is shown separately.
+          Check your business details, add anything that&apos;s missing, and get a dated credit assessment report as a PDF.
         </p>
       </div>
 
@@ -140,7 +140,7 @@ export function CreditAssessment() {
           <Card>
             <CardContent className="grid gap-3 py-5">
               <h2 className="font-semibold text-slate-950">Generate assessment and PDF</h2>
-              <p className="text-sm text-slate-600">The PDF includes George&apos;s financial profile result, its missing inputs, declared additional information, and a 30-day record summary.</p>
+              <p className="text-sm text-slate-600">The PDF includes your credit profile result, any information still missing, the details you added, and a summary of your last 30 days of activity.</p>
               {formDirty ? <p className="text-sm text-amber-800">Save additional information above before generating.</p> : null}
               <div><Button disabled={busy || !profile.data || formDirty} aria-busy={busy} onClick={() => void run()}>{busy ? "Generating…" : "Generate assessment PDF"}</Button></div>
             </CardContent>
@@ -152,13 +152,13 @@ export function CreditAssessment() {
         <CardHeader><h2 className="font-semibold text-slate-950">Latest assessment</h2></CardHeader>
         <CardContent>
           {current ? <SavedAssessmentDetail assessment={current} /> : (
-            <p className="text-sm text-slate-600">{history.loading ? "Loading assessments…" : "No assessment yet. Open the assessment form to begin."}</p>
+            <p className="text-sm text-slate-600">{history.loading ? "Loading assessments…" : "No assessment yet. Select Run credit assessment to get started."}</p>
           )}
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><div><h2 className="font-semibold text-slate-950">Recent credit assessments</h2><p className="mt-1 text-sm text-slate-600">Latest 10 saved results and their PDFs.</p></div></CardHeader>
+        <CardHeader><div><h2 className="font-semibold text-slate-950">Recent credit assessments</h2><p className="mt-1 text-sm text-slate-600">Your past assessments and their PDF reports.</p></div></CardHeader>
         <CardContent>
           {history.loading && !history.data ? <p className="text-sm text-slate-600">Loading recent assessments…</p> : recent.length ? (
             <ul className="divide-y divide-slate-100">
@@ -167,7 +167,7 @@ export function CreditAssessment() {
                 return (
                   <li key={assessment.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0">
                     <button type="button" className="min-h-11 text-left text-sm font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700" onClick={() => setSelected(assessment)}>
-                      {new Date(assessment.createdAt).toLocaleString()} · {assessment.stage.replaceAll("_", " ")}
+                      {new Date(assessment.createdAt).toLocaleString()} · {stageLabel(assessment.stage)}
                     </button>
                     {pdf ? <a className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700" href={`/api/merchant/me/finance-packages/${pdf.id}/pdf`} target="_blank" rel="noreferrer">Download PDF</a> : <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-700" href={`/finance-match?assessmentId=${assessment.id}`}>Prepare PDF</Link>}
                   </li>

@@ -132,17 +132,23 @@ export class GeorgeFinancialProfileV1 implements AssessmentModel {
       missingRequirements: [
         ...readiness.missingRequirements,
         ...missing.map(
-          (field) => `George model input: ${field.replaceAll('_', ' ')}`,
+          (field) => missingFieldLabel(field),
         ),
       ],
       limitations: [
-        "George's financial profile is a 0-100 business profile measure, not a credit risk score or lending decision.",
+        'The financial profile score is a 0-100 measure of your business profile. It is not a credit risk score or a lending decision.',
         ...readiness.limitations,
       ],
       disclaimer:
-        "George's financial profile uses available business evidence. Missing required inputs are not estimated; this is not a lending decision.",
+        'The financial profile uses your available business records. Missing information is never estimated, and this is not a lending decision.',
     };
   }
+}
+
+/** `estimated_margin_pct` -> "Estimated margin (%)" for merchant-facing lists. */
+function missingFieldLabel(field: string): string {
+  const words = field.replaceAll('_', ' ').replace(/ pct$/, ' (%)');
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 const MODELS = new Map<string, AssessmentModel>();
