@@ -15,6 +15,7 @@
     "deploy:api:cloud-run:bootstrap": "bash scripts/cloud-run/bootstrap.sh",
     "deploy:api:cloud-run": "bash scripts/cloud-run/deploy.sh",
     "deploy:portal:cloud-run": "bash scripts/cloud-run/deploy-portal.sh",
+    "deploy:credit-scoring": "bash scripts/cloud-run/deploy-credit-scoring.sh",
     "dev:api": "pnpm --filter api start:dev",
     "dev:portal": "pnpm --filter portal dev",
     "test:portal": "pnpm --filter portal test && pnpm --filter portal test:e2e"
