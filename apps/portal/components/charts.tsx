@@ -83,7 +83,8 @@ export function HourlyRhythm({
   return (
     <div>
       <div
-        className="flex h-24 items-end gap-1"
+        // Same height as SalesBars so the two Overview charts line up.
+        className="flex h-44 items-end gap-1"
         role="img"
         aria-label="Hourly sales rhythm for the last 30 days"
       >

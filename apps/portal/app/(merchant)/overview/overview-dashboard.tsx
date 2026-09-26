@@ -274,7 +274,13 @@ export function OverviewDashboard() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <h3 className="font-semibold text-slate-950">Daily trend</h3>
+              <div>
+                <h3 className="font-semibold text-slate-950">Daily trend</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Your total sales each day over the last 30 days, digital and
+                  cash combined. Hover a bar to see the amount.
+                </p>
+              </div>
             </CardHeader>
             <CardContent>
               {hasDailySales ? (
@@ -292,7 +298,13 @@ export function OverviewDashboard() {
           </Card>
           <Card>
             <CardHeader>
-              <h3 className="font-semibold text-slate-950">Sales rhythm</h3>
+              <div>
+                <h3 className="font-semibold text-slate-950">Sales rhythm</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  When in the day you sell: sales in each hour, added up over
+                  the last 30 days. Taller bars are your busiest hours.
+                </p>
+              </div>
             </CardHeader>
             <CardContent>
               <HourlyRhythm buckets={data.recordedHourlyRhythm} />
