@@ -60,10 +60,12 @@ export function ChartWithTable({
         {bars.map((bar) => (
           <div
             key={bar.key}
-            className="group relative flex min-w-0 flex-1 items-end"
+            // h-full gives the column a definite height; without it the
+            // percentage height on the bar resolves to 0 and nothing shows.
+            className="group relative flex h-full min-w-0 flex-1 items-end"
           >
             <div
-              className="w-full rounded-t-sm bg-blue-100 transition-colors group-hover:bg-blue-500"
+              className="w-full rounded-t-sm bg-blue-400 transition-colors group-hover:bg-blue-600"
               style={{ height: `${Math.max(3, (bar.value / max) * 100)}%` }}
               title={`${bar.label}: ${bar.cells[0] ?? ""}`}
             />

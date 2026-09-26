@@ -10,6 +10,7 @@ import {
 
 const allowed = [
   /^me\/credit-profile$/,
+  /^me\/credit-inputs$/,
   /^me$/,
   /^me\/summary$/,
   /^me\/transactions$/,

@@ -66,6 +66,12 @@ export class MerchantCreditController {
       dto.data,
     );
   }
+  /** George's activity-derived inputs, as a run would compute them now. */
+  @Get('credit-inputs') async inputs(@CurrentUser() u: { id: string }) {
+    return this.evidence.preview(
+      (await this.merchants.requireMerchant(u.id)).merchantId,
+    );
+  }
   @Get('credit-pilot-consent') async consent(@CurrentUser() u: { id: string }) {
     return this.evidence.consent(
       (await this.merchants.requireMerchant(u.id)).merchantId,

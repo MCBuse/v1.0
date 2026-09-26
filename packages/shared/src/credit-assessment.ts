@@ -17,6 +17,18 @@ export type CreditProfile = Partial<
   externalBureauScore?: number | null;
   externalBureauReport?: string | null;
 };
+/** Activity-derived model inputs shown before an assessment runs. */
+export interface CreditInputPreview {
+  asOfDate: string;
+  evidenceWindow: { from: string; to: string };
+  inputs: Array<{
+    key: string;
+    value: number | string | null;
+    provenance: string;
+    missingReason: string | null;
+  }>;
+  integritySummary: string[];
+}
 export interface CreditPublicResult {
   status: "ready" | "temporarily_unavailable" | "consent_required";
   modelVersion: string;

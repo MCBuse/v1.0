@@ -224,8 +224,8 @@ test("merchant credit profile preserves cents and exposes separate pilot consent
   await page.route("**/api/merchant/me/finance-packages", (r) =>
     r.fulfill({ json: { items: [] } }),
   );
-  // The credit profile form moved from Business profile into the
-  // Credit Assessment form (bc653ad) and is now titled "Additional information".
+  // The credit profile lives in the Run credit assessment drawer as
+  // "Additional information" and is saved by the single Run assessment action.
   await page.goto("/credit-assessment");
   await page
     .getByRole("button", { name: "Run credit assessment", exact: true })
@@ -236,16 +236,24 @@ test("merchant credit profile preserves cents and exposes separate pilot consent
   await page
     .getByLabel("Requested loan amount (EUR)", { exact: true })
     .fill("0.10");
+  // Only the declaration save matters here; stop before the run itself.
+  await page.route("**/api/merchant/me/assessments", (r) =>
+    r.request().method() === "POST" ? r.abort() : r.fallback(),
+  );
   const savedRequest = page.waitForRequest(
     (r) =>
       r.url().endsWith("/api/merchant/me/credit-profile") &&
       r.method() === "PATCH",
   );
   await page
-    .getByRole("button", { name: "Save credit profile", exact: true })
+    .getByLabel("Use my saved business records for this assessment", {
+      exact: false,
+    })
+    .check();
+  await page
+    .getByRole("button", { name: "Run assessment", exact: true })
     .click();
   expect((await savedRequest).postDataJSON().data.loanAmountMinor).toBe("10");
-  await expect(page.getByRole("status").filter({hasText:"Credit profile saved"})).toBeVisible();
   await expect(
     page.getByText("Internal pilot consent (optional)"),
   ).toHaveCount(0);

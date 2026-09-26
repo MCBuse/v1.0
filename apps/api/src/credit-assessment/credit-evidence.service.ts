@@ -1,7 +1,11 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { CreditProfile, CreditPublicResult } from '@repo/shared';
+import type {
+  CreditInputPreview,
+  CreditProfile,
+  CreditPublicResult,
+} from '@repo/shared';
 import { CREDIT_MODEL_VERSION } from './credit-contract';
 import { DRIZZLE } from '../database/database.provider';
 import * as s from '../database/schema';
@@ -17,6 +21,24 @@ import {
 } from './scoring-client';
 import { euroMajor, validateCreditProfile } from './credit-profile';
 export const PILOT_CONSENT = 'credit_pilot_assessment';
+/** Days of activity every merchant assessment reads, shared by preview and run. */
+export const CREDIT_EVIDENCE_WINDOW_DAYS = 90;
+/** Model inputs the merchant declares; everything else is derived from activity. */
+const DECLARED_INPUTS: ReadonlySet<string> = new Set([
+  'merchant_type',
+  'commencement_date',
+  'existing_debt_to_sales',
+  'loan_amount_eur',
+  'loan_term_months',
+  'inventory_value_eur',
+  'collateral_value_eur',
+  'business_debts_eur',
+  'business_assets_eur',
+  'owner_personal_assets_eur',
+  'owner_personal_debts_eur',
+  'external_bureau_score',
+  'external_bureau_report',
+]);
 export const PILOT_CONSENT_VERSION = '2026-09-credit-pilot-v1';
 export function trend(values: number[]): number | null {
   if (values.length < 2) return null;
@@ -273,21 +295,7 @@ export class CreditEvidenceService {
     for (const key of ['exception_rate', 'critical_unresolved_ratio'])
       if (typeof values[key] === 'number' && values[key] > 100)
         values[key] = null;
-    const declared = new Set([
-      'merchant_type',
-      'commencement_date',
-      'existing_debt_to_sales',
-      'loan_amount_eur',
-      'loan_term_months',
-      'inventory_value_eur',
-      'collateral_value_eur',
-      'business_debts_eur',
-      'business_assets_eur',
-      'owner_personal_assets_eur',
-      'owner_personal_debts_eur',
-      'external_bureau_score',
-      'external_bureau_report',
-    ]);
+    const declared = DECLARED_INPUTS;
     const provenance = Object.fromEntries(
       Object.keys(values).map((k) => [
         k,
@@ -328,6 +336,41 @@ export class CreditEvidenceService {
       integritySummary,
       profile,
       evidenceWindow: { from: from.toISOString(), to: to.toISOString() },
+    };
+  }
+  /**
+   * The activity-derived inputs a merchant assessment would use right now.
+   * Read-only: nothing is saved and the scoring service is not called, so it
+   * needs no assessment consent. Declared inputs are omitted; the merchant
+   * edits those in the Additional Information form.
+   */
+  async preview(
+    merchantId: string,
+    to = new Date(),
+  ): Promise<CreditInputPreview> {
+    const from = new Date(
+      to.getTime() - CREDIT_EVIDENCE_WINDOW_DAYS * 86_400_000,
+    );
+    const input = await this.build(merchantId, to, from);
+    return {
+      asOfDate: input.asOfDate,
+      evidenceWindow: input.evidenceWindow,
+      inputs: Object.keys(input.values)
+        .filter((key) => !DECLARED_INPUTS.has(key))
+        .map((key) => {
+          const value = input.values[key] ?? null;
+          return {
+            key,
+            value:
+              typeof value === 'number' || typeof value === 'string'
+                ? value
+                : null,
+            provenance: input.provenance[key] ?? 'unavailable',
+            missingReason:
+              value === null ? (input.missingReasons[key] ?? null) : null,
+          };
+        }),
+      integritySummary: input.integritySummary,
     };
   }
   async assess(merchantId: string, to: Date, from: Date, experimental = false) {

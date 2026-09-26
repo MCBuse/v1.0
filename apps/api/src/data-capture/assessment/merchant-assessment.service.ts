@@ -1,5 +1,8 @@
 import { publicCreditSnapshot } from '../../credit-assessment/scoring-client';
-import { CreditEvidenceService } from '../../credit-assessment/credit-evidence.service';
+import {
+  CREDIT_EVIDENCE_WINDOW_DAYS,
+  CreditEvidenceService,
+} from '../../credit-assessment/credit-evidence.service';
 import type { CreditPublicResult } from '@repo/shared';
 import {
   BadRequestException,
@@ -19,7 +22,7 @@ import {
   type AssessmentResult,
 } from './assessment-model';
 
-const EVIDENCE_WINDOW_DAYS = 90;
+const EVIDENCE_WINDOW_DAYS = CREDIT_EVIDENCE_WINDOW_DAYS;
 
 export interface SavedAssessment {
   id: string;
