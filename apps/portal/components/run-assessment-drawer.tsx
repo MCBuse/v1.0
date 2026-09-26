@@ -239,7 +239,7 @@ function AssessmentForm({
           {inputs.data ? (
             <>
               <p className="text-sm text-slate-600">
-                Calculated from your records for{" "}
+                Calculated from your MCBuse payments and recorded cash sales for{" "}
                 {DATE.format(new Date(inputs.data.evidenceWindow.from))} –{" "}
                 {DATE.format(new Date(inputs.data.evidenceWindow.to))}. These
                 can&apos;t be edited. Anything unavailable stays missing and is

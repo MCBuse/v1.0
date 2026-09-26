@@ -23,6 +23,15 @@ import { euroMajor, validateCreditProfile } from './credit-profile';
 export const PILOT_CONSENT = 'credit_pilot_assessment';
 /** Days of activity every merchant assessment reads, shared by preview and run. */
 export const CREDIT_EVIDENCE_WINDOW_DAYS = 90;
+/** Inputs calculated from recorded sales: verified digital payments plus merchant-recorded cash. */
+const SALES_INPUTS: ReadonlySet<string> = new Set([
+  'active_day_ratio',
+  'finalized_payments',
+  'avg_txn_value_eur',
+  'cv_txn_value',
+  'verified_sales_eur',
+  'revenue_trend_slope_pct',
+]);
 /** Model inputs the merchant declares; everything else is derived from activity. */
 const DECLARED_INPUTS: ReadonlySet<string> = new Set([
   'merchant_type',
@@ -182,7 +191,11 @@ export class CreditEvidenceService {
             ),
           ),
         this.db
-          .select({ id: s.merchantCashSales.id })
+          .select({
+            id: s.merchantCashSales.id,
+            amountMinor: s.merchantCashSales.amountMinor,
+            occurredAt: s.merchantCashSales.occurredAt,
+          })
           .from(s.merchantCashSales)
           .where(
             and(
@@ -204,31 +217,51 @@ export class CreditEvidenceService {
             ),
           ),
       ]);
-    // All finalized payments are disclosed, but only live EUR payments supply financial inputs.
+    // Digital sales: live EUR MCBuse payments only; test and devnet payments
+    // are not real sales. They also drive the payment-reliability inputs.
     const tx = allTransactions.filter(
       (t) => t.evidenceEnvironment === 'live' && t.displayCurrency === 'EUR',
     );
-    const amounts = tx.map((t) => euroMajor(t.displayAmountMinor));
+    // Sales inputs combine those payments with merchant-recorded cash sales
+    // (decision 2026-09-26). Cash stays labelled as merchant-recorded in the
+    // provenance; voided cash sales are already excluded by the query.
+    const recordedSales = [
+      ...tx.map((t) => ({
+        occurredAt: t.occurredAt,
+        amountMinor: t.displayAmountMinor,
+      })),
+      ...cash.map((c) => ({
+        occurredAt: c.occurredAt,
+        amountMinor: c.amountMinor,
+      })),
+    ].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+    const amounts = recordedSales.map((t) => euroMajor(t.amountMinor));
     const safe = amounts.every((v) => v !== null);
     const nums = amounts.filter((v): v is number => v !== null);
-    const totalMinor = tx.reduce((a, t) => a + t.displayAmountMinor, 0n);
+    const totalMinor = recordedSales.reduce((a, t) => a + t.amountMinor, 0n);
     const sales = safe ? euroMajor(totalMinor) : null;
-    const mean = sales !== null && tx.length ? sales / tx.length : null;
-    const observed = tx[0]
-      ? merchantCalendarDaySpan(tx[0].occurredAt, to, merchant.timezone)
+    const mean =
+      sales !== null && recordedSales.length
+        ? sales / recordedSales.length
+        : null;
+    const firstSale = recordedSales[0];
+    const observed = firstSale
+      ? merchantCalendarDaySpan(firstSale.occurredAt, to, merchant.timezone)
       : 0;
     const active = new Set(
-      tx.map((t) => merchantLocalDateKey(t.occurredAt, merchant.timezone)),
+      recordedSales.map((t) =>
+        merchantLocalDateKey(t.occurredAt, merchant.timezone),
+      ),
     ).size;
     const daily: Record<string, number> = {};
-    for (const t of tx) {
+    for (const t of recordedSales) {
       const k = merchantLocalDateKey(t.occurredAt, merchant.timezone);
-      daily[k] = (daily[k] ?? 0) + (euroMajor(t.displayAmountMinor) ?? 0);
+      daily[k] = (daily[k] ?? 0) + (euroMajor(t.amountMinor) ?? 0);
     }
     const dailyValues: number[] = [];
-    if (tx[0]) {
+    if (firstSale) {
       const first = Date.parse(
-        merchantLocalDateKey(tx[0].occurredAt, merchant.timezone),
+        merchantLocalDateKey(firstSale.occurredAt, merchant.timezone),
       );
       const end = Date.parse(merchantLocalDateKey(to, merchant.timezone));
       for (let d = first; d <= end; d += 86400000)
@@ -242,7 +275,7 @@ export class CreditEvidenceService {
       merchant_type: profile.merchantType ?? null,
       commencement_date: profile.commencementDate ?? null,
       active_day_ratio: observed ? (active / observed) * 100 : null,
-      finalized_payments: tx.length,
+      finalized_payments: recordedSales.length,
       avg_txn_value_eur: mean,
       cv_txn_value:
         mean && safe
@@ -296,6 +329,12 @@ export class CreditEvidenceService {
       if (typeof values[key] === 'number' && values[key] > 100)
         values[key] = null;
     const declared = DECLARED_INPUTS;
+    const salesProvenance =
+      tx.length && cash.length
+        ? 'mcbuse_live_payments_and_merchant_cash'
+        : cash.length
+          ? 'merchant_recorded_cash'
+          : 'mcbuse_live_payments';
     const provenance = Object.fromEntries(
       Object.keys(values).map((k) => [
         k,
@@ -303,12 +342,14 @@ export class CreditEvidenceService {
           ? 'unavailable'
           : declared.has(k)
             ? 'merchant_declared'
-            : k.includes('quality') ||
-                k === 'finality' ||
-                k.includes('exception') ||
-                k.includes('critical')
-              ? 'mcbuse_processing_records'
-              : 'mcbuse_live_payments',
+            : SALES_INPUTS.has(k)
+              ? salesProvenance
+              : k.includes('quality') ||
+                  k === 'finality' ||
+                  k.includes('exception') ||
+                  k.includes('critical')
+                ? 'mcbuse_processing_records'
+                : 'mcbuse_live_payments',
       ]),
     );
     const missingReasons: Record<string, string> = {
@@ -321,12 +362,14 @@ export class CreditEvidenceService {
       if (v === null && !missingReasons[k])
         missingReasons[k] = declared.has(k)
           ? 'Not provided in the business credit profile.'
-          : 'Insufficient compatible verified records in the evidence period.';
+          : SALES_INPUTS.has(k)
+            ? 'Not enough recorded sales in the evidence period.'
+            : 'Insufficient compatible verified records in the evidence period.';
     const integritySummary = [
-      `${tx.length} live verified payments; ${allTransactions.length - tx.length} other-environment or non-EUR payments excluded from financial inputs.`,
+      `${tx.length} live verified payments and ${cash.length} merchant-recorded cash sales used for sales inputs; ${allTransactions.length - tx.length} test, other-environment or non-EUR payments excluded.`,
       `${active} active days across ${observed} observed days.`,
       `${crit} unresolved critical exceptions raised in this period; ${exceptions.filter((e) => e.status === 'resolved').length} resolved exceptions.`,
-      `${cash.length} declared cash sales and ${imports.length} imported batches are disclosed separately and excluded from verified sales.`,
+      `Cash sales are merchant-recorded, not independently verified. ${imports.length} imported batches are disclosed separately and excluded from sales inputs.`,
     ];
     return {
       values,

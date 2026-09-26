@@ -22,10 +22,10 @@ export function stageLabel(stage: string | null | undefined) {
 /** Plain-language names for George's activity-derived model inputs. */
 const INPUT_LABELS: Record<string, string> = {
   active_day_ratio: "Days with sales (%)",
-  finalized_payments: "Verified payments",
-  avg_txn_value_eur: "Average payment (EUR)",
-  cv_txn_value: "Payment size variability",
-  verified_sales_eur: "Verified sales (EUR)",
+  finalized_payments: "Recorded sales",
+  avg_txn_value_eur: "Average sale (EUR)",
+  cv_txn_value: "Sale size variability",
+  verified_sales_eur: "Recorded sales value (EUR)",
   exception_rate: "Payment exception rate (%)",
   critical_unresolved_ratio: "Unresolved critical exceptions (%)",
   retry_success_rate: "Retry success rate (%)",

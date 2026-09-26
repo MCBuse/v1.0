@@ -40,7 +40,9 @@ type MissingGroup = "declared" | "payments" | "system";
 /** Sorts a missing input by why it is missing, so each group gets one clear next step. */
 function missingGroup(reason: string): MissingGroup {
   if (/not provided in the business credit profile/i.test(reason)) return "declared";
-  if (/insufficient compatible verified records/i.test(reason)) return "payments";
+  // "Not enough recorded sales…" since cash counts (2026-09-26); older saved
+  // assessments still carry the "verified records" wording.
+  if (/not enough recorded sales|insufficient compatible verified records/i.test(reason)) return "payments";
   return "system";
 }
 
@@ -50,8 +52,8 @@ const GROUP_COPY: Record<MissingGroup, { title: string; hint: string }> = {
     hint: "Fill them in under Additional information the next time you run a credit assessment.",
   },
   payments: {
-    title: "These build up as you take payments",
-    hint: "They're calculated from verified payments taken through MCBuse in this period. Cash sales you record yourself aren't counted.",
+    title: "These build up as you record sales",
+    hint: "They're calculated from your MCBuse payments and the cash sales you record in this period. Payment reliability figures use MCBuse payments only.",
   },
   system: {
     title: "Not measured yet",

@@ -57,7 +57,7 @@ test('one Run assessment saves changed information, runs the assessment and crea
  const drawer=page.getByRole('dialog',{name:'Run credit assessment'});
  // Section one: what George's inputs look like from recorded activity, missing ones named.
  await expect(drawer.getByRole('heading',{name:'From your business activity'})).toBeVisible();
- await expect(drawer.getByText('Verified payments',{exact:true})).toBeVisible();
+ await expect(drawer.getByText('Recorded sales',{exact:true})).toBeVisible();
  await expect(drawer.getByText('1 of 2 available')).toBeVisible();
  await expect(drawer.getByText('Verified supplier spending is not connected.')).toBeVisible();
  // Section two: the merchant's Additional Information, prefilled.

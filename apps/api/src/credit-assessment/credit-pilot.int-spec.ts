@@ -362,6 +362,36 @@ describe('private Python scoring and staff access (integration)', () => {
       'integrity_review',
     );
   });
+  it('counts merchant-recorded cash sales in the sales inputs and skips voided ones', async () => {
+    // A window with no card payments from the earlier cases, so only cash counts.
+    const to = new Date('2027-03-01T12:00:00Z');
+    const from = new Date(to.getTime() - 90 * 86400000);
+    for (const [days, minor, status] of [
+      [-2, 300, 'recorded'],
+      [-1, 450, 'recorded'],
+      [-1, 99900, 'voided'],
+    ] as const) {
+      await db.insert(s.merchantCashSales).values({
+        merchantId: one.merchantId,
+        receiptNumber: `CS${randomUUID().slice(0, 20)}`,
+        amountMinor: BigInt(minor),
+        occurredAt: new Date(to.getTime() + days * 86400000),
+        status,
+        actorUserId: one.userId,
+        idempotencyKey: randomUUID(),
+      });
+    }
+    const built = await evidence.build(one.merchantId, to, from);
+    expect(built.values.finalized_payments).toBe(2);
+    expect(built.values.verified_sales_eur).toBe(7.5);
+    expect(built.values.avg_txn_value_eur).toBe(3.75);
+    expect(built.provenance.verified_sales_eur).toBe('merchant_recorded_cash');
+    expect(built.integritySummary[0]).toContain(
+      '2 merchant-recorded cash sales used for sales inputs',
+    );
+    // Payment-reliability inputs still come only from digital payments.
+    expect(built.values.capture_quality).toBeNull();
+  });
   it('revocation takes effect without a new login', async () => {
     await db
       .update(s.staffPermissions)
