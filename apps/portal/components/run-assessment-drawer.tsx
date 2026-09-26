@@ -60,7 +60,7 @@ export function RunAssessmentDrawer({
       <DrawerTrigger asChild>
         <Button disabled={!merchantId}>Run credit assessment</Button>
       </DrawerTrigger>
-      <DrawerContent className="h-dvh w-full overflow-hidden rounded-none sm:max-w-2xl">
+      <DrawerContent className="h-dvh w-full overflow-hidden rounded-none sm:min-w-4xl">
         <DrawerHeader className="relative border-b border-slate-200 pr-16">
           <DrawerTitle>Run credit assessment</DrawerTitle>
           <DrawerDescription>

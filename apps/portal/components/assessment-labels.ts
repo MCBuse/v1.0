@@ -34,6 +34,20 @@ const INPUT_LABELS: Record<string, string> = {
   capture_quality_trend: "Capture quality trend",
   revenue_trend_slope_pct: "Sales trend (%)",
   estimated_margin_pct: "Estimated margin (%)",
+  // Declared in Additional information; wording matches that form.
+  merchant_type: "Merchant category",
+  commencement_date: "Business commencement date",
+  existing_debt_to_sales: "Existing debt compared with sales (%)",
+  loan_amount_eur: "Requested loan amount (EUR)",
+  loan_term_months: "Requested loan term (months)",
+  inventory_value_eur: "Declared inventory value (EUR)",
+  collateral_value_eur: "Declared collateral value (EUR)",
+  business_debts_eur: "Business debts (EUR)",
+  business_assets_eur: "Business assets (EUR)",
+  owner_personal_assets_eur: "Owner personal assets (EUR)",
+  owner_personal_debts_eur: "Owner personal debts (EUR)",
+  external_bureau_score: "External bureau score",
+  external_bureau_report: "Bureau report notes",
 };
 
 /** Formats an input value for display; `null` stays explicitly unavailable. */
@@ -59,4 +73,16 @@ export function fieldLabel(key: string) {
     .toLowerCase()
     .replace(/ pct$/, " (%)");
   return capitalise(words);
+}
+
+/** Badge tone for a saved assessment stage. */
+export function stageTone(
+  stage: string | null | undefined,
+): "success" | "warning" | "info" | "neutral" {
+  if (stage === "financial_profile_available" || stage === "evidence_ready")
+    return "success";
+  if (stage === "consent_required" || stage === "integrity_review")
+    return "warning";
+  if (stage) return "info";
+  return "neutral";
 }

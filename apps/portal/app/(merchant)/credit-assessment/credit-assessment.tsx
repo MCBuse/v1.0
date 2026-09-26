@@ -82,20 +82,28 @@ export function CreditAssessment() {
       </div>
 
       <Card>
-        <CardHeader>
-          <h2 className="font-semibold text-slate-950">Latest assessment</h2>
-        </CardHeader>
-        <CardContent>
-          {current ? (
-            <SavedAssessmentDetail assessment={current} />
-          ) : (
-            <p className="text-sm text-slate-600">
-              {history.loading
-                ? "Loading assessments…"
-                : "No assessment yet. Select Run credit assessment to get started."}
-            </p>
-          )}
-        </CardContent>
+        {current ? (
+          <CardContent className="py-6">
+            <SavedAssessmentDetail
+              assessment={current}
+              title={selected && selected.id !== history.data?.assessments[0]?.id ? "Selected assessment" : "Latest assessment"}
+              titleAs="h2"
+            />
+          </CardContent>
+        ) : (
+          <>
+            <CardHeader>
+              <h2 className="font-semibold text-slate-950">Latest assessment</h2>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-slate-600">
+                {history.loading
+                  ? "Loading assessments…"
+                  : "No assessment yet. Select Run credit assessment to get started."}
+              </p>
+            </CardContent>
+          </>
+        )}
       </Card>
 
       <Card>

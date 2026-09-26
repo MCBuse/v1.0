@@ -16,7 +16,7 @@ test('assessment retries retain their intent after a lost response and page refr
  await page.route('**/api/merchant/me/assessments',route=>{if(route.request().method()==='GET')return route.fallback();expect(route.request().postDataJSON().modelId).toBe('george-financial-profile-v1');const key=route.request().headers()['idempotency-key'];if(!key)throw new Error('Missing assessment idempotency key');keys.push(key);return keys.length===1?route.abort():route.fulfill({json:latest});});
  await page.goto('/credit-assessment');await page.getByRole('button',{name:'Run credit assessment',exact:true}).click();await page.getByRole('button',{name:'Run assessment',exact:true}).click();await expect(page.getByRole('button',{name:'Run assessment',exact:true})).toBeEnabled();
  await page.reload();await page.getByRole('button',{name:'Run credit assessment',exact:true}).click();await page.getByRole('button',{name:'Run assessment',exact:true}).click();await expect.poll(()=>keys.length).toBe(2);expect(keys[1]).toBe(keys[0]);
- await expect(page.getByText('Status: More information needed')).toBeVisible();await expect(page.getByText('george-financial-profile-v1', {exact:false})).toHaveCount(0);
+ await expect(page.getByText('More information needed', {exact:true}).first()).toBeVisible();await expect(page.getByText('george-financial-profile-v1', {exact:false})).toHaveCount(0);
 });
 test('Finance Match defaults visibly to latest and packages the explicitly selected older assessment',async({page},testInfo)=>{
  let selected='';
@@ -28,7 +28,7 @@ test('Finance Match defaults visibly to latest and packages the explicitly selec
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  await page.screenshot({path:`/tmp/mcbuse-demo-finance-${testInfo.project.name}.png`,fullPage:true});
  await page.getByLabel('Saved assessment').selectOption(older.id);await page.getByRole('button',{name:'7 days',exact:true}).click();await page.getByRole('button',{name:'Generate and preview'}).click();
- await expect(page.getByText('Older saved shop')).toBeVisible();expect(selected).toBe(older.id);await expect(page.getByText('Period covered', {exact:true})).toBeVisible();
+ await expect(page.getByText('Older saved shop')).toBeVisible();expect(selected).toBe(older.id);await expect(page.getByText('How this assessment was made', {exact:true})).toBeVisible();
  await expect(page.getByTitle('Immutable financial evidence PDF')).toHaveAttribute('src',/preview=true/);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
