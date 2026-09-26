@@ -2,10 +2,27 @@ import os
 import secrets
 from contextlib import asynccontextmanager
 from datetime import date
+from pathlib import Path
 from typing import Annotated
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from .engine import MODEL, MODEL_HASH, evaluate
+
+
+def load_local_env(path: Path | None = None) -> None:
+    """Load the scorer's local token without overriding a deployed secret."""
+    env_path = path or Path(__file__).resolve().parents[1] / '.env'
+    if not env_path.is_file():
+        return
+    for line in env_path.read_text(encoding='utf-8').splitlines():
+        key, separator, value = line.strip().partition('=')
+        if key == 'CREDIT_SCORING_TOKEN' and separator and value:
+            os.environ.setdefault(key, value.strip().strip('"').strip("'"))
+            return
+
+
+load_local_env()
+
 
 @asynccontextmanager
 async def lifespan(app):

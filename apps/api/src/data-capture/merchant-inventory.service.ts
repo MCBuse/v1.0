@@ -19,6 +19,7 @@ import type {
 import { randomUUID } from 'crypto';
 import {
   and,
+  asc,
   count,
   desc,
   eq,
@@ -104,13 +105,18 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
         )!,
       );
     }
+    if (filters.source === 'manual' || filters.source === 'imported') {
+      const imported = sql`exists (select 1 from ${schema.merchantProductSourceMappings} where ${schema.merchantProductSourceMappings.productId} = ${schema.merchantProducts.id} and ${schema.merchantProductSourceMappings.merchantId} = ${merchant.merchantId})`;
+      conditions.push(filters.source === 'imported' ? imported : sql`not ${imported}`);
+    }
     const where = and(...conditions);
     const [rows, totals] = await Promise.all([
       this.db
         .select()
         .from(schema.merchantProducts)
         .where(where)
-        .orderBy(desc(schema.merchantProducts.updatedAt))
+        // Stable order: stock changes bump updatedAt and must not move a row between pages.
+        .orderBy(asc(sql`lower(${schema.merchantProducts.name})`), asc(schema.merchantProducts.id))
         .limit(pageSize)
         .offset((page - 1) * pageSize),
       this.db

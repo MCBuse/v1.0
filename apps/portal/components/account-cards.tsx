@@ -70,9 +70,20 @@ type FlowKind = "funding" | "transfer" | "withdrawal" | null;
  * the euro figure is always presented as a conversion with its timestamp,
  * never as a balance the merchant is owed in euro.
  */
-export function AccountCards() {
+type AccountsResource = ReturnType<typeof useAccountsData>["summary"];
+type OperationsResource = ReturnType<typeof useAccountsData>["operations"];
+
+/** One fetch for every accounts-backed panel on the Payment page. */
+export function useAccountsData() {
   const summary = usePortalResource<AccountsSummary>("", 15_000, accountsFetcher);
   const operations = usePortalResource<AccountOperationsPage>("operations", 5000, accountsFetcher);
+  return { summary, operations };
+}
+
+/**
+ * A.1–A.10 — the two accounts, their money actions, and how money is held.
+ */
+export function AccountsBlock({ summary }: { summary: AccountsResource }) {
   const [flow, setFlow] = useState<FlowKind>(null);
   const [custodyOpen, setCustodyOpen] = useState(false);
 
@@ -112,10 +123,10 @@ export function AccountCards() {
       </Card>
     );
 
-  const { accounts, today, custody } = summary.data;
+  const { accounts, custody } = summary.data;
 
   return (
-    <section className="grid gap-4" aria-label="Accounts">
+    <div className="grid gap-4">
       {summary.error ? (
         <Alert className="border-amber-200 bg-amber-50 text-amber-900">
           These figures were last updated successfully a moment ago; the most
@@ -142,47 +153,6 @@ export function AccountCards() {
           />
         ))}
       </div>
-
-      <Card><CardHeader><h2 className="font-semibold">Money movement status</h2></CardHeader><CardContent>
-        {operations.error ? <p role="alert">{operations.error.message}</p> : null}
-        {operations.data?.operations.slice(0, 15).map(op => <div key={op.id} className="border-b py-3 text-sm">
-          <p>{op.kind.replaceAll('_', ' ')} · {op.amountCents ? money(op.amountCents) : '—'}</p>
-          <p>{op.status === 'reversed' ? 'Refund / return completed' : op.status === 'compensating' ? `Refund / return ${op.refundStatus ?? 'pending'}` : op.status.replaceAll('_', ' ')}</p>
-          {op.needsAttention ? <p className="text-amber-800">Recovery needs attention. Reference: {op.id}</p> : null}
-          {op.nextAttemptAt ? <p className="text-slate-500">Next check: {when(op.nextAttemptAt)}</p> : null}
-        </div>)}
-      </CardContent></Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <h2 className="font-semibold">Today</h2>
-          <Badge tone="info">{today.businessDate}</Badge>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Digital receipts today
-            </p>
-            <p className="mt-1 font-mono text-xl tabular-nums text-slate-950">
-              {money(today.digitalReceiptsCents)}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {today.digitalReceiptCount} received · {today.timezone}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Cash recorded today
-            </p>
-            <p className="mt-1 font-mono text-xl tabular-nums text-slate-950">
-              {money(today.cashRecordedCents, "EUR")}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {today.cashRecordedCount} recorded
-            </p>
-          </div>
-          <p className="sm:col-span-2 text-sm text-slate-600">{today.note}</p>
-        </CardContent>
-      </Card>
 
       <div>
         <Button variant="ghost" size="sm" onClick={() => setCustodyOpen(true)}>
@@ -232,7 +202,61 @@ export function AccountCards() {
       </Drawer>
 
       <MoneyFlowDrawer kind={flow} onClose={() => setFlow(null)} onDone={onDone} />
-    </section>
+    </div>
+  );
+}
+
+/** Today's digital receipts and recorded cash, kept apart from what is spendable. */
+export function ProcessedPaymentsCard({ summary }: { summary: AccountsResource }) {
+  if (!summary.data) return null;
+  const { today } = summary.data;
+  return (
+      <Card className="h-full">
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <h3 className="font-semibold">Processed payments</h3>
+          <Badge tone="info">{today.businessDate}</Badge>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-500">
+              Digital receipts today
+            </p>
+            <p className="mt-1 font-mono text-xl tabular-nums text-slate-950">
+              {money(today.digitalReceiptsCents)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {today.digitalReceiptCount} received · {today.timezone}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-500">
+              Cash recorded today
+            </p>
+            <p className="mt-1 font-mono text-xl tabular-nums text-slate-950">
+              {money(today.cashRecordedCents, "EUR")}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {today.cashRecordedCount} recorded
+            </p>
+          </div>
+          <p className="sm:col-span-2 text-sm text-slate-600">{today.note}</p>
+        </CardContent>
+      </Card>
+  );
+}
+
+export function MoneyMovementCard({ operations }: { operations: OperationsResource }) {
+  return (
+      <Card className="h-full"><CardHeader><h3 className="font-semibold">Money movement status</h3></CardHeader><CardContent>
+        {operations.error ? <p role="alert">{operations.error.message}</p> : null}
+        {operations.data && !operations.data.operations.length ? <p className="text-sm text-slate-500">No money movements yet.</p> : null}
+        {operations.data?.operations.slice(0, 15).map(op => <div key={op.id} className="border-b py-3 text-sm">
+          <p>{op.kind.replaceAll('_', ' ')} · {op.amountCents ? money(op.amountCents) : '—'}</p>
+          <p>{op.status === 'reversed' ? 'Refund / return completed' : op.status === 'compensating' ? `Refund / return ${op.refundStatus ?? 'pending'}` : op.status.replaceAll('_', ' ')}</p>
+          {op.needsAttention ? <p className="text-amber-800">Recovery needs attention. Reference: {op.id}</p> : null}
+          {op.nextAttemptAt ? <p className="text-slate-500">Next check: {when(op.nextAttemptAt)}</p> : null}
+        </div>)}
+      </CardContent></Card>
   );
 }
 
@@ -288,7 +312,7 @@ function AccountPanel({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {account.actions.map((label) => {
+          {account.actions.filter((label) => label !== "Pay").map((label) => {
             const Icon = ACTION_ICON[label] ?? Plus;
             return (
               <Button

@@ -80,42 +80,6 @@ function accountsSummary(
   };
 }
 
-function dayEndView(movedCents = "0") {
-  return {
-    businessDate: "2026-09-21",
-    timezone: "Europe/Berlin",
-    routine: { availableCents: "48000", pendingCents: "2500" },
-    today: {
-      digitalReceiptsCents: "32000",
-      digitalReceiptCount: 7,
-      cashRecordedMinor: "9500",
-      cashRecordedCurrency: "EUR",
-      cashRecordedCount: 3,
-    },
-    previousTransfers:
-      movedCents === "0"
-        ? []
-        : [
-            {
-              operationId: "op-day-end",
-              amountCents: movedCents,
-              status: "finalized",
-              confirmedAt: "2026-09-21T17:00:00.000Z",
-              chainSignature: "sig-day-end",
-              actorUserId: "user-9",
-            },
-          ],
-    suggestion: {
-      amountCents: "32000",
-      cappedBy: "todays_receipts",
-      explanation:
-        "Capped by today's digital receipts, which are lower than the available balance.",
-    },
-    cashNote:
-      "Cash is recorded for your records and is not part of this transfer: it has no digital balance to move.",
-  };
-}
-
 const payoutDestinations = {
   configured: true,
   payoutsEnabled: true,
@@ -156,13 +120,6 @@ test.beforeEach(async ({ context, page }) => {
       body: JSON.stringify(payoutDestinations),
     }),
   );
-  await page.route("**/api/accounts/day-end**", (route) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    return route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify(dayEndView()),
-    });
-  });
   await page.route("**/api/accounts/", (route) => {
     if (route.request().method() !== "GET") return route.fallback();
     return route.fulfill({
@@ -242,7 +199,8 @@ test("A.6 — the actions are named as the plan names them", async ({ page }) =>
   await page.goto("/payment");
   await expect(page.getByRole("button", { name: "Add money" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Withdraw" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Pay" })).toBeVisible();
+  // Routine offers Move money only; payments are taken under Process payments.
+  await expect(page.getByRole("button", { name: "Pay" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Move money" })).toHaveCount(2);
 });
 
@@ -356,66 +314,17 @@ test("an amount of zero is refused before anything is sent", async ({
   expect(sent).toBe(0);
 });
 
-test("E.1–E.7 — the day-end panel shows the figures and the limit that bound them", async ({
-  page,
-}) => {
+test("Payment is four blocks and has no End of day block", async ({ page }) => {
   await page.goto("/payment");
-
-  const dayEnd = page.getByRole("region", { name: "End of day" });
-  await expect(dayEnd.getByRole("heading", { name: "End of day" })).toBeVisible();
-  await expect(
-    dayEnd.getByText("Today's digital receipts", { exact: true }),
-  ).toBeVisible();
-  await expect(dayEnd.getByText("Available in Routine")).toBeVisible();
-  await expect(dayEnd.getByText("Cash recorded today")).toBeVisible();
-  await expect(dayEnd.getByText("€95.00")).toBeVisible();
-  await expect(
-    dayEnd.getByText("Capped by today's digital receipts", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    dayEnd.getByText("Cash is recorded for your records", { exact: false }),
-  ).toBeVisible();
-});
-
-test("E.5 — the suggested amount is editable and the merchant's number is sent", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "one submission proof is enough");
-
-  const bodies: unknown[] = [];
-  await page.route("**/api/accounts/day-end", (route) => {
-    if (route.request().method() === "GET")
-      return route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify(dayEndView()),
-      });
-    bodies.push(JSON.parse(route.request().postData() ?? "{}"));
-    return route.fulfill({
-      status: 201,
-      contentType: "application/json",
-      body: JSON.stringify({
-        operationId: "op-day-end",
-        status: "reserved",
-        amountCents: "10000",
-        replayed: false,
-      }),
-    });
-  });
-
-  await page.goto("/payment");
-  const amount = page.getByLabel("Amount to move");
-  await expect(amount).toHaveValue("320.00");
-  await amount.fill("100.00");
-  await page.getByRole("button", { name: "Move to Holding" }).click();
-
-  await expect.poll(() => bodies.length).toBe(1);
-  expect(bodies[0]).toEqual({
-    amountCents: "10000",
-    businessDate: "2026-09-21",
-  });
-  await expect(
-    page.getByText("US$100.00 is moving from Routine to Holding"),
-  ).toBeVisible();
+  for (const name of ["Accounts", "Process payments", "Today's payment activity", "Transactions data"])
+    await expect(page.getByRole("heading", { level: 2, name, exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "End of day" })).toHaveCount(0);
+  const today = page.getByRole("region", { name: "Today's payment activity" });
+  for (const name of ["Processed payments", "Money movement status", "On the counter", "Fast payment requests"])
+    await expect(today.getByRole("heading", { name })).toBeVisible();
+  const data = page.getByRole("region", { name: "Transactions data" });
+  await expect(data.getByRole("link", { name: "Transactions" })).toHaveAttribute("href", "/analytics/transactions");
+  await expect(data.getByRole("link", { name: "Receipts" })).toHaveAttribute("href", "/analytics/transactions#receipts");
 });
 
 test("a failed accounts read says so instead of showing zero balances", async ({

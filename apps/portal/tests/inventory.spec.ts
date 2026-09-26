@@ -72,14 +72,25 @@ async function mockInventory(page: Page, initial: Product[] = []) {
     const method = request.method();
 
     if (method === "GET") {
+      // Mirrors the API: source/status/query filters, name order, offset pages.
+      const source = url.searchParams.get("source") ?? "all";
+      const status = url.searchParams.get("status") ?? "all";
+      const term = (url.searchParams.get("query") ?? "").toLowerCase();
+      const pageNumber = Number(url.searchParams.get("page") ?? 1);
+      const pageSize = Number(url.searchParams.get("pageSize") ?? 30);
+      const matching = products
+        .filter((p) => source === "all" || (source === "imported") === Boolean(p.sourceNames?.length))
+        .filter((p) => status === "all" || p.status === status)
+        .filter((p) => !term || p.name.toLowerCase().includes(term) || (p.sku ?? "").toLowerCase().includes(term))
+        .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
       return route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
-          items: products,
-          page: 1,
-          pageSize: 100,
-          totalItems: products.length,
-          totalPages: 1,
+          items: matching.slice((pageNumber - 1) * pageSize, pageNumber * pageSize),
+          page: pageNumber,
+          pageSize,
+          totalItems: matching.length,
+          totalPages: Math.max(1, Math.ceil(matching.length / pageSize)),
         }),
       });
     }
@@ -257,7 +268,11 @@ test("edits a product in the same drawer", async ({ page }) => {
   await mockInventory(page, [makeProduct()]);
   await page.goto("/inventory");
 
-  await page.getByRole("button", { name: "Edit" }).click();
+  const more = page.getByRole("button", { name: "More actions for Coffee Candy" });
+  await more.click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   const drawer = page.getByRole("dialog");
   await expect(
     drawer.getByRole("heading", { name: "Edit product" }),
@@ -274,6 +289,21 @@ test("edits a product in the same drawer", async ({ page }) => {
   await expect(page.getByText("102 on hand · 0 reserved")).toBeVisible();
 });
 
+test("keeps secondary row actions in a keyboard-operable menu", async ({ page }) => {
+  await mockInventory(page, [makeProduct()]);
+  await page.goto("/inventory");
+  await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
+  const more = page.getByRole("button", { name: "More actions for Coffee Candy" });
+  await more.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", { name: "Restock +1" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", { name: "Edit" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(more).toBeFocused();
+});
+
 test("separates manual and imported inventory and keeps analytics in Analytics", async ({ page }, testInfo) => {
   await mockInventory(page, [
     makeProduct(),
@@ -285,9 +315,11 @@ test("separates manual and imported inventory and keeps analytics in Analytics",
   await expect(page.getByRole("heading", { name: "Coffee Candy" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Imported Beans" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Inventory analytics" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Imported inventory" }).click();
-  await expect(page.getByRole("button", { name: "Manual inventory" })).toHaveClass(/bg-white/);
-  await expect(page.getByRole("button", { name: "Imported inventory" })).toHaveClass(/bg-blue-600/);
+  await expect(page.getByRole("tab", { name: "Manual inventory" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Imported inventory" }).click();
+  await expect(page.getByRole("tab", { name: "Manual inventory" })).toHaveAttribute("aria-selected", "false");
+  await expect(page.getByRole("tab", { name: "Imported inventory" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("button", { name: "Add product" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Imported Beans" })).toBeVisible();
   await expect(page.getByText("Imported from Supplier CSV")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Coffee Candy" })).toHaveCount(0);
@@ -305,4 +337,55 @@ test("keeps product management available when analytics is unavailable", async (
   await expect(page.getByRole("heading", { name: "Coffee Candy" })).toBeVisible();
   await page.getByRole("button", { name: "Add product" }).click();
   await expect(page.getByRole("dialog").getByLabel("Name *")).toBeVisible();
+});
+
+test("pages through a large catalogue and keeps the place in the URL", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one pagination proof is enough");
+  const many = Array.from({ length: 30 }, (_, i) =>
+    makeProduct({
+      id: `00000000-0000-4000-8000-${String(200 + i).padStart(12, "0")}`,
+      name: `Product ${String(i + 1).padStart(2, "0")}`,
+    }),
+  );
+  await mockInventory(page, many);
+  await page.goto("/inventory");
+
+  const pager = page.getByRole("navigation", { name: "Product pages" });
+  await expect(pager.getByText("1–25")).toBeVisible();
+  await expect(pager.getByText("30")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Product 25" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Product 26" })).toHaveCount(0);
+  await expect(pager.getByRole("button", { name: "Previous" })).toBeDisabled();
+
+  await pager.getByRole("button", { name: "Next" }).click();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(pager.getByText("26–30")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Product 26" })).toBeVisible();
+  await expect(pager.getByRole("button", { name: "Next" })).toBeDisabled();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Product 30" })).toBeVisible();
+
+  await page.getByRole("searchbox", { name: "Search products" }).fill("product 0");
+  await expect(page).toHaveURL(/q=product\+0/);
+  await expect(page).not.toHaveURL(/page=/);
+  await expect(page.getByRole("heading", { name: "Product 09" })).toBeVisible();
+  await expect(pager.getByText("1–9")).toBeVisible();
+  await expect(pager.getByRole("button", { name: "Next" })).toBeDisabled();
+
+  await page.getByRole("searchbox", { name: "Search products" }).fill("zzz");
+  await expect(page.getByText("No matching products")).toBeVisible();
+});
+
+test("remembers the selected tab across a reload", async ({ page }) => {
+  await mockInventory(page, [
+    makeProduct(),
+    makeProduct({ id: "00000000-0000-4000-8000-000000000102", name: "Imported Beans", sourceNames: ["Supplier CSV"] }),
+  ]);
+  await page.goto("/inventory");
+  await page.getByRole("tab", { name: "Imported inventory" }).click();
+  await expect(page).toHaveURL(/tab=imported/);
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "Imported inventory" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Imported Beans" })).toBeVisible();
 });

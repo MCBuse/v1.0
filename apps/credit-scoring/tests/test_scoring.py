@@ -1,14 +1,29 @@
 import json
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from fastapi.testclient import TestClient
-from scoring.app import app
+from scoring.app import app, load_local_env
 from scoring.engine import evaluate, MODEL
 ROOT=Path(__file__).resolve().parent
 CASES=json.loads((ROOT/'parity-inputs.json').read_text())
 EXPECTED=json.loads((ROOT/'html-expected.json').read_text())
 class ScoringTests(unittest.TestCase):
+ def test_local_env_loads_token_without_overriding_deployed_secret(self):
+  original=os.environ.pop('CREDIT_SCORING_TOKEN',None)
+  try:
+   with tempfile.TemporaryDirectory() as directory:
+    env_path=Path(directory)/'.env'
+    env_path.write_text('CREDIT_SCORING_TOKEN=local-token-that-has-at-least-32-characters\n')
+    load_local_env(env_path)
+    self.assertEqual(os.environ['CREDIT_SCORING_TOKEN'],'local-token-that-has-at-least-32-characters')
+    os.environ['CREDIT_SCORING_TOKEN']='deployed-token-that-has-at-least-32-characters'
+    load_local_env(env_path)
+    self.assertEqual(os.environ['CREDIT_SCORING_TOKEN'],'deployed-token-that-has-at-least-32-characters')
+  finally:
+   if original is None: os.environ.pop('CREDIT_SCORING_TOKEN',None)
+   else: os.environ['CREDIT_SCORING_TOKEN']=original
  def test_html_parity(self):
   for case, expected in zip(CASES,EXPECTED):
    with self.subTest(case=case):

@@ -28,17 +28,23 @@ export function usePortalResource<T>(
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
+  /** The path `data` was fetched from; differs from `path` while a new one loads. */
+  const [dataPath, setDataPath] = useState<string | null>(null);
   const active = useRef(true);
+  /** Latest requested path; responses for any other path are stale and dropped. */
+  const latestPath = useRef(path);
+  latestPath.current = path;
 
   const refresh = useCallback(async () => {
     try {
       const value = await fetcher(path);
-      if (!active.current) return;
+      if (!active.current || latestPath.current !== path) return;
       setData(value);
+      setDataPath(path);
       setError(null);
       setOffline(false);
     } catch (reason) {
-      if (!active.current) return;
+      if (!active.current || latestPath.current !== path) return;
       setError(reason instanceof Error ? reason : new Error("Request failed"));
       setOffline(!navigator.onLine || !(reason instanceof PortalApiError));
     } finally {
@@ -62,5 +68,5 @@ export function usePortalResource<T>(
     };
   }, [intervalMs, refresh]);
 
-  return { data, error, loading, offline, refresh };
+  return { data, dataPath, error, loading, offline, refresh };
 }
