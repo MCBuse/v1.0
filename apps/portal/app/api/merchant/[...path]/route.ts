@@ -20,7 +20,7 @@ const allowed = [
   /^me\/presented-request$/,
   /^me\/events$/,
   /^me\/events\/stream$/,
-  /^me\/products(?:\/[0-9a-f-]{36}(?:\/(?:image|stock-adjustments|analytics))?)?$/i,
+  /^me\/products(?:\/[0-9a-f-]{36}(?:\/(?:image|stock-adjustments))?)?$/i,
   /^me\/invoices(?:\/[0-9a-f-]{36}(?:\/cancel)?)?$/i,
   /^me\/consents$/,
   /^me\/evidence-readiness$/,

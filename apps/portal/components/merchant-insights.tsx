@@ -18,22 +18,13 @@ const tone = (
       ? "warning"
       : "info";
 
-export function MerchantInsightsPanel({
-  limit,
-  inventoryOnly = false,
-}: {
-  limit?: number;
-  inventoryOnly?: boolean;
-}) {
+/** Business insights for Deep analytics: every current insight, with freshness. */
+export function MerchantInsightsPanel() {
   const resource = usePortalResource<MerchantInsightsResponse>(
     "me/insights",
     60_000,
   );
-  const headingId = inventoryOnly
-    ? "inventory-insights"
-    : limit
-      ? "overview-insights"
-      : "analytics-insights";
+  const headingId = "analytics-insights";
 
   if (resource.loading && !resource.data) return <Skeleton className="h-40" />;
   const data = resource.data;
@@ -45,7 +36,7 @@ export function MerchantInsightsPanel({
     return (
       <section className="grid gap-3" aria-labelledby={headingId}>
         <h2 id={headingId} className="font-semibold text-slate-950">
-          {inventoryOnly ? "Inventory insights" : "Business insights"}
+          Business insights
         </h2>
         <Alert className="border-amber-200 bg-amber-50 text-amber-900">
           <p className="font-semibold">Insights could not be loaded.</p>
@@ -77,22 +68,7 @@ export function MerchantInsightsPanel({
         {data.message ?? "Business insights are being prepared."}
       </Alert>
     );
-  const matchingInsights = inventoryOnly
-    ? data.insights.filter(
-        (insight) =>
-          insight.kind === "stock_risk" ||
-          insight.evidence.some(
-            (fact) =>
-              fact.id.startsWith("product:") ||
-              fact.id.startsWith("category:") ||
-              fact.id.startsWith("stock."),
-          ),
-      )
-    : data.insights;
-  const insights =
-    typeof limit === "number"
-      ? matchingInsights.slice(0, limit)
-      : matchingInsights;
+  const insights = data.insights;
   const calculationPeriod =
     data.scope.periodFrom && data.scope.periodTo
       ? `${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(data.scope.periodFrom))} – ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(data.scope.periodTo))}`
@@ -102,7 +78,7 @@ export function MerchantInsightsPanel({
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 id={headingId} className="font-semibold text-slate-950">
-            {inventoryOnly ? "Inventory insights" : "Business insights"}
+            Business insights
           </h2>
           <p className="mt-1 text-xs text-slate-500">
             All recorded activity · {calculationPeriod} · Last updated{" "}
@@ -126,7 +102,12 @@ export function MerchantInsightsPanel({
           failed.
         </Alert>
       ) : null}
-      {data.backlog ? <p className="text-sm text-amber-800">Refresh {data.backlog.status} · queued for {data.backlog.ageSeconds}s{data.backlog.reason ? ` · ${data.backlog.reason}` : ''}</p> : null}
+      {data.backlog ? (
+        <p className="text-sm text-amber-800">
+          Refresh {data.backlog.status} · queued for {data.backlog.ageSeconds}s
+          {data.backlog.reason ? ` · ${data.backlog.reason}` : ""}
+        </p>
+      ) : null}
       {data.lastFailure ? (
         <Alert className="border-red-200 bg-red-50 text-red-800">
           <p className="font-semibold">
@@ -156,9 +137,8 @@ export function MerchantInsightsPanel({
       ) : (
         <Card>
           <CardContent className="py-5 text-sm text-slate-500">
-            {inventoryOnly
-              ? "No inventory changes or risks were detected in the latest calculation."
-              : "No material changes or risks were detected in the latest calculation."}
+            No material changes or risks were detected in the latest
+            calculation.
           </CardContent>
         </Card>
       )}

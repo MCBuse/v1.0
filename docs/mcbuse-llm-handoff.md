@@ -147,6 +147,8 @@ Keep source, verification, and environment separate in UI, APIs, exports, and ex
 - Synthetic fixture: demonstration data; label it and isolate it from production merchant data.
 - Unknown historical source/environment: retain as unknown. Do not infer or relabel it.
 
+Analytics and activity lists include every record regardless of environment (decision by Frederick, 2026-09-26): the former "Records"/environment filter was removed from the API and portal. Environment stays visible as a per-record provenance label; only the filter is gone. The Digital/Cash source filter remains.
+
 Do not add synthetic transactions to production to improve a demo, and do not wipe or reset existing data to make room for demo fixtures. Prefer verified records from an approved demo account. If those are inadequate, use an isolated, clearly labelled demo environment or present the data limitation honestly.
 
 ### Analytics claims
@@ -160,6 +162,7 @@ Deterministic calculations are authoritative for totals and evidence. AI narrati
 - `readiness-rules-v1` is evidence completeness/readiness, not a score or lending decision.
 - George's serving model may return a 0–100 financial profile only with its required fields. Missing inputs stay null/unavailable and are named.
 - The 300–850 experimental risk output is staff-only, uses synthetic training data, and lacks real repayment/default validation. Never expose it to merchants or lenders through exports.
+- **Cash sales count in the credit model's sales inputs** (decision by Frederick, 2026-09-26): days with sales, number of sales, average sale, sale-size variability, total sales and sales trend use live EUR MCBuse payments plus merchant-recorded cash (voided cash excluded). Their provenance says so (`mcbuse_live_payments_and_merchant_cash` / `merchant_recorded_cash`) and cash stays described as merchant-recorded, not independently verified. Test/devnet/synthetic payments and imported batches remain excluded; payment-reliability inputs (exception rate, capture quality, finality) and the `readiness-rules-v1` checklist still count MCBuse payments only. Model input names are unchanged (scoring contract).
 - Consent does not prove the evidence is accurate; confidence does not prove repayment ability.
 - Merchant assessment and finance artifacts should remain tied to the assessment and its dated input snapshot. Do not silently regenerate or change an older assessment when business information changes.
 - Avoid sensitive raw inputs in logs. Preserve server-side access checks, consent status/revocation behavior, and audit evidence when changing presentation.
@@ -215,12 +218,28 @@ The repository contains useful, dated evidence. It does not prove the live syste
 
 Some older hand-offs describe different branches or report that no release had occurred. In particular, [the revised merchant plan hand-off](revised-merchant-plan-handoff.md) is a dated snapshot from a separate workstream. Use its technical findings where relevant, but resolve deployment status from the newest verifiable artifact and a fresh live check—not by copying its old summary.
 
-### Current demo task status
+### Current demo task status (updated 2026-09-26, `5df213a`)
 
-- Stakeholder intent for the six-page menu and the Payment structure is recorded above.
-- The earlier local UI/API changes exist in the working tree but are not established as the agreed final UI.
-- This task creates the hand-off document only. The broader UI changes, data seeding, migrations, and deployment require their own explicit work request and verification.
-- No live deployment or production-data inspection was performed to create this hand-off.
+All §2 pages are implemented in code: navigation order, Overview, Inventory, Analytics, Credit Assessment, Finance Match and Payment. Notable implementation choices:
+
+- **Analytics:** `/analytics` opens General Analytics (real tabs, `?tab=inventory|combined`); Deep analytics is `/analytics/deep` (business insights plus weekday patterns only). Shared shadcn-style filter bar: period, group by, source.
+- **Credit Assessment:** one "Run credit assessment" drawer: (1) activity-derived inputs, read-only, from `GET merchants/me/credit-inputs` over the same 90-day window as a run; (2) Additional information; (3) inline consent plus one "Run assessment" that saves declarations, runs, and creates the PDF. A status colour language (green available, amber you can add, blue builds with sales, grey not measured) is used on the latest-assessment view and the drawer.
+- **Finance Match:** latest PDF first (Email to a lender · View PDF · Download), earlier PDFs and sent emails as history tabs; no period selector or preview workflow. Email status never claims inbox delivery.
+- **Evidence PDF:** redesigned for human readers (`apps/api/src/data-capture/finance-report-pdf.ts`). Stored PDFs are immutable, so only new ones use the new layout.
+- **Labels:** plain-language labels live in `packages/shared/src/credit-labels.ts` for the portal. The API keeps a runtime copy (`apps/api/src/credit-assessment/credit-labels.ts`) because `@repo/shared` has no build step and may only be imported for *types* by the API; a parity test guards the copy.
+
+Not yet done:
+
+- **Browser tests:** the Playwright suite has not been run against these changes.
+- **Integration tests:** database-backed API integration specs (including the new cash-inputs case) have not been run.
+- **Deployment:** nothing is deployed. The portal and API must be released together, because the API now rejects the removed `environment` query parameter.
+
+Open decisions:
+
+- Should the readiness checklist count cash sales?
+- Should the Payment capture-quality tile stay on the Overview?
+- Should "Sale lines without a product" move to General Analytics' Inventory tab?
+- Should the staff pilot's consent requirement be dropped on the backend?
 
 ## 6. How to continue safely and effectively
 
