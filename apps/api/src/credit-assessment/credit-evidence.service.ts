@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type {
@@ -49,6 +49,47 @@ const DECLARED_INPUTS: ReadonlySet<string> = new Set([
   'external_bureau_report',
 ]);
 export const PILOT_CONSENT_VERSION = '2026-09-credit-pilot-v1';
+/**
+ * GO-LIVE: remove this mechanism (and CREDIT_INPUT_DEFAULTS) before launch —
+ * see docs/go-live-checklist.md.
+ *
+ * Inputs the platform cannot measure yet (no digital payment rails / event
+ * history). While the model is under test, `CREDIT_INPUT_DEFAULTS` may supply
+ * values for them as JSON, e.g. {"retry_success_rate":90}. A default is only
+ * used when the measured value is unavailable, and its provenance is recorded
+ * as `configured_input` in the saved input snapshot.
+ */
+const CONFIGURABLE_INPUTS: ReadonlySet<string> = new Set([
+  'exception_rate',
+  'critical_unresolved_ratio',
+  'retry_success_rate',
+  'capture_quality',
+  'finality',
+  'capture_quality_trend',
+  'estimated_margin_pct',
+]);
+export function configuredInputDefaults(
+  raw = process.env.CREDIT_INPUT_DEFAULTS,
+): Record<string, number> {
+  if (!raw?.trim()) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('CREDIT_INPUT_DEFAULTS must be a JSON object');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    throw new Error('CREDIT_INPUT_DEFAULTS must be a JSON object');
+  const out: Record<string, number> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!CONFIGURABLE_INPUTS.has(key))
+      throw new Error(`CREDIT_INPUT_DEFAULTS: ${key} is not configurable`);
+    if (typeof value !== 'number' || !Number.isFinite(value))
+      throw new Error(`CREDIT_INPUT_DEFAULTS: ${key} must be a finite number`);
+    out[key] = value;
+  }
+  return out;
+}
 export function trend(values: number[]): number | null {
   if (values.length < 2) return null;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
@@ -67,7 +108,14 @@ export class CreditEvidenceService {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof s>,
     private readonly scoring: ScoringClient,
-  ) {}
+  ) {
+    // Fails fast on malformed config and makes active defaults visible in logs.
+    const configured = Object.keys(configuredInputDefaults());
+    if (configured.length)
+      new Logger(CreditEvidenceService.name).warn(
+        `CREDIT_INPUT_DEFAULTS active for ${configured.join(', ')}. Remove before go-live (docs/go-live-checklist.md).`,
+      );
+  }
   async profile(merchantId: string): Promise<CreditProfile> {
     const [r] = await this.db
       .select()
@@ -328,6 +376,12 @@ export class CreditEvidenceService {
     for (const key of ['exception_rate', 'critical_unresolved_ratio'])
       if (typeof values[key] === 'number' && values[key] > 100)
         values[key] = null;
+    const configured = new Set<string>();
+    for (const [key, value] of Object.entries(configuredInputDefaults()))
+      if (values[key] === null) {
+        values[key] = value;
+        configured.add(key);
+      }
     const declared = DECLARED_INPUTS;
     const salesProvenance =
       tx.length && cash.length
@@ -340,16 +394,18 @@ export class CreditEvidenceService {
         k,
         values[k] === null
           ? 'unavailable'
-          : declared.has(k)
-            ? 'merchant_declared'
-            : SALES_INPUTS.has(k)
-              ? salesProvenance
-              : k.includes('quality') ||
-                  k === 'finality' ||
-                  k.includes('exception') ||
-                  k.includes('critical')
-                ? 'mcbuse_processing_records'
-                : 'mcbuse_live_payments',
+          : configured.has(k)
+            ? 'configured_input'
+            : declared.has(k)
+              ? 'merchant_declared'
+              : SALES_INPUTS.has(k)
+                ? salesProvenance
+                : k.includes('quality') ||
+                    k === 'finality' ||
+                    k.includes('exception') ||
+                    k.includes('critical')
+                  ? 'mcbuse_processing_records'
+                  : 'mcbuse_live_payments',
       ]),
     );
     const missingReasons: Record<string, string> = {
@@ -358,6 +414,8 @@ export class CreditEvidenceService {
       capture_quality_trend:
         'Historical capture-quality snapshots are not recorded.',
     };
+    for (const k of Object.keys(missingReasons))
+      if (values[k] !== null) delete missingReasons[k];
     for (const [k, v] of Object.entries(values))
       if (v === null && !missingReasons[k])
         missingReasons[k] = declared.has(k)

@@ -109,6 +109,15 @@ print(','.join(f'{name}={value}' for name,value in bindings.items()))
 PY_KEYS
 )"
 
+# GO-LIVE: assumed credit inputs must not reach a launch deploy (docs/go-live-checklist.md).
+if grep -q '^CREDIT_INPUT_DEFAULTS:' "$runtime_environment_file"; then
+  if [[ "${MCBUSE_GO_LIVE:-}" == "1" ]]; then
+    echo "MCBUSE_GO_LIVE=1 but CREDIT_INPUT_DEFAULTS is still set in deploy/cloud-run/api.env.yaml. Remove it first (docs/go-live-checklist.md)." >&2
+    exit 1
+  fi
+  echo "WARNING: CREDIT_INPUT_DEFAULTS is set — credit scores use assumed inputs. Remove before go-live (docs/go-live-checklist.md)." >&2
+fi
+
 revision="$(date -u +%Y%m%dT%H%M%SZ)-$(git -C "$repo_root" rev-parse --short=8 HEAD)"
 image="${region}-docker.pkg.dev/${project_id}/${repository}/api:${revision}"
 
