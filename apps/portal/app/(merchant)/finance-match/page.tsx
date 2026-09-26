@@ -57,6 +57,9 @@ export default function FinanceMatchPage() {
       );
     }
   }, [assessmentId, assessments.data]);
+  useEffect(() => {
+    if (pkg) document.getElementById("package-preview")?.scrollIntoView({ block: "start" });
+  }, [pkg]);
   async function preview(id: string) {
     setError("");
     try {
@@ -132,10 +135,9 @@ export default function FinanceMatchPage() {
     <div className="grid gap-6">
       <div>
         <p className="text-sm text-blue-700">Finance Match</p>
-        <h1 className="text-3xl font-semibold">Prepare financial evidence</h1>
+        <h1 className="text-3xl font-semibold">Share saved assessment PDFs</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Choose a saved assessment and reporting period. Preview, download and
-          email the same fixed documents.
+          Download or email an existing financial evidence PDF. Prepare a PDF for an older assessment when needed.
         </p>
       </div>
       {error ||
@@ -153,8 +155,26 @@ export default function FinanceMatchPage() {
       ) : null}
       {message ? <Alert>{message}</Alert> : null}
       <Card>
+        <CardHeader><div><h2 className="font-semibold">Saved assessment PDFs</h2><p className="mt-1 text-sm text-slate-600">Latest 10 fixed PDFs linked to saved assessments.</p></div></CardHeader>
+        <CardContent>
+          {history.loading && !history.data ? <p className="text-sm text-slate-600">Loading saved PDFs…</p> : history.data?.items.length ? (
+            <ul className="divide-y divide-slate-100">
+              {history.data.items.slice(0, 10).map((item) => (
+                <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0">
+                  <div><p className="text-sm font-medium text-slate-950">{new Date(item.createdAt).toLocaleString()}</p><p className="text-xs text-slate-600">{item.assessmentBinding === "verified" ? `Saved assessment · ${item.assessment?.stage.replaceAll("_", " ") ?? "stage unavailable"}` : "Legacy package · assessment link unverified"}</p></div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" onClick={() => void preview(item.id)}>Preview / email</Button>
+                    <Button asChild variant="secondary"><a href={`/api/merchant/me/finance-packages/${item.id}/pdf`} target="_blank" rel="noreferrer">Download PDF</a></Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-slate-600">No PDFs saved yet. Run a credit assessment or prepare one below.</p>}
+        </CardContent>
+      </Card>
+      <Card>
         <CardHeader>
-          <h2 className="font-semibold">Create package</h2>
+          <h2 className="font-semibold">Prepare PDF from a saved assessment</h2>
         </CardHeader>
         <CardContent className="grid gap-4">
           {assessments.data?.assessments.length ? (
@@ -162,15 +182,15 @@ export default function FinanceMatchPage() {
               <FieldLabel htmlFor="assessment">Saved assessment</FieldLabel>
               <select
                 id="assessment"
-                className="rounded border p-2"
+                className="min-w-0 w-full max-w-full rounded border border-slate-300 bg-white p-2 text-sm focus-visible:outline-2 focus-visible:outline-blue-700"
                 value={assessmentId}
                 onChange={(e) => setAssessmentId(e.target.value)}
               >
                 {assessments.data.assessments.map((a, index) => (
                   <option key={a.id} value={a.id}>
-                    {index === 0 ? "Latest saved · " : ""}
-                    {new Date(a.createdAt).toLocaleString()} ·{" "}
-                    {a.stage.replaceAll("_", " ")} · {a.id}
+                    {index === 0 ? "Latest · " : ""}
+                    {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(a.createdAt))} ·{" "}
+                    {a.stage.replaceAll("_", " ")}
                   </option>
                 ))}
               </select>
@@ -184,27 +204,31 @@ export default function FinanceMatchPage() {
               .
             </p>
           )}
-          <div className="flex flex-wrap gap-2">
-            {([7, 30, 90] as const).map((days) => (
-              <Button
-                key={days}
-                variant={periodDays === days ? "primary" : "secondary"}
-                onClick={() => setPeriodDays(days)}
-              >
-                {days} days
-              </Button>
-            ))}
-            <Button
+          <div className="grid gap-3">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Reporting period">
+              {([7, 30, 90] as const).map((days) => (
+                <Button
+                  key={days}
+                  variant={periodDays === days ? "primary" : "secondary"}
+                  aria-pressed={periodDays === days}
+                  onClick={() => setPeriodDays(days)}
+                >
+                  {days} days
+                </Button>
+              ))}
+            </div>
+            <div><Button
+              className="scroll-mt-24"
               disabled={busy || !assessmentId || !profile.data}
               onClick={() => void generate()}
             >
               {busy ? "Working…" : "Generate and preview"}
-            </Button>
+            </Button></div>
           </div>
         </CardContent>
       </Card>
       {pkg ? (
-        <Card>
+        <Card id="package-preview" className="scroll-mt-24">
           <CardHeader>
             <h2 className="font-semibold">Package preview</h2>
           </CardHeader>
@@ -246,6 +270,8 @@ export default function FinanceMatchPage() {
               onSubmit={(e) => void send(e)}
               className="grid gap-3 border-t pt-4"
             >
+              <h3 className="font-semibold text-slate-950">Email this assessment</h3>
+              <p className="text-sm text-slate-600">The recipient receives this fixed PDF and its data file.</p>
               <Field>
                 <FieldLabel htmlFor="recipient">Recipient email</FieldLabel>
                 <Input
@@ -266,31 +292,12 @@ export default function FinanceMatchPage() {
                 am authorised to share this fixed package with this recipient.
               </label>
               <Button disabled={busy}>
-                {message ? "Send another copy" : "Send package"}
+                {message ? "Send another copy" : "Email PDF and data"}
               </Button>
             </form>
           </CardContent>
         </Card>
       ) : null}
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold">Package history</h2>
-        </CardHeader>
-        <CardContent>
-          <ul className="grid gap-2">
-            {history.data?.items.map((p) => (
-              <li key={p.id}>
-                <Button variant="secondary" onClick={() => void preview(p.id)}>
-                  {new Date(p.createdAt).toLocaleString()} ·{" "}
-                  {p.assessmentBinding === "verified"
-                    ? "Saved assessment"
-                    : "Legacy package"}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
       <Card>
         <CardHeader>
           <h2 className="font-semibold">Email history</h2>

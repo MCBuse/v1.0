@@ -19,8 +19,8 @@ import { usePortalResource } from "@/lib/client/use-portal-resource";
 
 const navigation = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
-  { href: "/payment", label: "Payment", icon: CircleDollarSign },
   { href: "/inventory", label: "Inventory", icon: Package },
+  { href: "/payment", label: "Payment", icon: CircleDollarSign },
   { href: "/analytics", label: "Analytics", icon: ChartNoAxesCombined },
   { href: "/credit-assessment", label: "Credit Assessment", icon: Building2 },
   { href: "/finance-match", label: "Finance Match", icon: Landmark },

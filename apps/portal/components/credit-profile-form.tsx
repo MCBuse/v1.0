@@ -35,7 +35,7 @@ export function creditMinorInput(value: string) {
   const [whole = "0", decimal = ""] = value.split(".");
   return (BigInt(whole) * 100n + BigInt(decimal.padEnd(2, "0"))).toString();
 }
-export function CreditProfileForm() {
+export function CreditProfileForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean) => void }) {
   const profile = usePortalResource<CreditProfile>("me/credit-profile");
   const consent = usePortalResource<MerchantConsent>("me/credit-pilot-consent");
   const [busy, setBusy] = useState(false);
@@ -69,6 +69,7 @@ export function CreditProfileForm() {
       });
       await profile.refresh();
       setSaved(true);
+      onDirtyChange?.(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save profile");
     } finally {
@@ -94,12 +95,9 @@ export function CreditProfileForm() {
     <Card>
       <CardHeader>
         <div>
-          <h2 className="font-semibold">Credit profile and pilot consent</h2>
+          <h2 className="font-semibold">Additional information</h2>
           <p className="mt-2 text-sm text-slate-500">
-            These details are merchant declarations. Inventory, collateral,
-            assets, and bureau information are retained for lender review.
-            Verified supplier spending is not connected, so verified margin
-            remains unavailable.
+            Review or add business, finance, and owner details. These are merchant declarations.
           </p>
         </div>
       </CardHeader>
@@ -117,6 +115,7 @@ export function CreditProfileForm() {
         {profile.data ? (
           <form
             onSubmit={(e) => void save(e)}
+            onChangeCapture={() => onDirtyChange?.(true)}
             className="grid gap-4 sm:grid-cols-2"
           >
             <Field>
@@ -212,10 +211,8 @@ export function CreditProfileForm() {
               : "Credit profile unavailable."}
           </p>
         )}
-        <div className="border-t pt-5">
-          <h3 className="font-medium">
-            Internal experimental assessment consent
-          </h3>
+        <details className="border-t pt-5">
+          <summary className="cursor-pointer font-medium text-slate-950 focus-visible:outline-2 focus-visible:outline-blue-700">Internal pilot consent (optional)</summary>
           <p className="my-3 text-sm leading-6 text-slate-600">
             Allow authorized MCBuse credit analysts to review your business
             evidence and declared credit profile in the internal experimental
@@ -236,7 +233,7 @@ export function CreditProfileForm() {
               ? "Withdraw pilot consent"
               : "Give pilot consent"}
           </Button>
-        </div>
+        </details>
       </CardContent>
     </Card>
   );

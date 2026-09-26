@@ -5,5 +5,5 @@ export default async function AnalyticsInventoryPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  redirectMerchantBookmark("/inventory", await searchParams);
+  redirectMerchantBookmark("/analytics/general#inventory-analytics", await searchParams);
 }

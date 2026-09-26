@@ -908,16 +908,63 @@ export class MerchantFinanceService {
         document.text(`Assessment evidence window: ${snapshot.assessment.evidenceWindow.from} to ${snapshot.assessment.evidenceWindow.to}`);
         document.text(`Passed requirements: ${snapshot.assessment.passedRequirements.join(', ') || 'None'}`);
         document.text(`Missing requirements: ${snapshot.assessment.missingRequirements.join(', ') || 'None'}`);
-        document.text(`Reliability: ${JSON.stringify(snapshot.assessment.reliability)}`);
-        document.text(`Source coverage: ${JSON.stringify(snapshot.assessment.sourceCoverage)}`);
-        document.text(`Business profile and consent: ${JSON.stringify(snapshot.assessment.businessProfile)}`);
+        document.moveDown(0.5).fontSize(11).text('Evidence and source coverage');
+        document.fontSize(10);
+        const evidenceLabel = (key: string) =>
+          key.replace(/([A-Z])/g, ' $1').replaceAll('_', ' ')
+            .replace(/\b\w/g, (letter) => letter.toUpperCase())
+            .replace(/^Mcbuse/, 'MCBuse');
+        for (const [key, value] of Object.entries(snapshot.assessment.reliability ?? {})) {
+          document.text(`${evidenceLabel(key)}: ${String(value ?? 'Not available')}`);
+        }
+        for (const [key, value] of Object.entries(snapshot.assessment.sourceCoverage ?? {})) {
+          document.text(`${evidenceLabel(key)}: ${typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value ?? 'Not available')}`);
+        }
+        const business = snapshot.assessment.businessProfile ?? {};
+        const declared = business.creditProfile ?? {};
+        document.moveDown(0.5).fontSize(11).text('Business and additional information');
+        document.fontSize(10).text(`Business name: ${business.businessName ?? 'Not available'}`);
+        document.text(`Reporting timezone: ${business.timezone ?? 'Not available'}`);
+        document.text(`Evidence consent at assessment: ${business.consent?.active ? 'Active' : 'Not active'}`);
+        const declaredLabels: Record<string, string> = {
+          commencementDate: 'Business commencement date',
+          merchantType: 'Merchant category',
+          loanTermMonths: 'Requested loan term (months)',
+          externalBureauScore: 'External bureau score (declared scale)',
+          externalBureauReport: 'External bureau notes',
+          existingDebtMinor: 'Existing debt (EUR)',
+          loanAmountMinor: 'Requested loan amount (EUR)',
+          inventoryValueMinor: 'Declared inventory value (EUR)',
+          collateralValueMinor: 'Declared collateral value (EUR)',
+          businessDebtsMinor: 'Business debts (EUR)',
+          businessAssetsMinor: 'Business assets (EUR)',
+          ownerPersonalAssetsMinor: 'Owner personal assets (EUR)',
+          ownerPersonalDebtsMinor: 'Owner personal debts (EUR)',
+        };
+        const missingDeclared: string[] = [];
+        for (const [key, label] of Object.entries(declaredLabels)) {
+          const value = declared[key];
+          if (value == null || value === '') {
+            missingDeclared.push(label);
+            continue;
+          }
+          const minor = key.endsWith('Minor') ? BigInt(String(value)) : null;
+          const shown = minor === null
+            ? String(value)
+            : `${(minor / 100n).toLocaleString('en-IE')}.${(minor % 100n).toString().padStart(2, '0')}`;
+          document.text(`${label}: ${shown}`);
+        }
+        if (missingDeclared.length) document.text(`Not provided: ${missingDeclared.join(', ')}.`);
+        document.fillColor('#64748b').text('Additional information is merchant-declared unless another source is identified.').fillColor('black');
         snapshot.assessment.limitations.forEach((item: string) => document.text(item));
       }
       if (snapshot.assessment?.credit) {
+        if (document.y > 650) document.addPage();
         const credit = snapshot.assessment.credit;
-        document.moveDown().fontSize(14).text('Business financial profile');
+        document.moveDown().fontSize(14).text("George's business financial profile");
         document.fontSize(10).text(`Model: ${credit.modelVersion} | Status: ${credit.status}`);
         document.text(`Financial profile: ${credit.financialProfile ? credit.financialProfile.score.toFixed(1) + ' / 100' : 'Not available'}`);
+        if (credit.status === 'ready' && !credit.financialProfile) document.text('A score cannot be calculated while required inputs are missing. No missing values were filled in.');
         document.text(`Profile confidence: ${credit.profileConfidence?.label ?? 'Not available'}`);
         document.text('Confidence describes completeness and processing quality, not independent verification or credit risk.');
         for (const line of credit.integritySummary) document.text(line);

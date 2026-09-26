@@ -12,7 +12,6 @@ import { Money } from "@repo/ui/money";
 import { Skeleton } from "@repo/ui/skeleton";
 import {
   Archive,
-  BarChart3,
   ImagePlus,
   Minus,
   PackagePlus,
@@ -36,8 +35,6 @@ import { portalApi } from "@/lib/client/api";
 import { euroInputToMinor } from "@/lib/client/money-input";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
 import { MerchantImportDrawer } from "@/components/merchant-import-drawer";
-import { InventoryAnalytics } from "@/components/inventory-analytics";
-import { ProductAnalyticsDrawer } from "@/components/product-analytics-drawer";
 import { ReceivePaymentDrawer } from "@/components/receive-payment";
 
 type Draft = {
@@ -121,13 +118,14 @@ export function InventoryView() {
   const [pageError, setPageError] = useState("");
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [analyticsProduct, setAnalyticsProduct] = useState<MerchantProduct | null>(null);
+  const [sourceTab, setSourceTab] = useState<"manual" | "imported">("manual");
   // Q.1 — one drawer for the whole table; the chosen product seeds its lines.
   const [invoiceProductId, setInvoiceProductId] = useState<string | null>(null);
 
   const products = (resource.data?.items ?? []).filter((product) => {
     const term = query.trim().toLowerCase();
     return (
+      (sourceTab === "imported" ? Boolean(product.sourceNames?.length) : !product.sourceNames?.length) &&
       (!showArchived ? product.status === "active" : true) &&
       (!term ||
         product.name.toLowerCase().includes(term) ||
@@ -299,8 +297,17 @@ export function InventoryView() {
             Stock is reserved while an invoice is waiting for payment.
           </p>
         </div>
-        <div className="flex gap-3"><MerchantImportDrawer kind="inventory" label="Import inventory" onCommitted={() => window.dispatchEvent(new Event("merchant:refresh"))} /><Button onClick={(event) => beginCreate(event.currentTarget)}><PackagePlus data-icon="inline-start" aria-hidden="true" />Add product</Button></div>
+        {sourceTab === "imported" ? (
+          <MerchantImportDrawer kind="inventory" label="Import inventory" onCommitted={() => { window.dispatchEvent(new Event("merchant:refresh")); void resource.refresh(); }} />
+        ) : (
+          <Button onClick={(event) => beginCreate(event.currentTarget)}><PackagePlus data-icon="inline-start" aria-hidden="true" />Add product</Button>
+        )}
       </div>
+
+      <nav aria-label="Inventory sources" className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <Button variant={sourceTab === "manual" ? "primary" : "secondary"} aria-current={sourceTab === "manual" ? "page" : undefined} onClick={() => setSourceTab("manual")}>Manual inventory</Button>
+        <Button variant={sourceTab === "imported" ? "primary" : "secondary"} aria-current={sourceTab === "imported" ? "page" : undefined} onClick={() => setSourceTab("imported")}>Imported inventory</Button>
+      </nav>
 
       {pageError ? (
         <Alert className="border-red-200 bg-red-50 text-red-800">
@@ -374,6 +381,7 @@ export function InventoryView() {
                       {product.category ? `${product.category} · ` : ""}
                       <Money value={product.unitPrice} />
                     </p>
+                    {product.sourceNames?.length ? <p className="mt-1 text-xs text-slate-600">Imported from {product.sourceNames.join(", ")}</p> : null}
                   </div>
                   <div className="min-w-32">
                     <p className="text-xs text-slate-500">Available</p>
@@ -385,7 +393,7 @@ export function InventoryView() {
                       {product.reservedQuantity} reserved
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                     <Button
                       variant="secondary"
                       size="sm"
@@ -398,14 +406,6 @@ export function InventoryView() {
                     >
                       <QrCode data-icon="inline-start" aria-hidden="true" />
                       Create invoice / QR
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setAnalyticsProduct(product)}
-                    >
-                      <BarChart3 data-icon="inline-start" aria-hidden="true" />
-                      Analytics
                     </Button>
                     <Button
                       variant="secondary"
@@ -463,16 +463,12 @@ export function InventoryView() {
             </div>
           ) : (
             <EmptyState
-              title="No products yet"
-              description="Use Add product at the top of this page to create your first item."
+              title={sourceTab === "manual" ? "No manual products yet" : "No imported products yet"}
+              description={sourceTab === "manual" ? "Use Add product above to create your first item." : "Use Import inventory above to upload a product catalogue."}
             />
           )}
         </CardContent>
       </Card>
-
-      <InventoryAnalytics />
-
-      <ProductAnalyticsDrawer product={analyticsProduct} open={Boolean(analyticsProduct)} onOpenChange={(open) => { if (!open) setAnalyticsProduct(null); }} />
 
       <ReceivePaymentDrawer
         open={Boolean(invoiceProductId)}

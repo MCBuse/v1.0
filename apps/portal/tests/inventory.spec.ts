@@ -4,6 +4,7 @@ const productId = "00000000-0000-4000-8000-000000000101";
 
 type Product = {
   id: string;
+  sourceNames?: string[];
   name: string;
   sku: string | null;
   description: string | null;
@@ -193,7 +194,7 @@ test("uses one Add product trigger and resets an abandoned draft", async ({
 
   const trigger = page.getByRole("button", { name: "Add product" });
   await expect(trigger).toHaveCount(1);
-  await expect(page.getByText("No products yet")).toBeVisible();
+  await expect(page.getByText("No manual products yet")).toBeVisible();
 
   await trigger.click();
   let drawer = page.getByRole("dialog");
@@ -273,73 +274,35 @@ test("edits a product in the same drawer", async ({ page }) => {
   await expect(page.getByText("102 on hand · 0 reserved")).toBeVisible();
 });
 
-test("keeps Inventory in main navigation and shares its analytics with Analytics", async ({ page }, testInfo) => {
-  await mockInventory(page, [makeProduct()]);
-  const money = { minor: "2000", currency: "EUR", estimated: false, rateTimestamp: null };
-  const requests: string[] = [];
-  await page.route("**/api/merchant/me/analytics?*", (route) => {
-    requests.push(route.request().url());
-    return route.fulfill({ json: {
-      period: { from: "2026-09-01T00:00:00Z", to: "2026-09-19T00:00:00Z", timezone: "UTC", partialCurrentDay: true },
-      generatedAt: "2026-09-19T00:00:00Z",
-      totalRecordedSales: money, saleCount: 10, averageSale: money,
-      comparisons: { salesPercent: 10, transactionCountPercent: 10, averageSalePercent: 0 },
-      digitalSales: money, cashSales: money,
-      sourceCoverage: { mcbuse_payment: 10, merchant_cash: 0 },
-      dailyTrend: [], hourlyRhythm: [],
-      productPerformance: [{ productId, name: "Coffee Candy", category: "Sweets", quantitySold: 10, totalSales: money, quantityChangePercent: 25, turnoverStatus: "available", turnover: 0.5 }],
-      categoryPerformance: [{ category: "Sweets", quantitySold: 10, totalSales: money, quantityChangePercent: 25 }],
-      inventory: { stockValueAtSellingPrices: money, availableValueAtSellingPrices: money, reservedValueAtSellingPrices: money, lowStockProductCount: 2, zeroStockProductCount: 1 },
-      unassignedItems: [{ name: "Unassigned sweet", quantitySold: 1, totalSales: money }],
-    } });
-  });
-  await page.route("**/api/merchant/me/insights", (route) => route.fulfill({ json: {
-    status: "ready", generatedAt: "2026-09-19T00:00:00Z", stale: false,
-    scope: { periodFrom: "2026-09-01T00:00:00Z", periodTo: "2026-09-19T00:00:00Z" },
-    insights: [
-      { id: "stock", kind: "stock_risk", title: "Restock Coffee Candy", summary: "Stock is running low.", recommendation: null, evidence: [], limitations: [], narrationSource: "deterministic" },
-      { id: "discrepancy", kind: "discrepancy", title: "Stock movement mismatch", summary: "Review recorded movements.", recommendation: null, evidence: [{ id: `product:${productId}`, label: "Coffee Candy", value: "100 units" }], limitations: [], narrationSource: "deterministic" },
-      { id: "anomaly", kind: "anomaly", title: "Unusual product sales", summary: "Review product demand.", recommendation: null, evidence: [{ id: `product:${productId}`, label: "Coffee Candy", value: "10 units" }], limitations: [], narrationSource: "deterministic" },
-      { id: "sales", kind: "performance", title: "Sales increased", summary: "Sales are up.", recommendation: null, evidence: [], limitations: [], narrationSource: "deterministic" },
-    ],
-  } }));
-
-  await page.goto("/overview");
+test("separates manual and imported inventory and keeps analytics in Analytics", async ({ page }, testInfo) => {
+  await mockInventory(page, [
+    makeProduct(),
+    makeProduct({ id: "00000000-0000-4000-8000-000000000102", name: "Imported Beans", sourceNames: ["Supplier CSV"] }),
+  ]);
+  await page.goto("/inventory");
   const nav = page.getByRole("navigation", { name: testInfo.project.name === "desktop" ? "Primary" : "Mobile", exact: true });
-  const inventoryLink = nav.getByRole("link", { name: "Inventory", exact: true });
-  await expect(inventoryLink).toBeVisible();
-  await inventoryLink.click();
-  await expect(page).toHaveURL("/inventory");
-  await expect(inventoryLink).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: "Analytics", exact: true })).not.toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("button", { name: "Add product" })).toBeVisible();
-  const section = page.getByRole("region", { name: "Inventory analytics", exact: true });
-  const headings = ["Best-selling products", "Slow-moving products", "Inventory value", "Category performance", "Unassigned items"];
-  for (const heading of headings) await expect(section.getByRole("heading", { name: heading, exact: true })).toBeVisible();
-  await expect(section.getByText("Low-stock products", { exact: true })).toBeVisible();
-  await expect(section.getByText("Out-of-stock products", { exact: true })).toBeVisible();
-  await expect(section.getByRole("heading", { name: "Restock Coffee Candy" })).toBeVisible();
-  await expect(section.getByRole("heading", { name: "Sales increased" })).toHaveCount(0);
-  await expect(section.getByRole("heading", { name: "Stock movement mismatch" })).toBeVisible();
-  await expect(section.getByRole("heading", { name: "Unusual product sales" })).toBeVisible();
-  await section.getByRole("button", { name: "7 days", exact: true }).click();
-  await expect.poll(() => requests.some((url) => url.endsWith("period=7d"))).toBe(true);
-  await section.getByLabel("Source", { exact: true }).selectOption("merchant_cash");
-  await expect.poll(() => requests.some((url) => url.includes("period=7d&source=merchant_cash"))).toBe(true);
-  await page.screenshot({ path: `/tmp/mcbuse-inventory-${testInfo.project.name}.png`, fullPage: true });
-
+  await expect(nav.getByRole("link", { name: "Inventory", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: "Coffee Candy" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Imported Beans" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Inventory analytics" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Imported inventory" }).click();
+  await expect(page.getByRole("button", { name: "Manual inventory" })).toHaveClass(/bg-white/);
+  await expect(page.getByRole("button", { name: "Imported inventory" })).toHaveClass(/bg-blue-600/);
+  await expect(page.getByRole("heading", { name: "Imported Beans" })).toBeVisible();
+  await expect(page.getByText("Imported from Supplier CSV")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Coffee Candy" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Import inventory" })).toBeVisible();
+  await page.screenshot({ path: `/tmp/mcbuse-demo-inventory-${testInfo.project.name}.png`, fullPage: true });
   await nav.getByRole("link", { name: "Analytics", exact: true }).click();
   await expect(page).toHaveURL("/analytics");
-  for (const heading of headings) await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Sales increased" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Restock Coffee Candy" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Analytics", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
-test("keeps product management available when inventory analytics fails", async ({ page }) => {
+test("keeps product management available when analytics is unavailable", async ({ page }) => {
   await mockInventory(page, [makeProduct()]);
   await page.route("**/api/merchant/me/analytics?*", (route) => route.fulfill({ status: 503, json: { message: "Unavailable" } }));
   await page.goto("/inventory");
-  await expect(page.getByText("Inventory analytics could not load. You can still manage your products above.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Coffee Candy" })).toBeVisible();
   await page.getByRole("button", { name: "Add product" }).click();
   await expect(page.getByRole("dialog").getByLabel("Name *")).toBeVisible();
 });

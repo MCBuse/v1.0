@@ -1,5 +1,9 @@
-import type { MerchantReadinessMeasurements } from '@repo/shared';
+import type {
+  CreditPublicResult,
+  MerchantReadinessMeasurements,
+} from '@repo/shared';
 import {
+  GeorgeFinancialProfileV1,
   ReadinessRulesV1,
   assessmentModel,
   availableAssessmentModels,
@@ -27,6 +31,24 @@ const input = (overrides: Partial<MerchantReadinessMeasurements> = {}) => ({
   evidenceFrom: new Date('2026-08-01T00:00:00Z'),
   evidenceTo: new Date('2026-09-15T00:00:00Z'),
 });
+
+function georgeResult(
+  overrides: Partial<CreditPublicResult> = {},
+): CreditPublicResult {
+  return {
+    status: 'ready',
+    modelVersion: 'george-html-2026.09.1',
+    businessAgeMonths: 36,
+    unavailableFields: [],
+    financialProfile: { score: 71.5, scale: '0-100', breakdown: {} },
+    profileConfidence: null,
+    missingReasons: {},
+    indicators: {},
+    provenance: {},
+    integritySummary: [],
+    ...overrides,
+  };
+}
 
 describe('readiness-rules-v1', () => {
   const model = new ReadinessRulesV1();
@@ -78,7 +100,9 @@ describe('readiness-rules-v1', () => {
   it('states its limitations, including that it is not the credit model', () => {
     const result = model.assess(input());
     expect(result.limitations.join(' ')).toMatch(/not a credit score/i);
-    expect(result.limitations.join(' ')).toMatch(/do not estimate default risk/i);
+    expect(result.limitations.join(' ')).toMatch(
+      /do not estimate default risk/i,
+    );
     expect(result.disclaimer).toMatch(/not a credit decision/i);
   });
 
@@ -89,6 +113,40 @@ describe('readiness-rules-v1', () => {
   });
 });
 
+describe('George financial profile', () => {
+  const model = new GeorgeFinancialProfileV1();
+
+  it('saves George model identity and the public profile score', () => {
+    const result = model.assess({ ...input(), credit: georgeResult() });
+    expect(result.modelId).toBe('george-financial-profile-v1');
+    expect(result.modelVersion).toBe('george-html-2026.09.1');
+    expect(result.stage).toBe('financial_profile_available');
+    expect(result.score).toBe(71.5);
+    expect(result.disclaimer).toMatch(/not a lending decision/i);
+  });
+
+  it('does not assign a score when required evidence is missing or scoring is unavailable', () => {
+    const missing = model.assess({
+      ...input(),
+      credit: georgeResult({
+        unavailableFields: ['estimated_margin_pct'],
+        financialProfile: null,
+      }),
+    });
+    expect(missing.score).toBeNull();
+    expect(missing.stage).toBe('missing_model_inputs');
+    expect(missing.missingRequirements).toContain(
+      'George model input: estimated margin pct',
+    );
+    expect(
+      model.assess({
+        ...input(),
+        credit: georgeResult({ status: 'temporarily_unavailable' }),
+      }).score,
+    ).toBeNull();
+  });
+});
+
 describe('assessment model registry', () => {
   it('defaults to the readiness fallback', () => {
     expect(assessmentModel().id).toBe('readiness-rules-v1');
@@ -96,6 +154,9 @@ describe('assessment model registry', () => {
 
   it('resolves a model by id', () => {
     expect(assessmentModel('readiness-rules-v1').id).toBe('readiness-rules-v1');
+    expect(assessmentModel('george-financial-profile-v1').id).toBe(
+      'george-financial-profile-v1',
+    );
   });
 
   it('refuses an unknown model rather than silently falling back', () => {

@@ -193,6 +193,12 @@ test.beforeEach(async ({ context, page }) => {
       }),
     }),
   );
+  await page.route("**/api/merchant/me/assessments", (route) =>
+    route.fulfill({ json: { assessments: [] } }),
+  );
+  await page.route("**/api/merchant/me/finance-packages", (route) =>
+    route.fulfill({ json: { items: [] } }),
+  );
 });
 
 test("overview renders money records and responsive navigation", async ({

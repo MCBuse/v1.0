@@ -56,12 +56,27 @@ export class MerchantAssessmentService {
   ) {}
 
   /** Runs the model and saves the result. */
-  async run(userId: string, modelId?: string, idempotencyKey?: string): Promise<SavedAssessment> {
+  async run(
+    userId: string,
+    modelId?: string,
+    idempotencyKey?: string,
+  ): Promise<SavedAssessment> {
     const merchant = await this.merchants.requireMerchant(userId);
     const findReplay = async () => {
       if (!idempotencyKey) return null;
-      const [row] = await this.db.select().from(schema.merchantAssessments).where(and(eq(schema.merchantAssessments.merchantId, merchant.merchantId), eq(schema.merchantAssessments.idempotencyKey, idempotencyKey)));
-      if (row && row.modelId !== (modelId ?? 'readiness-rules-v1')) throw new ConflictException('Assessment key already used with a different model');
+      const [row] = await this.db
+        .select()
+        .from(schema.merchantAssessments)
+        .where(
+          and(
+            eq(schema.merchantAssessments.merchantId, merchant.merchantId),
+            eq(schema.merchantAssessments.idempotencyKey, idempotencyKey),
+          ),
+        );
+      if (row && row.modelId !== (modelId ?? 'readiness-rules-v1'))
+        throw new ConflictException(
+          'Assessment key already used with a different model',
+        );
       return row ? this.present(row) : null;
     };
     const replay = await findReplay();
@@ -73,8 +88,15 @@ export class MerchantAssessmentService {
       evidenceTo.getTime() - EVIDENCE_WINDOW_DAYS * 86_400_000,
     );
 
-    const readiness = await this.merchants.getReadiness(userId, { from: evidenceFrom, to: evidenceTo });
-    const creditAssessment = await this.creditEvidence.assess(merchant.merchantId, evidenceTo, evidenceFrom);
+    const readiness = await this.merchants.getReadiness(userId, {
+      from: evidenceFrom,
+      to: evidenceTo,
+    });
+    const creditAssessment = await this.creditEvidence.assess(
+      merchant.merchantId,
+      evidenceTo,
+      evidenceFrom,
+    );
 
     // Naming a model that does not exist is a caller mistake, not a server
     // fault, and must not be answered by quietly using a different model.
@@ -86,11 +108,15 @@ export class MerchantAssessmentService {
         error instanceof Error ? error.message : 'Unknown assessment model',
       );
     }
-    const result = { ...model.assess({
-      measurements: readiness.measured,
-      evidenceFrom,
-      evidenceTo,
-    }), credit: creditAssessment.result };
+    const result = {
+      ...model.assess({
+        measurements: readiness.measured,
+        evidenceFrom,
+        evidenceTo,
+        credit: creditAssessment.result,
+      }),
+      credit: creditAssessment.result,
+    };
 
     const profileSnapshot = {
       businessName: profile.businessName,
@@ -186,7 +212,9 @@ export class MerchantAssessmentService {
   private present(
     row: typeof schema.merchantAssessments.$inferSelect,
   ): SavedAssessment {
-    const result = row.result as AssessmentResult & { credit?: CreditPublicResult };
+    const result = row.result as AssessmentResult & {
+      credit?: CreditPublicResult;
+    };
     const days = Math.round(
       (row.evidenceTo.getTime() - row.evidenceFrom.getTime()) / 86_400_000,
     );
@@ -195,7 +223,7 @@ export class MerchantAssessmentService {
       modelId: row.modelId,
       modelVersion: row.modelVersion,
       stage: row.stage,
-      score: null,
+      score: result.score ?? null,
       ...(result.credit ? { credit: publicCreditSnapshot(result.credit) } : {}),
       evidenceWindow: {
         from: row.evidenceFrom.toISOString(),

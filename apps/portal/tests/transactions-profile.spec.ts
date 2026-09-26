@@ -42,7 +42,7 @@ test("preserves old-bookmark query parameters when moving to a pillar route", as
 }) => {
   const redirects: Array<[string, string]> = [
     ["/transactions?source=merchant_cash&page=2", "/analytics/transactions?source=merchant_cash&page=2"],
-    ["/analytics/inventory?query=tea", "/inventory?query=tea"],
+    ["/analytics/inventory?query=tea", "/analytics/general?query=tea#inventory-analytics"],
     ["/invoices?status=history", "/payment/invoices?status=history"],
     ["/business-profile?section=consent", "/credit-assessment/business-profile?section=consent"],
   ];

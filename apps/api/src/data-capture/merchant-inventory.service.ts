@@ -118,9 +118,24 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
         .from(schema.merchantProducts)
         .where(where),
     ]);
+    const sourceRows = rows.length
+      ? await this.db
+          .select({ productId: schema.merchantProductSourceMappings.productId, sourceName: schema.merchantProductSourceMappings.sourceName })
+          .from(schema.merchantProductSourceMappings)
+          .where(and(
+            eq(schema.merchantProductSourceMappings.merchantId, merchant.merchantId),
+            inArray(schema.merchantProductSourceMappings.productId, rows.map((row) => row.id)),
+          ))
+      : [];
+    const sources = new Map<string, string[]>();
+    for (const row of sourceRows) {
+      const names = sources.get(row.productId) ?? [];
+      if (!names.includes(row.sourceName)) names.push(row.sourceName);
+      sources.set(row.productId, names);
+    }
     const totalItems = totals[0]?.value ?? 0;
     return {
-      items: rows.map((row) => this.productResponse(row)),
+      items: rows.map((row) => ({ ...this.productResponse(row), sourceNames: sources.get(row.id) ?? [] })),
       page,
       pageSize,
       totalItems,

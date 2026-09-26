@@ -472,8 +472,8 @@ export class MerchantController {
   async listAssessments(@CurrentUser() user: { id: string }) {
     return {
       assessments: await this.assessments.history(user.id),
-      // Named so a reader can see which models exist and that George's is
-      // not among them yet.
+      // Named so clients can distinguish George's financial profile from
+      // evidence readiness and from the staff-only experimental risk score.
       availableModels: availableAssessmentModels(),
     };
   }

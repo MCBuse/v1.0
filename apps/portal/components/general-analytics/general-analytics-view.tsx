@@ -10,6 +10,7 @@ import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardHeader } from "@repo/ui/card";
 import { Skeleton } from "@repo/ui/skeleton";
 import { RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
 import { ChartWithTable } from "./chart-with-table";
@@ -85,6 +86,16 @@ export function GeneralAnalyticsView() {
           Transactions, inventory and what the two say together.
         </p>
       </div>
+
+      <nav aria-label="Analytics views" className="flex flex-wrap gap-2">
+        <Button aria-current="page">General analytics</Button>
+        <Button asChild variant="secondary"><Link href="/analytics">Deep analytics</Link></Button>
+      </nav>
+      <nav aria-label="General analytics sections" className="flex flex-wrap gap-2 text-sm">
+        <a className="rounded-md border border-slate-200 bg-white px-3 py-2 font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700" href="#transaction-analytics">Transaction analytics</a>
+        <a className="rounded-md border border-slate-200 bg-white px-3 py-2 font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700" href="#inventory-analytics">Inventory analytics</a>
+        <a className="rounded-md border border-slate-200 bg-white px-3 py-2 font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700" href="#combined-analytics">Combined transaction and inventory analytics</a>
+      </nav>
 
       <Card>
         <CardContent className="grid gap-3 py-4">
@@ -213,8 +224,8 @@ function Stat({
 function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
   const t = data.transactions;
   return (
-    <section className="grid gap-4" aria-label="Transaction analytics">
-      <h2 className="text-xl font-semibold text-slate-950">Transactions</h2>
+    <section id="transaction-analytics" className="grid scroll-mt-24 gap-4" aria-label="Transaction analytics">
+      <h2 className="text-xl font-semibold text-slate-950">Transaction analytics</h2>
 
       {t.labels.notes.length ? (
         <Alert>{t.labels.notes.join(" ")}</Alert>
@@ -405,8 +416,8 @@ function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
 function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
   const v = data.inventory;
   return (
-    <section className="grid gap-4" aria-label="Inventory analytics">
-      <h2 className="text-xl font-semibold text-slate-950">Inventory</h2>
+    <section id="inventory-analytics" className="grid scroll-mt-24 gap-4" aria-label="Inventory analytics">
+      <h2 className="text-xl font-semibold text-slate-950">Inventory analytics</h2>
 
       {v.notes.length ? <Alert>{v.notes.join(" ")}</Alert> : null}
 
@@ -703,9 +714,9 @@ function List({
 
 function CombinedSection({ data }: { data: GeneralAnalyticsResponse }) {
   return (
-    <section className="grid gap-4" aria-label="Combined analytics">
+    <section id="combined-analytics" className="grid scroll-mt-24 gap-4" aria-label="Combined analytics">
       <h2 className="text-xl font-semibold text-slate-950">
-        Reading them together
+        Combined transaction and inventory analytics
       </h2>
       <Alert>{data.combined.stockScopeNote}</Alert>
       <div className="grid gap-4 lg:grid-cols-2">

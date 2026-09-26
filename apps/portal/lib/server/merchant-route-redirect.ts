@@ -12,5 +12,8 @@ export function redirectMerchantBookmark(
     else for (const entry of value ?? []) query.append(key, entry);
   }
   const serialized = query.toString();
-  redirect(serialized ? `${destination}?${serialized}` : destination);
+  const hashAt = destination.indexOf("#");
+  const path = hashAt === -1 ? destination : destination.slice(0, hashAt);
+  const hash = hashAt === -1 ? "" : destination.slice(hashAt);
+  redirect(`${path}${serialized ? `?${serialized}` : ""}${hash}`);
 }

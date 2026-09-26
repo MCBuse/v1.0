@@ -86,13 +86,17 @@ export function AnalyticsDashboard() {
       <div>
         <p className="text-sm font-medium text-blue-700">Analytics</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
-          Why your sales are changing
+          Deep analytics
         </h1>
         <p className="mt-2 text-sm text-slate-500">
           Recorded activity only. Payment-method shares do not establish
           complete business turnover.
         </p>
       </div>
+      <nav aria-label="Analytics views" className="flex flex-wrap gap-2">
+        <Button asChild variant="secondary"><Link href="/analytics/general">General analytics</Link></Button>
+        <Button aria-current="page">Deep analytics</Button>
+      </nav>
       <AnalyticsFilters filters={filters} />
       <p className="text-xs text-slate-500">
         {new Intl.DateTimeFormat("en-GB", {
@@ -268,9 +272,7 @@ export function AnalyticsDashboard() {
           <Button asChild variant="secondary">
             <Link href="/analytics/transactions">Transactions</Link>
           </Button>
-          <Button asChild variant="secondary">
-            <Link href="/inventory">Inventory</Link>
-          </Button>
+          <Button asChild variant="secondary"><Link href="/analytics/general#inventory-analytics">Inventory analytics</Link></Button>
         </CardContent>
       </Card>
     </div>

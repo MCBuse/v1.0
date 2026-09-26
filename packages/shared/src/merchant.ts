@@ -141,6 +141,8 @@ export type MerchantProductStatus = 'active' | 'archived';
 
 export type MerchantProduct = {
   id: string;
+  /** Sources linked to this product by a committed inventory import. */
+  sourceNames?: string[];
   name: string;
   category: string | null;
   sku: string | null;

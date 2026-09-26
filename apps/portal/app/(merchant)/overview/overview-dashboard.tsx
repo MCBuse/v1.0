@@ -3,6 +3,7 @@
 import type {
   MerchantActivityPage,
   MerchantWorkspaceSummary,
+  SavedMerchantAssessment,
 } from "@repo/shared";
 import { Alert } from "@repo/ui/alert";
 import { Badge } from "@repo/ui/badge";
@@ -55,6 +56,8 @@ export function OverviewDashboard() {
   const activity = usePortalResource<MerchantActivityPage>(
     "me/activity?page=1&pageSize=5",
   );
+  const assessments = usePortalResource<{ assessments: SavedMerchantAssessment[] }>("me/assessments");
+  const packages = usePortalResource<{ items: Array<{ id: string; createdAt: string }> }>("me/finance-packages");
   if (summary.loading && !summary.data)
     return (
       <div className="grid gap-6" aria-label="Loading overview">
@@ -144,6 +147,18 @@ export function OverviewDashboard() {
           </p>
         </section>
       ) : null}
+      <section aria-labelledby="records-summary" className="grid gap-4">
+        <div>
+          <h2 id="records-summary" className="text-lg font-semibold text-slate-950">Records summary</h2>
+          <p className="mt-1 text-sm text-slate-600">The four parts of your business record in one view.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryLink href="/payment" title="Payment records" value={`${data.recordedSaleCount30Days} recorded sales`} detail="Last 30 days" />
+          <SummaryLink href="/analytics/general" title="Analytics records" value={<Money value={data.recorded30Days} />} detail="Recorded sales · last 30 days" />
+          <SummaryLink href="/credit-assessment" title="Credit records" value={assessments.data ? `${assessments.data.assessments.length} saved assessments` : assessments.loading ? "Loading…" : "Unavailable"} detail={assessments.data?.assessments[0] ? `Latest: ${assessments.data.assessments[0].stage.replaceAll("_", " ")}` : "Evidence readiness"} />
+          <SummaryLink href="/finance-match" title="Finance Match records" value={packages.data ? `${packages.data.items.length} saved PDFs` : packages.loading ? "Loading…" : "Unavailable"} detail="Financial evidence packages" />
+        </div>
+      </section>
       <Card className="overflow-hidden">
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-6">
@@ -360,5 +375,15 @@ export function OverviewDashboard() {
         </p>
       ) : null}
     </div>
+  );
+}
+
+function SummaryLink({ href, title, value, detail }: { href: string; title: string; value: React.ReactNode; detail: string }) {
+  return (
+    <a href={href} className="rounded-lg border border-slate-200 bg-white p-5 transition-colors hover:border-blue-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+      <span className="flex items-center justify-between gap-2 text-sm font-medium text-slate-600">{title}<ArrowRight size={16} aria-hidden="true" /></span>
+      <span className="mt-3 block text-xl font-semibold tracking-tight text-slate-950">{value}</span>
+      <span className="mt-1 block text-xs text-slate-600">{detail}</span>
+    </a>
   );
 }

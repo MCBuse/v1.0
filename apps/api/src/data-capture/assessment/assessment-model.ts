@@ -1,29 +1,27 @@
 import type {
+  CreditPublicResult,
   MerchantReadiness,
   MerchantReadinessMeasurements,
 } from '@repo/shared';
 import { calculateMerchantReadiness } from '../merchant-readiness';
+import { CREDIT_MODEL_VERSION } from '../../credit-assessment/credit-contract';
 
 /**
- * The boundary George's scoring model will plug into.
- *
- * Today there is exactly one implementation: the agreed evidence-readiness
- * fallback. It deliberately produces no score and no decision, because it is
- * not a credit model and must never be presented as one. When the real model
- * arrives it implements this interface, registers under its own id, and its
- * results are stored alongside rather than replacing what came before.
+ * Saved assessment models share the same evidence window. George's public
+ * financial profile is separate from his staff-only experimental risk score.
  */
 export interface AssessmentInput {
   measurements: MerchantReadinessMeasurements;
   evidenceFrom: Date;
   evidenceTo: Date;
+  credit?: CreditPublicResult;
 }
 
 export interface AssessmentResult {
   modelId: string;
   modelVersion: string;
   stage: string;
-  /** Deliberately absent for the fallback; a real model may populate it. */
+  /** Public financial profile score for George's model; never a risk score. */
   score: number | null;
   passedRequirements: string[];
   missingRequirements: string[];
@@ -61,8 +59,8 @@ const FALLBACK_LIMITATIONS = [
  * `readiness-rules-v1` — the agreed demonstration fallback.
  *
  * It reports how complete the observed evidence is and what is still missing.
- * It never produces a score, precisely so that nobody can mistake it for the
- * credit model that has not been delivered yet.
+ * It never produces a score, so evidence readiness cannot be mistaken for
+ * George's separate financial profile or experimental risk score.
  */
 export class ReadinessRulesV1 implements AssessmentModel {
   readonly id = 'readiness-rules-v1';
@@ -99,11 +97,61 @@ export class ReadinessRulesV1 implements AssessmentModel {
   }
 }
 
+/** George's public 0-100 financial profile, with readiness as supporting evidence. */
+export class GeorgeFinancialProfileV1 implements AssessmentModel {
+  readonly id = 'george-financial-profile-v1';
+  readonly version = CREDIT_MODEL_VERSION;
+
+  assess(input: AssessmentInput): AssessmentResult {
+    const readiness = new ReadinessRulesV1().assess(input);
+    const credit = input.credit;
+    const missing = credit?.unavailableFields ?? [];
+    const proposedScore = credit?.financialProfile?.score;
+    const score =
+      credit?.status === 'ready' &&
+      missing.length === 0 &&
+      typeof proposedScore === 'number' &&
+      Number.isFinite(proposedScore) &&
+      proposedScore >= 0 &&
+      proposedScore <= 100
+        ? proposedScore
+        : null;
+    return {
+      ...readiness,
+      modelId: this.id,
+      modelVersion: credit?.modelVersion ?? this.version,
+      stage:
+        score !== null
+          ? 'financial_profile_available'
+          : credit?.status === 'consent_required'
+            ? 'consent_required'
+            : credit?.status === 'temporarily_unavailable'
+              ? 'scoring_unavailable'
+              : 'missing_model_inputs',
+      score,
+      missingRequirements: [
+        ...readiness.missingRequirements,
+        ...missing.map(
+          (field) => `George model input: ${field.replaceAll('_', ' ')}`,
+        ),
+      ],
+      limitations: [
+        "George's financial profile is a 0-100 business profile measure, not a credit risk score or lending decision.",
+        ...readiness.limitations,
+      ],
+      disclaimer:
+        "George's financial profile uses available business evidence. Missing required inputs are not estimated; this is not a lending decision.",
+    };
+  }
+}
+
 const MODELS = new Map<string, AssessmentModel>();
 const fallback = new ReadinessRulesV1();
 MODELS.set(fallback.id, fallback);
+const george = new GeorgeFinancialProfileV1();
+MODELS.set(george.id, george);
 
-/** Registers an additional model, such as George's when it lands. */
+/** Registers an additional model. */
 export function registerAssessmentModel(model: AssessmentModel): void {
   MODELS.set(model.id, model);
 }

@@ -2,6 +2,8 @@
 
 The merchant portal contains business credit-profile declarations, separate pilot consent, evidence readiness, confidence, missing inputs and public financial-profile results. `/staff/credit-assessments` is a separately authorized staff workspace in the same Next.js app. Python computes scores; NestJS enforces who can see them.
 
+The merchant's Run credit assessment action now saves `george-financial-profile-v1`, backed by the public result of `george-html-2026.09.1`. Its `score` field, when present, is the 0–100 **financial profile** score. The readiness result remains supporting evidence. A missing required field leaves the score null and is named in the saved result and PDF. The model's 300–850 experimental credit risk score and default probability remain staff-only; neither is copied into merchant assessment history or finance packages.
+
 ## Data and access
 
 Apply migration `0033_credit_assessment_pilot` before starting the updated API. It adds server-only credit profiles, staff permissions, pilot enrollments and staff assessment snapshots. Existing assessments and finance packages are retained unchanged. New merchant assessment JSON adds optional `credit` results and snapshots the declared profile and inputs. Experimental results live exclusively in `staff_credit_assessments`; that table is never queried by merchant history or finance exports.

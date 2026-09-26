@@ -25,6 +25,8 @@
 }
 html {
   background: #f8fafc;
+  scroll-padding-top: 5rem;
+  scroll-padding-bottom: 6rem;
 }
 body {
   margin: 0;

@@ -1,5 +1,4 @@
 "use client";
-import { CreditProfileForm } from "@/components/credit-profile-form";
 
 import type {
   MerchantConsent,
@@ -117,7 +116,6 @@ export function BusinessProfile() {
           Your payment-history readiness and consent controls.
         </p>
       </div>
-      <CreditProfileForm />
       <div className="grid gap-6 2xl:grid-cols-[1.2fr_.8fr]">
         <Card>
           <CardHeader>

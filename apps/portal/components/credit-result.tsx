@@ -3,7 +3,7 @@ export function CreditResult({ credit: c }: { credit: CreditPublicResult }) {
   return (
     <section className="grid gap-4 text-sm">
       <div>
-        <h3 className="font-semibold">Business financial profile</h3>
+        <h3 className="font-semibold">George&apos;s business financial profile</h3>
         <p className="mt-1 text-xs text-slate-500">Model {c.modelVersion}</p>
       </div>
       {c.status !== "ready" ? (
@@ -40,6 +40,11 @@ export function CreditResult({ credit: c }: { credit: CreditPublicResult }) {
           ) : null}
         </div>
       </dl>
+      {c.status === "ready" && !c.financialProfile ? (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
+          A financial profile score cannot be calculated yet. George&apos;s model requires the missing inputs listed below; unavailable values have not been filled in.
+        </p>
+      ) : null}
       <p className="text-xs leading-5 text-slate-500">
         Confidence describes field completeness and processing quality. Declared
         information is not independently verified. These results are not a
