@@ -50,10 +50,14 @@ background URL. Use `MCBUSE_GCP_PROJECT_ID` only when an explicit project
 override is needed. Do not copy API database, JWT, Stripe, encryption, or wallet
 secrets into the portal service.
 
-For the custom-domain release, configure the portal with
-`MCBUSE_API_URL=https://api.mcbuse.com/api/v1`,
-`MCBUSE_PORTAL_ORIGIN=https://merchant.mcbuse.com`, and `PORTAL_ORIGINS` containing
-both that URL and the generated Cloud Run portal URL. Stripe continues to use
+The portal's runtime configuration lives in `deploy/cloud-run/portal.env.yaml`
+(canonical origin `https://merchant.mcbuse.com`, API
+`https://api.mcbuse.com/api/v1`). The deploy script replaces every variable on
+the service with that file, so never edit portal variables in the Cloud Console.
+It builds `PORTAL_ORIGINS` automatically from the canonical origin and both
+Cloud Run URLs of the service, then fails the deploy if sign-in rejects any of
+them. `MCBUSE_PORTAL_ORIGIN`, `MCBUSE_API_URL` and a comma-separated
+`MCBUSE_PORTAL_EXTRA_ORIGINS` override the file for one-off releases. Stripe continues to use
 its existing regional Cloud Run webhook URL; it is an official alias of the
 same API service and remains covered by the readiness check.
 

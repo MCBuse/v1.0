@@ -13,11 +13,23 @@ function equal(left: string, right: string) {
 }
 
 export function hasTrustedOrigin(request: NextRequest) {
-  return isTrustedPortalOrigin(
-    request.headers.get("origin"),
+  const origin = request.headers.get("origin");
+  const trusted = isTrustedPortalOrigin(
+    origin,
     PORTAL_ORIGINS,
     process.env.NODE_ENV,
   );
+  if (!trusted)
+    // Surfaces misconfigured PORTAL_ORIGIN/PORTAL_ORIGINS in Cloud Run logs.
+    console.warn(
+      JSON.stringify({
+        message: "Rejected request from untrusted origin",
+        origin,
+        path: request.nextUrl.pathname,
+        trustedOrigins: PORTAL_ORIGINS,
+      }),
+    );
+  return trusted;
 }
 
 export function hasValidCsrf(request: NextRequest) {
