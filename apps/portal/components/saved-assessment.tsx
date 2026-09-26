@@ -1,15 +1,15 @@
-import { Check, Minus } from "lucide-react";
 import type { CreditPublicResult, SavedMerchantAssessment } from "@repo/shared";
 import { Badge } from "@repo/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@repo/ui/table";
+import { Button } from "@repo/ui/button";
+import { ArrowRight } from "lucide-react";
 import { fieldLabel, stageLabel, stageTone } from "./assessment-labels";
+import {
+  AvailabilityBar,
+  STATUS,
+  StatusIcon,
+  missingStatus,
+  type InputStatus,
+} from "./assessment-status";
 
 const DATE = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" });
 const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
@@ -19,41 +19,59 @@ const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
 
 /**
  * The seven evidence-readiness checks, in the order the API evaluates them,
- * with merchant wording and the measurement that backs each one.
+ * with merchant wording, the measurement behind each one and its target.
  */
 const READINESS_CHECKS: Array<{
   api: string;
   label: string;
-  measure?: { key: string; unit?: "%" };
+  measure?: { key: string; target: number; unit?: "%"; noun?: string };
 }> = [
-  { api: "At least 30 observed days", label: "At least 30 days of records", measure: { key: "observedDays" } },
-  { api: "At least 10 active days", label: "Sales on at least 10 days", measure: { key: "activeDays" } },
-  { api: "At least 25 finalized payments", label: "At least 25 verified payments", measure: { key: "finalizedPayments" } },
-  { api: "Capture quality of at least 98%", label: "Payment capture quality of 98% or more", measure: { key: "captureQualityPercent", unit: "%" } },
-  { api: "Payment finality of at least 98%", label: "98% or more of payments completed", measure: { key: "finalityPercent", unit: "%" } },
-  { api: "Evidence consent is active", label: "Consent to use your business records" },
-  { api: "No unresolved critical exception", label: "No unresolved critical payment issues" },
+  {
+    api: "At least 30 observed days",
+    label: "At least 30 days of records",
+    measure: { key: "observedDays", target: 30, noun: "days" },
+  },
+  {
+    api: "At least 10 active days",
+    label: "Sales on at least 10 days",
+    measure: { key: "activeDays", target: 10, noun: "days" },
+  },
+  {
+    api: "At least 25 finalized payments",
+    label: "At least 25 verified payments",
+    measure: { key: "finalizedPayments", target: 25, noun: "payments" },
+  },
+  {
+    api: "Capture quality of at least 98%",
+    label: "Payment capture quality of 98% or more",
+    measure: { key: "captureQualityPercent", target: 98, unit: "%" },
+  },
+  {
+    api: "Payment finality of at least 98%",
+    label: "98% or more of payments completed",
+    measure: { key: "finalityPercent", target: 98, unit: "%" },
+  },
+  {
+    api: "Evidence consent is active",
+    label: "Consent to use your business records",
+  },
+  {
+    api: "No unresolved critical exception",
+    label: "No unresolved critical payment issues",
+  },
 ];
 
-type MissingGroup = "declared" | "payments" | "system";
-
-/** Sorts a missing input by why it is missing, so each group gets one clear next step. */
-function missingGroup(reason: string): MissingGroup {
-  if (/not provided in the business credit profile/i.test(reason)) return "declared";
-  // "Not enough recorded sales…" since cash counts (2026-09-26); older saved
-  // assessments still carry the "verified records" wording.
-  if (/not enough recorded sales|insufficient compatible verified records/i.test(reason)) return "payments";
-  return "system";
-}
-
-const GROUP_COPY: Record<MissingGroup, { title: string; hint: string }> = {
-  declared: {
-    title: "You can add these",
-    hint: "Fill them in under Additional information the next time you run a credit assessment.",
+const GROUP_COPY: Record<
+  Exclude<InputStatus, "available">,
+  { title: string; hint: string }
+> = {
+  declare: {
+    title: "You can add these now",
+    hint: "Fill them in under Additional information when you run your next assessment.",
   },
-  payments: {
+  sales: {
     title: "These build up as you record sales",
-    hint: "They're calculated from your MCBuse payments and the cash sales you record in this period. Payment reliability figures use MCBuse payments only.",
+    hint: "They're calculated from your MCBuse payments and the cash sales you record. Keep recording sales and they'll fill in.",
   },
   system: {
     title: "Not measured yet",
@@ -65,48 +83,59 @@ export function SavedAssessmentDetail({
   assessment: a,
   title = "Credit assessment",
   titleAs: Title = "h3",
+  onAddInformation,
 }: {
   assessment: SavedMerchantAssessment;
   title?: string;
   titleAs?: "h2" | "h3";
+  /** Opens the assessment form; when omitted the page shows guidance only. */
+  onAddInformation?: () => void;
 }) {
   const business = assessmentBusiness(a.businessProfile);
   const credit = a.credit;
-  const nextStep = nextStepFor(a.stage, credit);
 
   return (
-    <div className="grid gap-6 text-sm text-slate-700">
+    <div className="grid gap-8 text-sm text-slate-700">
       {/* Header: what this is, whose it is, and its status at a glance. */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <Title className="text-lg font-semibold text-slate-950">{title}</Title>
+          <Title className="text-lg font-semibold text-slate-950">
+            {title}
+          </Title>
           <p className="mt-1 text-slate-600">
             {business.businessName ? <>{business.businessName} · </> : null}
             {DATE.format(new Date(a.evidenceWindow.from))} –{" "}
-            {DATE.format(new Date(a.evidenceWindow.to))} ({a.evidenceWindow.days} days)
+            {DATE.format(new Date(a.evidenceWindow.to))} (
+            {a.evidenceWindow.days} days)
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
-            Saved <span className="font-mono tabular-nums">{DATE_TIME.format(new Date(a.createdAt))}</span>
+            Saved{" "}
+            <span className="font-mono tabular-nums">
+              {DATE_TIME.format(new Date(a.createdAt))}
+            </span>
           </p>
         </div>
         <Badge tone={stageTone(a.stage)}>{stageLabel(a.stage)}</Badge>
       </div>
 
-      {nextStep ? (
-        <div role="status" className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="font-medium text-slate-950">{nextStep.title}</p>
-          <p className="mt-0.5 text-slate-600">{nextStep.body}</p>
-        </div>
-      ) : null}
+      <ResultHero
+        stage={a.stage}
+        credit={credit}
+        onAddInformation={onAddInformation}
+      />
 
-      {credit ? <ResultFigures credit={credit} /> : null}
-      {credit ? <MissingInformation credit={credit} /> : null}
+      {credit ? (
+        <InformationBreakdown
+          credit={credit}
+          onAddInformation={onAddInformation}
+        />
+      ) : null}
 
       <ReadinessChecklist assessment={a} hasCredit={Boolean(credit)} />
 
       <p className="text-xs leading-5 text-slate-500">
-        Information you declare is not independently verified. This assessment is
-        not a lending decision.
+        Information you declare is not independently verified. This assessment
+        is not a lending decision.
       </p>
 
       <details className="rounded-lg border border-slate-200 px-4 py-3">
@@ -143,182 +172,392 @@ export function SavedAssessmentDetail({
   );
 }
 
-/** One short, prioritised instruction instead of several competing messages. */
+/** One clear instruction for whatever stands between the merchant and a score. */
 function nextStepFor(stage: string, credit: CreditPublicResult | undefined) {
   if (credit?.status === "consent_required" || stage === "consent_required")
     return {
       title: "Your consent is needed",
-      body: "We can't calculate your score until you allow MCBuse to use your business records. Tick the consent box when you next run a credit assessment.",
+      body: "We can't calculate your score until you allow MCBuse to use your business records. Tick the consent box when you run your next assessment.",
+      action: "Run a new assessment",
     };
-  if (credit?.status === "temporarily_unavailable" || stage === "scoring_unavailable")
+  if (
+    credit?.status === "temporarily_unavailable" ||
+    stage === "scoring_unavailable"
+  )
     return {
       title: "Scoring is temporarily unavailable",
-      body: "Your assessment has been saved. Please run it again later to get your score.",
+      body: "Your assessment has been saved. Run it again a little later to get your score.",
+      action: "Try again",
     };
   if (credit && !credit.financialProfile) {
-    const count = Object.keys(credit.missingReasons).length;
-    return {
-      title: "We can't calculate your score yet",
-      body: `${count} ${count === 1 ? "piece of information is" : "pieces of information are"} missing. See what's needed below.`,
-    };
+    const reasons = Object.values(credit.missingReasons);
+    const addable = reasons.filter(
+      (r) => missingStatus(r) === "declare",
+    ).length;
+    return addable
+      ? {
+          title: "Your score isn't ready yet",
+          body: `Add ${addable} missing ${addable === 1 ? "detail" : "details"} to move closer to a score. ${reasons.length - addable ? "Some other items build up as you record sales." : ""}`.trim(),
+          action: `Add ${addable} missing ${addable === 1 ? "detail" : "details"}`,
+        }
+      : {
+          title: "Your score isn't ready yet",
+          body: "Keep recording sales. The missing items fill in as your activity builds up, then run a new assessment.",
+          action: null,
+        };
   }
   if (stage === "integrity_review")
     return {
       title: "A payment issue needs attention",
       body: "Resolve the open critical payment issue, then run a new assessment.",
+      action: null,
     };
   return null;
 }
 
-function ResultFigures({ credit: c }: { credit: CreditPublicResult }) {
-  const provenance = Object.values(c.provenance ?? {});
-  const filled = c.profileConfidence?.fieldsFilled ?? provenance.filter((p) => p !== "unavailable").length;
-  const total = c.profileConfidence?.fieldsTotal ?? provenance.length;
+function ResultHero({
+  stage,
+  credit,
+  onAddInformation,
+}: {
+  stage: string;
+  credit: CreditPublicResult | undefined;
+  onAddInformation?: () => void;
+}) {
+  const score = credit?.financialProfile?.score;
+  const confidence = credit?.profileConfidence;
+  const next = nextStepFor(stage, credit);
+
+  if (typeof score === "number")
+    return (
+      <section
+        aria-label="Result"
+        className="grid gap-5 rounded-xl border border-emerald-200 bg-emerald-50 p-6 sm:grid-cols-[1fr_auto] sm:items-end"
+      >
+        <div className="grid gap-3">
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
+            <StatusIcon status="available" /> Your financial profile score
+          </p>
+          <p className="flex items-baseline gap-2">
+            <span className="font-mono text-5xl font-semibold tabular-nums text-slate-950">
+              {score.toFixed(1)}
+            </span>
+            <span className="text-lg text-slate-600">/ 100</span>
+          </p>
+          <div
+            className="h-2.5 w-full max-w-md overflow-hidden rounded-full bg-white"
+            role="img"
+            aria-label={`Score ${score.toFixed(1)} out of 100`}
+          >
+            <div
+              className="h-full rounded-full bg-emerald-500"
+              style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
+            />
+          </div>
+          <p className="text-sm text-slate-600">
+            Higher is stronger. This is not a lending decision.
+          </p>
+        </div>
+        {confidence ? (
+          <div className="grid gap-1 sm:text-right">
+            <p className="text-sm text-slate-600">Confidence</p>
+            <p>
+              <Badge
+                tone={
+                  confidence.label === "High"
+                    ? "success"
+                    : confidence.label === "Medium"
+                      ? "info"
+                      : "warning"
+                }
+                className="px-3 py-1 text-sm"
+              >
+                {confidence.label}
+              </Badge>
+            </p>
+            <p className="text-xs text-slate-500">
+              <span className="font-mono tabular-nums">
+                {confidence.fieldsFilled}
+              </span>{" "}
+              of{" "}
+              <span className="font-mono tabular-nums">
+                {confidence.fieldsTotal}
+              </span>{" "}
+              items provided
+            </p>
+          </div>
+        ) : null}
+      </section>
+    );
+
+  if (!next) return null;
   return (
-    <dl className="grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-3">
-      <Figure
-        label="Financial profile score"
-        value={c.financialProfile ? c.financialProfile.score.toFixed(1) : "—"}
-        suffix={c.financialProfile ? "/ 100" : undefined}
-        hint={c.financialProfile ? "Higher is stronger" : "Not calculated yet"}
-      />
-      <Figure
-        label="Confidence"
-        value={c.profileConfidence?.label ?? "—"}
-        hint={c.profileConfidence ? "How complete and reliable your records are" : "Not calculated yet"}
-      />
-      <Figure
-        label="Information available"
-        value={total ? String(filled) : "—"}
-        suffix={total ? `of ${total}` : undefined}
-        hint="Items used to calculate your score"
-      />
-    </dl>
+    <section
+      aria-label="Result"
+      aria-live="polite"
+      className="grid gap-4 rounded-xl border border-amber-200 bg-amber-50 p-6"
+    >
+      <div className="flex items-start gap-3">
+        <StatusIcon status="declare" className="mt-1 size-6" />
+        <div className="grid gap-1">
+          <p className="text-xl font-semibold text-slate-950">{next.title}</p>
+          <p className="max-w-prose text-base text-slate-700">{next.body}</p>
+        </div>
+      </div>
+      {next.action && onAddInformation ? (
+        <div className="sm:pl-9">
+          <Button size="lg" onClick={onAddInformation}>
+            {next.action} <ArrowRight className="size-4" aria-hidden="true" />
+          </Button>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
-function Figure({ label, value, suffix, hint }: { label: string; value: string; suffix?: string; hint: string }) {
-  return (
-    <div className="bg-white p-4">
-      <dt className="text-xs font-medium text-slate-500">{label}</dt>
-      <dd className="mt-1 flex items-baseline gap-1.5">
-        <span className="font-mono text-2xl font-semibold tabular-nums text-slate-950">{value}</span>
-        {suffix ? <span className="text-sm text-slate-500">{suffix}</span> : null}
-      </dd>
-      <dd className="mt-1 text-xs text-slate-500">{hint}</dd>
-    </div>
+function InformationBreakdown({
+  credit: c,
+  onAddInformation,
+}: {
+  credit: CreditPublicResult;
+  onAddInformation?: () => void;
+}) {
+  const missing = new Set(Object.keys(c.missingReasons));
+  const available = Object.keys(c.provenance ?? {}).filter(
+    (key) => !missing.has(key) && c.provenance[key] !== "unavailable",
   );
-}
-
-function MissingInformation({ credit: c }: { credit: CreditPublicResult }) {
-  const entries = Object.entries(c.missingReasons);
-  if (!entries.length) return null;
-  const groups: Record<MissingGroup, Array<[string, string]>> = { declared: [], payments: [], system: [] };
-  for (const entry of entries) groups[missingGroup(entry[1])].push(entry);
+  const groups: Record<
+    Exclude<InputStatus, "available">,
+    Array<[string, string]>
+  > = {
+    declare: [],
+    sales: [],
+    system: [],
+  };
+  for (const entry of Object.entries(c.missingReasons))
+    groups[missingStatus(entry[1])].push(entry);
+  const counts = {
+    available: available.length,
+    declare: groups.declare.length,
+    sales: groups.sales.length,
+    system: groups.system.length,
+  };
 
   return (
-    <section aria-labelledby="missing-information" className="grid gap-3">
-      <h4 id="missing-information" className="font-semibold text-slate-950">
-        What&apos;s missing
+    <section aria-labelledby="information-breakdown" className="grid gap-5">
+      <h4
+        id="information-breakdown"
+        className="text-lg font-semibold text-slate-950"
+      >
+        Information behind your score
       </h4>
-      <div className="grid divide-y divide-slate-200 rounded-lg border border-slate-200">
-        {(Object.keys(GROUP_COPY) as MissingGroup[]).map((group) =>
+      <AvailabilityBar
+        counts={counts}
+        label="Items the score is calculated from"
+      />
+
+      <div className="grid gap-4">
+        {(["declare", "sales", "system"] as const).map((group) =>
           groups[group].length ? (
-            <div key={group} className="grid gap-2 p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="font-medium text-slate-950">{GROUP_COPY[group].title}</p>
-                <span className="font-mono text-xs tabular-nums text-slate-500">{groups[group].length}</span>
+            <div
+              key={group}
+              className={`grid gap-3 rounded-xl border p-5 ${STATUS[group].border} ${STATUS[group].soft}`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <StatusIcon status={group} className="mt-0.5" />
+                  <div>
+                    <p className="text-base font-semibold text-slate-950">
+                      {GROUP_COPY[group].title}{" "}
+                      <span
+                        className={`font-mono tabular-nums ${STATUS[group].text}`}
+                      >
+                        ({groups[group].length})
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-sm text-slate-600">
+                      {GROUP_COPY[group].hint}
+                    </p>
+                  </div>
+                </div>
+                {group === "declare" && onAddInformation ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onAddInformation}
+                  >
+                    Add these details{" "}
+                    <ArrowRight className="size-4" aria-hidden="true" />
+                  </Button>
+                ) : null}
               </div>
-              <p className="text-slate-600">{GROUP_COPY[group].hint}</p>
-              <ul className="mt-1 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+              <ul className="grid gap-x-6 gap-y-2 pl-7 sm:grid-cols-2">
                 {groups[group].map(([key, reason]) => (
-                  <li key={key} className="flex gap-2 text-slate-950">
-                    <Minus size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-slate-400" />
-                    <span>
-                      {fieldLabel(key)}
-                      {group === "system" ? (
-                        <span className="block text-xs text-slate-500">{reason}</span>
-                      ) : null}
-                    </span>
+                  <li key={key} className="text-[15px] text-slate-950">
+                    {fieldLabel(key)}
+                    {group === "system" ? (
+                      <span className="block text-xs text-slate-500">
+                        {reason}
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>
             </div>
           ) : null,
         )}
+
+        {available.length ? (
+          <details
+            className={`group rounded-xl border p-5 ${STATUS.available.border}`}
+          >
+            <summary className="flex cursor-pointer list-none items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-blue-700">
+              <StatusIcon status="available" />
+              <span className="text-base font-semibold text-slate-950">
+                Already available{" "}
+                <span className="font-mono tabular-nums text-emerald-700">
+                  ({available.length})
+                </span>
+              </span>
+              <span className="ml-auto text-sm font-medium text-blue-700 group-open:hidden">
+                Show
+              </span>
+              <span className="ml-auto hidden text-sm font-medium text-blue-700 group-open:inline">
+                Hide
+              </span>
+            </summary>
+            <ul className="mt-3 flex flex-wrap gap-2 pl-7">
+              {available.map((key) => (
+                <li
+                  key={key}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-sm text-emerald-800"
+                >
+                  {fieldLabel(key)}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </div>
     </section>
   );
 }
 
-function ReadinessChecklist({ assessment: a, hasCredit }: { assessment: SavedMerchantAssessment; hasCredit: boolean }) {
+function ReadinessChecklist({
+  assessment: a,
+  hasCredit,
+}: {
+  assessment: SavedMerchantAssessment;
+  hasCredit: boolean;
+}) {
   const passed = new Set(a.passedRequirements);
   const missing = new Set(a.missingRequirements);
   const known = new Set(READINESS_CHECKS.map((c) => c.api));
-  const rows = READINESS_CHECKS.filter((c) => passed.has(c.api) || missing.has(c.api)).map((c) => ({
-    key: c.api,
-    label: c.label,
-    met: passed.has(c.api),
-    measured: c.measure ? formatMeasure(a.reliability[c.measure.key], c.measure.unit) : null,
-  }));
+  const rows = READINESS_CHECKS.filter(
+    (c) => passed.has(c.api) || missing.has(c.api),
+  ).map((c) => {
+    const raw = c.measure ? a.reliability[c.measure.key] : undefined;
+    return {
+      key: c.api,
+      label: c.label,
+      met: passed.has(c.api),
+      value: typeof raw === "number" && Number.isFinite(raw) ? raw : null,
+      measure: c.measure,
+    };
+  });
   // Anything the API adds later still shows. With a credit result, unknown
-  // missing items are model inputs, which "What's missing" already lists.
+  // missing items are model inputs, which the breakdown above already lists.
   for (const item of a.passedRequirements)
-    if (!known.has(item)) rows.push({ key: item, label: item, met: true, measured: null });
+    if (!known.has(item))
+      rows.push({
+        key: item,
+        label: item,
+        met: true,
+        value: null,
+        measure: undefined,
+      });
   if (!hasCredit)
     for (const item of a.missingRequirements)
-      if (!known.has(item)) rows.push({ key: item, label: item, met: false, measured: null });
+      if (!known.has(item))
+        rows.push({
+          key: item,
+          label: item,
+          met: false,
+          value: null,
+          measure: undefined,
+        });
   if (!rows.length) return null;
   const metCount = rows.filter((r) => r.met).length;
 
   return (
-    <section aria-labelledby="readiness-checklist" className="grid gap-3">
+    <section aria-labelledby="readiness-checklist" className="grid gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h4 id="readiness-checklist" className="font-semibold text-slate-950">
+        <h4
+          id="readiness-checklist"
+          className="text-lg font-semibold text-slate-950"
+        >
           Payment history checklist
         </h4>
-        <span className="text-xs text-slate-500">
+        <p className="text-base font-semibold text-slate-950">
           <span className="font-mono tabular-nums">{metCount}</span> of{" "}
           <span className="font-mono tabular-nums">{rows.length}</span> met
-        </span>
+        </p>
       </div>
-      <div className="overflow-x-auto rounded-lg border border-slate-200">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead scope="col">Requirement</TableHead>
-              <TableHead scope="col" className="text-right">Yours</TableHead>
-              <TableHead scope="col" className="w-24">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.key}>
-                <TableCell className="text-slate-950">{row.label}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-slate-700">{row.measured ?? "—"}</TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {row.met ? (
-                    <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                      <Check size={16} aria-hidden="true" /> Met
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 text-slate-500">
-                      <Minus size={16} aria-hidden="true" /> Not yet
-                    </span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <ul className="grid divide-y divide-slate-200 rounded-xl border border-slate-200">
+        {rows.map((row) => {
+          const status: InputStatus = row.met ? "available" : "sales";
+          const pct =
+            row.measure && row.value !== null
+              ? Math.min(100, (row.value / row.measure.target) * 100)
+              : null;
+          return (
+            <li key={row.key} className="grid gap-2 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="flex items-start gap-2.5 text-[15px] text-slate-950">
+                  <StatusIcon status={status} className="mt-0.5" />
+                  {row.label}
+                </p>
+                <p
+                  className={`shrink-0 text-sm font-semibold ${STATUS[status].text}`}
+                >
+                  {row.met ? "Met" : "Not yet"}
+                </p>
+              </div>
+              {row.measure ? (
+                <div className="grid gap-1.5 pl-7">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className={`h-full rounded-full ${STATUS[status].bar}`}
+                      style={{ width: `${pct ?? 0}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    {row.value === null ? (
+                      "Not measured yet"
+                    ) : (
+                      <>
+                        <span className="font-mono tabular-nums text-slate-950">
+                          {row.measure.unit === "%"
+                            ? `${row.value.toFixed(1)}%`
+                            : Math.round(row.value)}
+                        </span>{" "}
+                        of{" "}
+                        <span className="font-mono tabular-nums">
+                          {row.measure.target}
+                          {row.measure.unit ?? ""}
+                        </span>
+                        {row.measure.noun ? ` ${row.measure.noun}` : ""}
+                      </>
+                    )}
+                  </p>
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
-}
-
-function formatMeasure(value: unknown, unit?: "%") {
-  if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  return unit === "%" ? `${value.toFixed(1)}%` : String(Math.round(value));
 }
 
 function assessmentBusiness(value: Record<string, unknown>) {

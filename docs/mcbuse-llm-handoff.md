@@ -130,6 +130,8 @@ Organize Payment into **four** clearly separated outer blocks. The original note
    - Transactions.
    - Receipts.
 
+   Update 2026-09-26 (Frederick): Transactions and Receipts are record views, not a workflow step, so they now sit as two secondary buttons in the Payment page header (top right) instead of a fourth block at the bottom. The page therefore has three framed blocks.
+
 Distinguish each block with a clear, consistent border/demarcation, as on Overview. Delete the **End of Day** block: processed payments already cover that activity and money can be moved under Accounts.
 
 ## 3. Trust, evidence, analytics, and credit rules

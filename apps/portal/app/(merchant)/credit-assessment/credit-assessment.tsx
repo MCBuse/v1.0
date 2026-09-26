@@ -30,6 +30,7 @@ export function CreditAssessment() {
   );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
 
   async function completed({ assessment, pdfError }: AssessmentOutcome) {
     setSelected(assessment);
@@ -78,6 +79,8 @@ export function CreditAssessment() {
         <RunAssessmentDrawer
           merchantId={profile.data?.id}
           onCompleted={completed}
+          open={formOpen}
+          onOpenChange={setFormOpen}
         />
       </div>
 
@@ -86,14 +89,23 @@ export function CreditAssessment() {
           <CardContent className="py-6">
             <SavedAssessmentDetail
               assessment={current}
-              title={selected && selected.id !== history.data?.assessments[0]?.id ? "Selected assessment" : "Latest assessment"}
+              title={
+                selected && selected.id !== history.data?.assessments[0]?.id
+                  ? "Selected assessment"
+                  : "Latest assessment"
+              }
               titleAs="h2"
+              onAddInformation={
+                profile.data ? () => setFormOpen(true) : undefined
+              }
             />
           </CardContent>
         ) : (
           <>
             <CardHeader>
-              <h2 className="font-semibold text-slate-950">Latest assessment</h2>
+              <h2 className="font-semibold text-slate-950">
+                Latest assessment
+              </h2>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-slate-600">
@@ -140,14 +152,23 @@ export function CreditAssessment() {
                       {stageLabel(assessment.stage)}
                     </button>
                     {pdf ? (
-                      <a
-                        className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700"
-                        href={`/api/merchant/me/finance-packages/${pdf.id}/pdf`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Download PDF
-                      </a>
+                      <span className="inline-flex gap-4">
+                        <a
+                          className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700"
+                          href={`/api/merchant/me/finance-packages/${pdf.id}/pdf?preview=true`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View PDF
+                        </a>
+                        <a
+                          className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-700"
+                          href={`/api/merchant/me/finance-packages/${pdf.id}/pdf`}
+                          download
+                        >
+                          Download
+                        </a>
+                      </span>
                     ) : (
                       <Link
                         className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-700"

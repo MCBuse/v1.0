@@ -314,15 +314,16 @@ test("an amount of zero is refused before anything is sent", async ({
   expect(sent).toBe(0);
 });
 
-test("Payment is four blocks and has no End of day block", async ({ page }) => {
+test("Payment is three blocks with record links in the header, and no End of day block", async ({ page }) => {
   await page.goto("/payment");
-  for (const name of ["Accounts", "Process payments", "Today's payment activity", "Transactions data"])
+  for (const name of ["Accounts", "Process payments", "Today's payment activity"])
     await expect(page.getByRole("heading", { level: 2, name, exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "End of day" })).toHaveCount(0);
   const today = page.getByRole("region", { name: "Today's payment activity" });
   for (const name of ["Processed payments", "Money movement status", "On the counter", "Fast payment requests"])
     await expect(today.getByRole("heading", { name })).toBeVisible();
-  const data = page.getByRole("region", { name: "Transactions data" });
+  await expect(page.getByRole("heading", { name: "Transactions data" })).toHaveCount(0);
+  const data = page.getByRole("navigation", { name: "Payment records" });
   await expect(data.getByRole("link", { name: "Transactions" })).toHaveAttribute("href", "/analytics/transactions");
   await expect(data.getByRole("link", { name: "Receipts" })).toHaveAttribute("href", "/analytics/transactions#receipts");
 });

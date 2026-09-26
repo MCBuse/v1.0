@@ -5,7 +5,7 @@ import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardHeader } from "@repo/ui/card";
 import { Money } from "@repo/ui/money";
-import { ArrowRight } from "lucide-react";
+import { List, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import {
   AccountsBlock,
@@ -28,7 +28,11 @@ const statusTone = (status: string) =>
         ? "info"
         : "neutral";
 
-/** Payment in four blocks: Accounts → Process payments → Today's activity → Transactions data. */
+/**
+ * Payment in three blocks: Accounts → Process payments → Today's activity.
+ * Transactions and Receipts are record views, so they sit in the page header
+ * as secondary links rather than as a fourth block at the bottom.
+ */
 export function PaymentWorkspace() {
   const { summary, operations } = useAccountsData();
   const requests = usePortalResource<MerchantPaymentRequestPage>(
@@ -38,14 +42,28 @@ export function PaymentWorkspace() {
 
   return (
     <div className="grid gap-8">
-      <div>
-        <p className="text-sm font-medium text-blue-700">Payment</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
-          Capture business activity
-        </h1>
-        <p className="mt-2 text-sm text-slate-500">
-          Create a fast request, prepare an itemised invoice, or record a cash sale.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-blue-700">Payment</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+            Capture business activity
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Create a fast request, prepare an itemised invoice, or record a cash sale.
+          </p>
+        </div>
+        <nav aria-label="Payment records" className="flex flex-wrap gap-2">
+          <Button asChild variant="secondary">
+            <Link href="/analytics/transactions">
+              <List aria-hidden="true" className="size-4" /> Transactions
+            </Link>
+          </Button>
+          <Button asChild variant="secondary">
+            <Link href="/analytics/transactions#receipts">
+              <ReceiptText aria-hidden="true" className="size-4" /> Receipts
+            </Link>
+          </Button>
+        </nav>
       </div>
 
       <PageSection id="payment-accounts" title="Accounts" framed>
@@ -122,13 +140,6 @@ export function PaymentWorkspace() {
           </Card>
         </div>
       </PageSection>
-
-      <PageSection id="payment-data" title="Transactions data" framed>
-        <div className="grid gap-4 md:grid-cols-2">
-          <LinkCard href="/analytics/transactions" title="Transactions" />
-          <LinkCard href="/analytics/transactions#receipts" title="Receipts" />
-        </div>
-      </PageSection>
     </div>
   );
 }
@@ -152,17 +163,5 @@ function ActionCard({
         <div className="mt-auto">{children}</div>
       </CardContent>
     </Card>
-  );
-}
-
-function LinkCard({ href, title }: { href: string; title: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex min-h-16 items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 font-semibold text-slate-950 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
-    >
-      {title}
-      <ArrowRight size={16} aria-hidden="true" className="text-slate-400" />
-    </Link>
   );
 }

@@ -231,7 +231,7 @@ test("merchant credit profile preserves cents and exposes separate pilot consent
     .getByRole("button", { name: "Run credit assessment", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Additional information", exact: true }),
+    page.getByRole("heading", { name: /Add what's missing/ }),
   ).toBeVisible();
   await page
     .getByLabel("Requested loan amount (EUR)", { exact: true })

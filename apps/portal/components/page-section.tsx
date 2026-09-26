@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { Button } from "@repo/ui/button";
 
 /**
  * One block of a merchant page: title row with a hairline underneath, then content.
@@ -31,12 +33,11 @@ export function PageSection({
           {title}
         </h2>
         {href ? (
-          <a
-            href={href}
-            className="flex min-h-11 items-center gap-1 text-sm font-semibold text-blue-700"
-          >
-            {linkLabel ?? `Open ${title}`} <ArrowRight size={16} aria-hidden="true" />
-          </a>
+          <Button asChild size="sm">
+            <Link href={href}>
+              {linkLabel ?? `Open ${title}`} <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          </Button>
         ) : null}
       </div>
       {children}

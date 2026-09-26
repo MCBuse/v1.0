@@ -4,6 +4,12 @@ function values(buckets: MerchantSummaryBucket[]) {
   return buckets.map((bucket) => Number(BigInt(bucket.amountMinor)) / 100);
 }
 
+const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+function dayLabel(start: string) {
+  const date = new Date(start);
+  return Number.isNaN(date.getTime()) ? start : DAY.format(date);
+}
+
 export function SalesBars({
   buckets,
   label,
@@ -25,10 +31,12 @@ export function SalesBars({
           return (
             <div
               key={bucket.start}
-              className="group relative flex min-w-0 flex-1 items-end"
+              // h-full gives the column a definite height; without it the
+              // percentage height on the bar resolves to 0 and nothing shows.
+              className="group relative flex h-full min-w-0 flex-1 items-end"
             >
               <div
-                className="w-full rounded-t-sm bg-blue-100 transition-colors group-hover:bg-blue-500"
+                className="w-full rounded-t-sm bg-blue-400 transition-colors group-hover:bg-blue-600"
                 style={{ height: `${Math.max(3, (amount / max) * 100)}%` }}
                 title={`${bucket.start}: €${amount.toFixed(2)}`}
               />
@@ -36,6 +44,12 @@ export function SalesBars({
           );
         })}
       </div>
+      {buckets.length ? (
+        <div className="mt-2 flex justify-between text-xs text-slate-400">
+          <span>{dayLabel(buckets[0]!.start)}</span>
+          <span>{dayLabel(buckets[buckets.length - 1]!.start)}</span>
+        </div>
+      ) : null}
       <table className="sr-table">
         <caption>{label}</caption>
         <thead>
@@ -78,7 +92,7 @@ export function HourlyRhythm({
           return (
             <div
               key={bucket.start}
-              className="min-w-0 flex-1 rounded-t-sm bg-slate-200"
+              className="min-w-0 flex-1 rounded-t-sm bg-blue-400 transition-colors hover:bg-blue-600"
               style={{ height: `${Math.max(4, (amount / max) * 100)}%` }}
               title={`${bucket.start}: €${amount.toFixed(2)}`}
             />

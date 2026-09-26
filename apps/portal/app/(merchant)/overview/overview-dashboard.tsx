@@ -20,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/table";
-import { AlertTriangle, Clock3 } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ArrowRight, Clock3 } from "lucide-react";
 import { SalesBars, HourlyRhythm } from "@/components/charts";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
 import { PageSection } from "@/components/page-section";
@@ -257,11 +258,17 @@ export function OverviewDashboard() {
           <Metric
             label="Low-stock products"
             value={
-              <a className="font-mono tabular-nums text-blue-700" href="/inventory">
+              <span className="font-mono tabular-nums">
                 {data.lowStockProductCount}
-              </a>
+              </span>
             }
-            detail="View Inventory"
+            detail={
+              <Button asChild size="sm">
+                <Link href="/inventory">
+                  View Inventory <ArrowRight size={16} aria-hidden="true" />
+                </Link>
+              </Button>
+            }
           />
         </TileRow>
         <div className="grid gap-4 lg:grid-cols-2">
