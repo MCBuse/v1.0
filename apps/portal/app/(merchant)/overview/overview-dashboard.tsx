@@ -88,7 +88,7 @@ export function OverviewDashboard() {
   );
   const latestAssessment = assessments.data?.assessments[0];
   return (
-    <div className="grid gap-12">
+    <div className="grid gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-blue-700">Overview</p>
@@ -122,7 +122,7 @@ export function OverviewDashboard() {
 
       {/* Every section: title + link, one row of tiles, then at most one detail panel. */}
 
-      <PageSection id="overview-payment" title="Payment" href="/payment">
+      <PageSection id="overview-payment" title="Payment" href="/payment" framed>
         {data.problemCount > 0 ? (
           <div className="grid gap-3" aria-labelledby="payment-problems">
             <div className="flex items-center gap-2">
@@ -236,7 +236,7 @@ export function OverviewDashboard() {
         </Card>
       </PageSection>
 
-      <PageSection id="overview-analytics" title="Analytics" href="/analytics">
+      <PageSection id="overview-analytics" title="Analytics" href="/analytics" framed>
         <TileRow>
           <Metric
             label="Recorded sales · 30 days"
@@ -293,7 +293,7 @@ export function OverviewDashboard() {
         <MerchantInsightsPanel limit={3} />
       </PageSection>
 
-      <PageSection id="overview-credit" title="Credit Assessment" href="/credit-assessment">
+      <PageSection id="overview-credit" title="Credit Assessment" href="/credit-assessment" framed>
         <TileRow>
           <Metric
             label="Saved assessments"
@@ -312,7 +312,7 @@ export function OverviewDashboard() {
         </TileRow>
       </PageSection>
 
-      <PageSection id="overview-finance" title="Finance Match" href="/finance-match">
+      <PageSection id="overview-finance" title="Finance Match" href="/finance-match" framed>
         <TileRow>
           <Metric
             label="Saved PDFs"

@@ -83,11 +83,22 @@ bash scripts/cloud-run/provision-merchant-evidence.sh
 
 ## Build, migrate, and deploy
 
-Use the pre-migration backup created for this cutover:
+The repository loads local deployment defaults from `.env.local` (or the path
+set in `MCBUSE_ENV_FILE`). The checked-in `.env.example` shows the non-secret
+settings. The local file is ignored by Git; it must never contain database,
+service-account, or application-secret values.
+
+Before a deployment that may run database migrations, create and verify a
+fresh backup for that release, then add its directory to `.env.local`:
 
 ```bash
-export MCBUSE_GCP_PROJECT_ID="your-dedicated-project-id"
-export MCBUSE_BACKUP_DIR="/absolute/path/to/verified-backup"
+# .env.local
+MCBUSE_BACKUP_DIR="/absolute/path/to/verified-backup"
+```
+
+Then deploy:
+
+```bash
 pnpm deploy:api:cloud-run
 ```
 

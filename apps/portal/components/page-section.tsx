@@ -9,6 +9,7 @@ export function PageSection({
   title,
   href,
   linkLabel,
+  framed = false,
   children,
 }: {
   id: string;
@@ -16,10 +17,15 @@ export function PageSection({
   /** Optional route for the whole block, shown as "Open <title> →". */
   href?: string;
   linkLabel?: string;
+  /** Draw a thin line around the whole block so its subsections read as one group. */
+  framed?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <section aria-labelledby={id} className="grid scroll-mt-24 gap-4">
+    <section
+      aria-labelledby={id}
+      className={`grid scroll-mt-24 gap-4 ${framed ? "rounded-xl border border-slate-200 p-4 sm:p-6" : ""}`}
+    >
       <div className="flex min-h-11 items-center justify-between gap-4 border-b border-slate-200 pb-3">
         <h2 id={id} className="text-xl font-semibold tracking-tight text-slate-950">
           {title}

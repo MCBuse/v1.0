@@ -2,6 +2,27 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+local_env_file="${MCBUSE_ENV_FILE:-$repo_root/.env.local}"
+project_id_from_shell="${MCBUSE_GCP_PROJECT_ID-}"
+region_from_shell="${MCBUSE_GCP_REGION-}"
+backup_dir_from_shell="${MCBUSE_BACKUP_DIR-}"
+project_id_was_set="${MCBUSE_GCP_PROJECT_ID+x}"
+region_was_set="${MCBUSE_GCP_REGION+x}"
+backup_dir_was_set="${MCBUSE_BACKUP_DIR+x}"
+
+# Keep personal deployment defaults out of Git while allowing an explicit
+# environment variable to take precedence (for CI or one-off releases).
+if [[ -f "$local_env_file" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$local_env_file"
+  set +a
+fi
+
+if [[ "$project_id_was_set" == x ]]; then export MCBUSE_GCP_PROJECT_ID="$project_id_from_shell"; fi
+if [[ "$region_was_set" == x ]]; then export MCBUSE_GCP_REGION="$region_from_shell"; fi
+if [[ "$backup_dir_was_set" == x ]]; then export MCBUSE_BACKUP_DIR="$backup_dir_from_shell"; fi
+
 project_id="${MCBUSE_GCP_PROJECT_ID:?Set MCBUSE_GCP_PROJECT_ID to the dedicated GCP project.}"
 backup_dir="${MCBUSE_BACKUP_DIR:?Set MCBUSE_BACKUP_DIR to the verified pre-migration backup directory.}"
 region="${MCBUSE_GCP_REGION:-europe-west1}"

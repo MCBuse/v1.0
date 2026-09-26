@@ -182,10 +182,18 @@ Tap **Swap** to convert between USDC and EURC inside the Holding Account.
 
 ### API → Google Cloud Run
 
+Set the stable local Cloud Run defaults once in the ignored `.env.local` file.
+Copy `.env.example` if the file does not yet exist. The API deployment script
+loads that file automatically.
+
 ```bash
-export MCBUSE_GCP_PROJECT_ID="mcbuse-hackathon-2026-fno"
-export MCBUSE_GCP_REGION="europe-west1"
-export MCBUSE_BACKUP_DIR="/absolute/path/to/verified-pre-migration-backup"
+# .env.local
+MCBUSE_BACKUP_DIR="/absolute/path/to/verified-pre-migration-backup"
+```
+
+Then deploy:
+
+```bash
 pnpm deploy:api:cloud-run
 ```
 

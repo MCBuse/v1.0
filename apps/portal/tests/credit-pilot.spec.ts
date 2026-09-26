@@ -223,9 +223,20 @@ test("merchant credit profile preserves cents and exposes separate pilot consent
     if(r.request().method()==='POST')pilotConsent = r.request().postDataJSON().active === true;
     await r.fulfill({json:{active:pilotConsent,purpose:'credit_pilot_assessment',version:'2026-09-credit-pilot-v1',recordedAt:null}});
   });
-  await page.goto("/business-profile");
+  await page.route("**/api/merchant/me/assessments", (r) =>
+    r.fulfill({ json: { assessments: [] } }),
+  );
+  await page.route("**/api/merchant/me/finance-packages", (r) =>
+    r.fulfill({ json: { items: [] } }),
+  );
+  // The credit profile form moved from Business profile into the
+  // Credit Assessment form (bc653ad) and is now titled "Additional information".
+  await page.goto("/credit-assessment");
+  await page
+    .getByRole("button", { name: "Run credit assessment", exact: true })
+    .click();
   await expect(
-    page.getByRole("heading", { name: "Credit profile and pilot consent" }),
+    page.getByRole("heading", { name: "Additional information", exact: true }),
   ).toBeVisible();
   await page
     .getByLabel("Requested loan amount (EUR)", { exact: true })
@@ -240,6 +251,10 @@ test("merchant credit profile preserves cents and exposes separate pilot consent
     .click();
   expect((await savedRequest).postDataJSON().data.loanAmountMinor).toBe("10");
   await expect(page.getByRole("status").filter({hasText:"Credit profile saved"})).toBeVisible();
+  // Pilot consent is kept separate, inside a collapsed disclosure.
+  await page
+    .getByText("Internal pilot consent (optional)", { exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Give pilot consent", exact: true })
     .click();

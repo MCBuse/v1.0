@@ -224,8 +224,8 @@ function Stat({
 function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
   const t = data.transactions;
   return (
-    <section id="transaction-analytics" className="grid scroll-mt-24 gap-4" aria-label="Transaction analytics">
-      <h2 className="text-xl font-semibold text-slate-950">Transaction analytics</h2>
+    <section id="transaction-analytics" className="grid scroll-mt-24 gap-4 rounded-xl border border-slate-200 p-4 sm:p-6" aria-label="Transaction analytics">
+      <h2 className="border-b border-slate-200 pb-3 text-xl font-semibold tracking-tight text-slate-950">Transaction analytics</h2>
 
       {t.labels.notes.length ? (
         <Alert>{t.labels.notes.join(" ")}</Alert>
@@ -416,8 +416,8 @@ function TransactionsSection({ data }: { data: GeneralAnalyticsResponse }) {
 function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
   const v = data.inventory;
   return (
-    <section id="inventory-analytics" className="grid scroll-mt-24 gap-4" aria-label="Inventory analytics">
-      <h2 className="text-xl font-semibold text-slate-950">Inventory analytics</h2>
+    <section id="inventory-analytics" className="grid scroll-mt-24 gap-4 rounded-xl border border-slate-200 p-4 sm:p-6" aria-label="Inventory analytics">
+      <h2 className="border-b border-slate-200 pb-3 text-xl font-semibold tracking-tight text-slate-950">Inventory analytics</h2>
 
       {v.notes.length ? <Alert>{v.notes.join(" ")}</Alert> : null}
 
@@ -714,8 +714,8 @@ function List({
 
 function CombinedSection({ data }: { data: GeneralAnalyticsResponse }) {
   return (
-    <section id="combined-analytics" className="grid scroll-mt-24 gap-4" aria-label="Combined analytics">
-      <h2 className="text-xl font-semibold text-slate-950">
+    <section id="combined-analytics" className="grid scroll-mt-24 gap-4 rounded-xl border border-slate-200 p-4 sm:p-6" aria-label="Combined analytics">
+      <h2 className="border-b border-slate-200 pb-3 text-xl font-semibold tracking-tight text-slate-950">
         Combined transaction and inventory analytics
       </h2>
       <Alert>{data.combined.stockScopeNote}</Alert>

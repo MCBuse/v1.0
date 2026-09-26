@@ -37,7 +37,7 @@ export function PaymentWorkspace() {
   );
 
   return (
-    <div className="grid gap-12">
+    <div className="grid gap-8">
       <div>
         <p className="text-sm font-medium text-blue-700">Payment</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
@@ -48,11 +48,11 @@ export function PaymentWorkspace() {
         </p>
       </div>
 
-      <PageSection id="payment-accounts" title="Accounts">
+      <PageSection id="payment-accounts" title="Accounts" framed>
         <AccountsBlock summary={summary} />
       </PageSection>
 
-      <PageSection id="payment-process" title="Process payments">
+      <PageSection id="payment-process" title="Process payments" framed>
         <div className="grid gap-4 md:grid-cols-3">
           <ActionCard
             title="Digital payment"
@@ -77,7 +77,7 @@ export function PaymentWorkspace() {
         </div>
       </PageSection>
 
-      <PageSection id="payment-today" title="Today's payment activity">
+      <PageSection id="payment-today" title="Today's payment activity" framed>
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <ProcessedPaymentsCard summary={summary} />
           <MoneyMovementCard operations={operations} />
@@ -123,7 +123,7 @@ export function PaymentWorkspace() {
         </div>
       </PageSection>
 
-      <PageSection id="payment-data" title="Transactions data">
+      <PageSection id="payment-data" title="Transactions data" framed>
         <div className="grid gap-4 md:grid-cols-2">
           <LinkCard href="/analytics/transactions" title="Transactions" />
           <LinkCard href="/analytics/transactions#receipts" title="Receipts" />

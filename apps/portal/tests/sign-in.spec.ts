@@ -64,7 +64,7 @@ test("rejects a valid consumer account that has no merchant membership", async (
 
   await expect(page).toHaveURL("/sign-in");
   await expect(
-    page.getByText("This account does not have merchant portal access"),
+    page.getByText("This account does not have portal access"),
   ).toBeVisible();
   const cookies = await context.cookies();
   expect(cookies.some((cookie) => cookie.name === "mcbuse_portal_access")).toBe(
