@@ -51,8 +51,7 @@ export function CreditAssessment() {
   return (
     <div className="grid gap-6">
       <div>
-        <p className="text-sm font-medium text-blue-700">Credit Assessment</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
           Business assessment
         </h1>
         <p className="mt-2 max-w-prose text-sm text-slate-600">
@@ -149,7 +148,17 @@ export function CreditAssessment() {
                       onClick={() => setSelected(assessment)}
                     >
                       {new Date(assessment.createdAt).toLocaleString()} ·{" "}
-                      {stageLabel(assessment.stage)}
+                      {assessment.credit?.creditScore ? (
+                        <>
+                          Credit score{" "}
+                          <span className="font-mono tabular-nums">
+                            {assessment.credit.creditScore.score}
+                          </span>{" "}
+                          · {assessment.credit.creditScore.grade}
+                        </>
+                      ) : (
+                        stageLabel(assessment.stage)
+                      )}
                     </button>
                     {pdf ? (
                       <span className="inline-flex gap-4">

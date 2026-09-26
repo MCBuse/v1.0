@@ -47,6 +47,49 @@ describe('Credit evidence boundaries', () => {
       JSON.stringify(publicScoringResult(raw as unknown as ScoringResponse)),
     ).not.toMatch(/experimentalCredit|probabilityOfDefault/);
   });
+  it('shares only the credit score and grade, never default risk', () => {
+    const raw = {
+      modelVersion: 'v',
+      businessAgeMonths: 3,
+      unavailableFields: [],
+      financialProfile: null,
+      profileConfidence: null,
+      experimentalCredit: {
+        experimental: true,
+        disclaimer: 'Experimental: synthetic training data',
+        probabilityOfDefault: 0.031,
+        statisticalScore: 690,
+        policyOverlayPoints: 22,
+        overlayBreakdown: { capture_quality: 10 },
+        creditScore: 711.6,
+        creditGrade: 'Good',
+        scale: '300-850',
+      },
+    };
+    const projected = publicScoringResult(raw as unknown as ScoringResponse);
+    expect(projected.creditScore).toEqual({
+      score: 712,
+      grade: 'Good',
+      scale: '300-850',
+    });
+    expect(JSON.stringify(projected)).not.toMatch(
+      /probabilityOfDefault|statisticalScore|overlay|[Ee]xperimental/,
+    );
+    // A saved projection keeps its score when it is projected again.
+    expect(
+      publicScoringResult(projected as unknown as ScoringResponse).creditScore,
+    ).toEqual(projected.creditScore);
+  });
+  it('includes the credit score for merchants unless switched off', () => {
+    expect(
+      new ScoringClient(new ConfigService({})).creditScoreForMerchants(),
+    ).toBe(true);
+    expect(
+      new ScoringClient(
+        new ConfigService({ CREDIT_SCORE_FOR_MERCHANTS: 'false' }),
+      ).creditScoreForMerchants(),
+    ).toBe(false);
+  });
   it('returns unavailability without substituting a model when unconfigured', async () => {
     expect(
       await new ScoringClient(new ConfigService({})).evaluate({}, '2026-09-20'),

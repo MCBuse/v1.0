@@ -69,3 +69,20 @@ export function missingInputKind(
     return "sales";
   return "system";
 }
+
+/**
+ * Grade bands of the 300–850 credit score, lowest first. Mirrors
+ * `gradeBands` in apps/credit-scoring/artifacts/george-html-2026.09.1.json;
+ * the score service decides the grade, these only draw the scale.
+ */
+export const CREDIT_SCORE_RANGE = { min: 300, max: 850 } as const;
+export const CREDIT_GRADE_BANDS: ReadonlyArray<{
+  grade: string;
+  from: number;
+  to: number;
+}> = [
+  { grade: "Sufficient", from: 300, to: 641 },
+  { grade: "Acceptable", from: 642, to: 708 },
+  { grade: "Good", from: 709, to: 775 },
+  { grade: "Excellent", from: 776, to: 850 },
+];

@@ -233,7 +233,7 @@ test("capture the Week 2 product surfaces", async ({ context, page }) => {
     path: path.join(outputDirectory, "payment-request.png"),
   });
 
-  await page.goto("/analytics/transactions");
+  await page.goto("/payment/transactions");
   await expect(page.getByText("Lunch service")).toBeVisible();
   await page.screenshot({
     path: path.join(outputDirectory, "transactions.png"),

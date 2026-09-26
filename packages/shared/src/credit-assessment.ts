@@ -29,6 +29,11 @@ export interface CreditInputPreview {
   }>;
   integritySummary: string[];
 }
+export interface CreditScore {
+  score: number;
+  grade: string;
+  scale: "300-850";
+}
 export interface CreditPublicResult {
   status: "ready" | "temporarily_unavailable" | "consent_required";
   modelVersion: string;
@@ -40,6 +45,8 @@ export interface CreditPublicResult {
     scale: string;
     breakdown: Record<string, number>;
   } | null;
+  /** 300–850 credit score and grade; absent on runs made before it was shared. */
+  creditScore?: CreditScore | null;
   profileConfidence: {
     label: "Low" | "Medium" | "High";
     confidenceScore: number;

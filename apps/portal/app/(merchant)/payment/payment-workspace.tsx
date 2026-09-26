@@ -44,8 +44,7 @@ export function PaymentWorkspace() {
     <div className="grid gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-blue-700">Payment</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
             Capture business activity
           </h1>
           <p className="mt-2 text-sm text-slate-500">
@@ -54,12 +53,12 @@ export function PaymentWorkspace() {
         </div>
         <nav aria-label="Payment records" className="flex flex-wrap gap-2">
           <Button asChild variant="secondary">
-            <Link href="/analytics/transactions">
+            <Link href="/payment/transactions">
               <List aria-hidden="true" className="size-4" /> Transactions
             </Link>
           </Button>
           <Button asChild variant="secondary">
-            <Link href="/analytics/transactions#receipts">
+            <Link href="/payment/transactions#receipts">
               <ReceiptText aria-hidden="true" className="size-4" /> Receipts
             </Link>
           </Button>

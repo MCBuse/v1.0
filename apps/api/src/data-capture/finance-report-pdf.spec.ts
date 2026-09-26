@@ -112,6 +112,7 @@ function snapshot(scored: boolean): FinanceReportSnapshot {
         status: 'ready',
         modelVersion: 'george-html-2026.09.1',
         financialProfile: scored ? { score: 64.25 } : null,
+        creditScore: scored ? { score: 712, grade: 'Good' } : null,
         profileConfidence: scored
           ? { label: 'Medium', fieldsFilled: 20, fieldsTotal: 26 }
           : null,

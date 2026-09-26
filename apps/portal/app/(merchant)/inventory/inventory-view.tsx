@@ -338,8 +338,7 @@ export function InventoryView() {
   return (
     <div className="grid gap-6">
       <div>
-        <p className="text-sm font-medium text-blue-700">Inventory</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
           Products and stock
         </h1>
         <p className="mt-2 text-sm text-slate-500">

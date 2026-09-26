@@ -139,3 +139,17 @@ test('a calculated score is shown large, with its confidence',async({page})=>{
  await expect(result.getByText('Medium',{exact:true})).toBeVisible();
  await expect(result.getByRole('button')).toHaveCount(0);
 });
+test('the credit score leads the result, with the financial profile beside it',async({page},testInfo)=>{
+ const scored={...latest,stage:'financial_profile_available',credit:{...latest.credit,financialProfile:{score:64.25,scale:'0-100',breakdown:{}},creditScore:{score:712,grade:'Good',scale:'300-850' as const},profileConfidence:{label:'Medium' as const,confidenceScore:0.7,coveragePct:80,dataReliabilityQualityPct:90,fieldsFilled:8,fieldsTotal:10},unavailableFields:[],missingReasons:{}}};
+ await page.route('**/api/merchant/me/assessments',route=>route.fulfill({json:{assessments:[scored]}}));
+ await page.goto('/credit-assessment');
+ const result=page.getByRole('region',{name:'Result'});
+ await expect(result.getByText('Your credit score')).toBeVisible();
+ await expect(result.getByText('712',{exact:true})).toBeVisible();
+ await expect(result.getByRole('img',{name:/Credit score 712 .* grade Good/})).toBeVisible();
+ await expect(result.getByText('Financial profile')).toBeVisible();
+ await expect(result.getByText('64.3')).toBeVisible();
+ await expect(page.getByText('experimental',{exact:false})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:/Credit score 712/})).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('credit-score.png'),fullPage:true});
+});

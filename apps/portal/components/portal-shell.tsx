@@ -12,6 +12,7 @@ import {
   Package,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { Breadcrumbs } from "./breadcrumbs";
 import { Logo } from "./logo";
 import { LogoutButton } from "./logout-button";
 import { ReceivePaymentDrawer } from "./receive-payment";
@@ -62,28 +63,33 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="lg:pl-60">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur lg:px-8">
-          <div className="lg:hidden">
-            <Logo />
-          </div>
-          <div className="hidden lg:block">
-            <p className="text-sm font-medium text-slate-500">
-              Merchant workspace
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div
-              className="hidden items-center gap-2 sm:flex"
-              title={connectionLabel}
-            >
-              <span className="text-xs text-slate-500">{connectionLabel}</span>
-              <span
-                className={`size-2 rounded-full ${connection.offline || connection.error ? "bg-rose-500" : connection.loading || stale ? "bg-amber-400" : "bg-emerald-500"}`}
-                aria-label={connectionLabel}
-              />
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+          <div className="flex h-16 items-center justify-between gap-4 px-5 lg:px-8">
+            <div className="shrink-0 lg:hidden">
+              <Logo />
             </div>
-            <ReceivePaymentDrawer />
+            <Breadcrumbs className="hidden lg:block" />
+            <div className="flex shrink-0 items-center gap-3">
+              <div
+                className="hidden items-center gap-2 sm:flex"
+                title={connectionLabel}
+              >
+                <span className="text-xs text-slate-500">
+                  {connectionLabel}
+                </span>
+                <span
+                  className={`size-2 rounded-full ${connection.offline || connection.error ? "bg-rose-500" : connection.loading || stale ? "bg-amber-400" : "bg-emerald-500"}`}
+                  aria-label={connectionLabel}
+                />
+              </div>
+              <ReceivePaymentDrawer />
+            </div>
           </div>
+          {pathname !== "/overview" ? (
+            <div className="flex h-10 items-center border-t border-slate-100 px-5 lg:hidden">
+              <Breadcrumbs />
+            </div>
+          ) : null}
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-10">
           {children}

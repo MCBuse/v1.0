@@ -3,6 +3,7 @@ import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
 import { ArrowRight } from "lucide-react";
 import { fieldLabel, stageLabel, stageTone } from "./assessment-labels";
+import { CreditScoreScale } from "./credit-score-scale";
 import {
   AvailabilityBar,
   STATUS,
@@ -226,7 +227,38 @@ function ResultHero({
 }) {
   const score = credit?.financialProfile?.score;
   const confidence = credit?.profileConfidence;
+  const creditScore = credit?.creditScore;
   const next = nextStepFor(stage, credit);
+
+  if (creditScore)
+    return (
+      <section
+        aria-label="Result"
+        className="grid gap-6 rounded-xl border border-emerald-200 bg-emerald-50 p-6 lg:grid-cols-[1fr_minmax(0,16rem)]"
+      >
+        <div className="grid gap-3">
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
+            <StatusIcon status="available" /> Your credit score
+          </p>
+          <p className="flex items-baseline gap-3">
+            <span className="font-mono text-5xl font-semibold tabular-nums text-slate-950">
+              {creditScore.score}
+            </span>
+            <span className="text-xl font-semibold text-slate-900">
+              {creditScore.grade}
+            </span>
+          </p>
+          <CreditScoreScale credit={creditScore} />
+          <p className="text-sm text-slate-600">
+            On a scale of 300 to 850. Higher is stronger. Lenders make their
+            own decision.
+          </p>
+        </div>
+        {typeof score === "number" ? (
+          <ReadinessPanel score={score} confidence={confidence ?? null} />
+        ) : null}
+      </section>
+    );
 
   if (typeof score === "number")
     return (
@@ -312,6 +344,66 @@ function ResultHero({
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** The 0–100 financial profile, shown to the merchant as how ready they are. */
+function ReadinessPanel({
+  score,
+  confidence,
+}: {
+  score: number;
+  confidence: CreditPublicResult["profileConfidence"];
+}) {
+  return (
+    <div className="grid content-start gap-3 border-t border-emerald-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+      <p className="text-sm font-semibold text-slate-700">Financial profile</p>
+      <p className="flex items-baseline gap-1.5">
+        <span className="font-mono text-3xl font-semibold tabular-nums text-slate-950">
+          {score.toFixed(1)}
+        </span>
+        <span className="text-base text-slate-600">/ 100</span>
+      </p>
+      <div
+        className="h-2 w-full overflow-hidden rounded-full bg-white"
+        role="img"
+        aria-label={`Financial profile ${score.toFixed(1)} out of 100`}
+      >
+        <div
+          className="h-full rounded-full bg-emerald-500"
+          style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
+        />
+      </div>
+      <p className="text-sm text-slate-600">
+        How ready your records are to show a lender.
+      </p>
+      {confidence ? (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+          Confidence
+          <Badge
+            tone={
+              confidence.label === "High"
+                ? "success"
+                : confidence.label === "Medium"
+                  ? "info"
+                  : "warning"
+            }
+          >
+            {confidence.label}
+          </Badge>
+          <span className="text-xs text-slate-500">
+            <span className="font-mono tabular-nums">
+              {confidence.fieldsFilled}
+            </span>{" "}
+            of{" "}
+            <span className="font-mono tabular-nums">
+              {confidence.fieldsTotal}
+            </span>{" "}
+            items provided
+          </span>
+        </p>
+      ) : null}
+    </div>
   );
 }
 

@@ -5,5 +5,5 @@ export default async function TransactionsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  redirectMerchantBookmark("/analytics/transactions", await searchParams);
+  redirectMerchantBookmark("/payment/transactions", await searchParams);
 }

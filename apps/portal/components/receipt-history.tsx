@@ -71,7 +71,7 @@ export function ReceiptHistory() {
   );
 
   return (
-    <section id="receipts" className="grid scroll-mt-24 gap-3" aria-label="Receipt history">
+    <section id="receipts" className="grid scroll-mt-28 gap-3" aria-label="Receipt history">
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-semibold">Receipts</h2>

@@ -43,7 +43,7 @@ export function TransactionsView() {
       if (value) updated.set(key, value);
       else updated.delete(key);
     }
-    router.push(`/analytics/transactions?${updated.toString()}`);
+    router.push(`/payment/transactions?${updated.toString()}`);
   }
   async function voidCashSale(id: string) {
     const reason = window.prompt("Why is this cash sale being voided? This is retained in the audit history.")?.trim();
@@ -56,8 +56,7 @@ export function TransactionsView() {
   return (
     <div className="grid gap-6">
       <div>
-        <p className="text-sm font-medium text-blue-700">Transactions</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
           Recorded sales and receipts
         </h1>
         <p className="mt-2 text-sm text-slate-500">

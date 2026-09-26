@@ -324,8 +324,8 @@ test("Payment is three blocks with record links in the header, and no End of day
     await expect(today.getByRole("heading", { name })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Transactions data" })).toHaveCount(0);
   const data = page.getByRole("navigation", { name: "Payment records" });
-  await expect(data.getByRole("link", { name: "Transactions" })).toHaveAttribute("href", "/analytics/transactions");
-  await expect(data.getByRole("link", { name: "Receipts" })).toHaveAttribute("href", "/analytics/transactions#receipts");
+  await expect(data.getByRole("link", { name: "Transactions" })).toHaveAttribute("href", "/payment/transactions");
+  await expect(data.getByRole("link", { name: "Receipts" })).toHaveAttribute("href", "/payment/transactions#receipts");
 });
 
 test("a failed accounts read says so instead of showing zero balances", async ({

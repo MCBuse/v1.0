@@ -423,7 +423,13 @@ export class CreditEvidenceService {
       experimental ? PILOT_CONSENT : 'evidence_assessment',
     );
     const response = consent.active
-      ? await this.scoring.evaluate(input.values, input.asOfDate, experimental)
+      ? await this.scoring.evaluate(
+          input.values,
+          input.asOfDate,
+          // The consent purpose above stays tied to `experimental`; asking the
+          // model for its credit score does not change what was consented to.
+          experimental || this.scoring.creditScoreForMerchants(),
+        )
       : null;
     const result: CreditPublicResult = {
       status: !consent.active
@@ -435,6 +441,7 @@ export class CreditEvidenceService {
       businessAgeMonths: null,
       unavailableFields: Object.keys(input.missingReasons),
       financialProfile: null,
+      creditScore: null,
       profileConfidence: null,
       ...(response ? publicScoringResult(response) : {}),
       missingReasons: input.missingReasons,

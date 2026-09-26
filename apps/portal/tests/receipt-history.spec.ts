@@ -82,7 +82,7 @@ test("Q.13 — receipts are listed with their reconciliation state", async ({
     }),
   );
 
-  await page.goto("/analytics/transactions");
+  await page.goto("/payment/transactions");
   const history = page.getByRole("region", { name: "Receipt history" });
   await expect(history.getByText("MCB-TEST0")).toBeVisible();
   await expect(history.getByText("Morning rush")).toBeVisible();
@@ -107,7 +107,7 @@ test("Q.13 — the financial attributes are one click away", async ({
     }),
   );
 
-  await page.goto("/analytics/transactions");
+  await page.goto("/payment/transactions");
   const history = page.getByRole("region", { name: "Receipt history" });
   await history
     .getByRole("button", { name: "Show financial detail for MCB-TEST0" })
@@ -150,7 +150,7 @@ test("Q.13 — a matched receipt names the settlement record", async ({
     }),
   );
 
-  await page.goto("/analytics/transactions");
+  await page.goto("/payment/transactions");
   const history = page.getByRole("region", { name: "Receipt history" });
   await expect(history.getByText("Matched")).toBeVisible();
   await history
@@ -179,7 +179,7 @@ test("Q.13 — searching asks the API for the term", async ({
     });
   });
 
-  await page.goto("/analytics/transactions");
+  await page.goto("/payment/transactions");
   const history = page.getByRole("region", { name: "Receipt history" });
   await history.getByLabel("Search receipts").fill("Morning");
   await history.getByRole("button", { name: "Search" }).click();
@@ -208,7 +208,7 @@ test("Q.13 — a search with no match says so rather than showing an empty table
     });
   });
 
-  await page.goto("/analytics/transactions");
+  await page.goto("/payment/transactions");
   const history = page.getByRole("region", { name: "Receipt history" });
   await history.getByLabel("Search receipts").fill("nothing-matches-this");
   await history.getByRole("button", { name: "Search" }).click();
@@ -236,7 +236,7 @@ test("Q.13 — the history pages", async ({ page }, testInfo) => {
     });
   });
 
-  await page.goto("/analytics/transactions");
+  await page.goto("/payment/transactions");
   const history = page.getByRole("region", { name: "Receipt history" });
   await expect(history.getByText("Page 1 of 2")).toBeVisible();
   await expect(

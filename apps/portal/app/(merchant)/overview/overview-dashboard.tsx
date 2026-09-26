@@ -94,8 +94,7 @@ export function OverviewDashboard() {
     <div className="grid gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-blue-700">Overview</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
             Your business, at a glance
           </h1>
           <p className="mt-2 text-sm text-slate-500">
@@ -316,13 +315,16 @@ export function OverviewDashboard() {
       <PageSection id="overview-credit" title="Credit Assessment" href="/credit-assessment" framed>
         <TileRow>
           <Metric
-            label="Latest financial profile"
+            label="Latest credit score"
             value={
               !latestAssessment ? (
                 assessments.loading ? "…" : "No assessment yet"
-              ) : latestCredit?.financialProfile ? (
-                <span className="font-mono tabular-nums">
-                  {latestCredit.financialProfile.score.toFixed(1)} / 100
+              ) : latestCredit?.creditScore ? (
+                <span>
+                  <span className="font-mono tabular-nums">
+                    {latestCredit.creditScore.score}
+                  </span>{" "}
+                  · {latestCredit.creditScore.grade}
                 </span>
               ) : (
                 "Not available"
@@ -331,20 +333,32 @@ export function OverviewDashboard() {
             detail={
               !latestAssessment
                 ? undefined
-                : latestCredit?.financialProfile
-                  ? `Saved ${DATE_TIME.format(new Date(latestAssessment.createdAt))}`
+                : latestCredit?.creditScore
+                  ? `Out of 850 · saved ${DATE_TIME.format(new Date(latestAssessment.createdAt))}`
                   : latestCredit?.unavailableFields.length
                     ? `${latestCredit.unavailableFields.length} required ${latestCredit.unavailableFields.length === 1 ? "input" : "inputs"} missing`
-                    : "No profile result saved"
+                    : "No score saved"
             }
           />
-          {latestCredit?.profileConfidence ? (
-            <Metric
-              label="Profile confidence"
-              value={latestCredit.profileConfidence.label}
-              detail={`Coverage ${latestCredit.profileConfidence.coveragePct.toFixed(1)}%`}
-            />
-          ) : null}
+          <Metric
+            label="Financial profile"
+            value={
+              latestCredit?.financialProfile ? (
+                <span className="font-mono tabular-nums">
+                  {latestCredit.financialProfile.score.toFixed(1)} / 100
+                </span>
+              ) : latestAssessment ? (
+                "Not available"
+              ) : (
+                "—"
+              )
+            }
+            detail={
+              latestCredit?.profileConfidence
+                ? `${latestCredit.profileConfidence.label} confidence`
+                : undefined
+            }
+          />
           <Metric
             label="Evidence readiness"
             value={<span className="capitalize">{data.readinessStage.replaceAll("_", " ")}</span>}

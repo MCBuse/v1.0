@@ -8,6 +8,7 @@ describe('API credit labels', () => {
     expect(local.MERCHANT_CATEGORY_LABELS).toEqual(
       shared.MERCHANT_CATEGORY_LABELS,
     );
+    expect(local.CREDIT_GRADE_BANDS).toEqual(shared.CREDIT_GRADE_BANDS);
     for (const reason of [
       'Not provided in the business credit profile.',
       'Not enough recorded sales in the evidence period.',

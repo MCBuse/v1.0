@@ -129,8 +129,7 @@ export function GeneralAnalyticsView() {
   return (
     <div className="grid min-w-0 gap-6 [&>*]:min-w-0">
       <div>
-        <p className="text-sm font-medium text-blue-700">Analytics</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
           General analytics
         </h1>
         <p className="mt-2 text-sm text-slate-500">

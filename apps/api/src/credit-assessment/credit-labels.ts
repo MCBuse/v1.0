@@ -72,3 +72,15 @@ export function missingInputKind(
     return 'sales';
   return 'system';
 }
+
+/** Grade bands of the 300–850 credit score, lowest first (see shared copy). */
+export const CREDIT_GRADE_BANDS: ReadonlyArray<{
+  grade: string;
+  from: number;
+  to: number;
+}> = [
+  { grade: 'Sufficient', from: 300, to: 641 },
+  { grade: 'Acceptable', from: 642, to: 708 },
+  { grade: 'Good', from: 709, to: 775 },
+  { grade: 'Excellent', from: 776, to: 850 },
+];

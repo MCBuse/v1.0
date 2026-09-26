@@ -41,7 +41,8 @@ test("preserves old-bookmark query parameters when moving to a pillar route", as
   page,
 }) => {
   const redirects: Array<[string, string]> = [
-    ["/transactions?source=merchant_cash&page=2", "/analytics/transactions?source=merchant_cash&page=2"],
+    ["/transactions?source=merchant_cash&page=2", "/payment/transactions?source=merchant_cash&page=2"],
+    ["/analytics/transactions?source=merchant_cash", "/payment/transactions?source=merchant_cash"],
     ["/analytics/inventory?query=tea", "/analytics/general?query=tea&tab=inventory"],
     ["/analytics?period=7d", "/analytics/general?period=7d"],
     ["/invoices?status=history", "/payment/invoices?status=history"],
@@ -125,7 +126,7 @@ test("keeps the source filter and pagination in the URL, with no environment fil
     });
   });
 
-  await page.goto("/analytics/transactions");
+  await page.goto("/payment/transactions");
   await expect(page.getByText("Counter sale")).toBeVisible();
   await page.getByLabel("Source").selectOption("merchant_cash");
   await expect(page).toHaveURL(/source=merchant_cash/);
@@ -163,7 +164,7 @@ test("shows transaction empty and error states without leaking technical data", 
         }),
   );
 
-  await page.goto("/analytics/transactions");
+  await page.goto("/payment/transactions");
   await expect(page.getByText("No recorded sales yet")).toBeVisible();
   fail = true;
   await page.reload();

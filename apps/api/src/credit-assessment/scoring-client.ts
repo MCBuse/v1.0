@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { CreditPublicResult, ExperimentalCredit } from '@repo/shared';
+import type {
+  CreditPublicResult,
+  CreditScore,
+  ExperimentalCredit,
+} from '@repo/shared';
 import { CREDIT_MODEL_VERSION } from './credit-contract';
 export type ScoringValues = Record<string, string | number | null>;
 export type ScoringResponse = Pick<
@@ -12,11 +16,28 @@ export type ScoringResponse = Pick<
   | 'financialProfile'
   | 'profileConfidence'
 > & { experimentalCredit?: ExperimentalCredit | null };
+/**
+ * Score and grade only: default probability, statistical score and overlay
+ * points stay out of anything a merchant or lender sees.
+ */
+function creditScoreOf(r: {
+  creditScore?: CreditScore | null;
+  experimentalCredit?: ExperimentalCredit | null;
+}): CreditScore | null {
+  const score = r.experimentalCredit?.creditScore ?? r.creditScore?.score;
+  const grade = r.experimentalCredit?.creditGrade ?? r.creditScore?.grade;
+  if (typeof score !== 'number' || !Number.isFinite(score)) return null;
+  if (typeof grade !== 'string' || !grade) return null;
+  return { score: Math.round(score), grade, scale: '300-850' };
+}
 /** Construct an allowlisted public projection; never spread a remote result. */
 export function publicScoringResult(
-  r: ScoringResponse,
-): Omit<ScoringResponse, 'experimentalCredit'> {
+  r: ScoringResponse & { creditScore?: CreditScore | null },
+): Omit<ScoringResponse, 'experimentalCredit'> & {
+  creditScore: CreditScore | null;
+} {
   return {
+    creditScore: creditScoreOf(r),
     modelVersion: r.modelVersion,
     artifactSha256: r.artifactSha256,
     businessAgeMonths: r.businessAgeMonths,
@@ -123,6 +144,15 @@ export class ScoringClient {
     });
     if (!response.ok) throw new Error('Scoring service unavailable');
     return response.json();
+  }
+  /** Merchant runs include the credit score unless CREDIT_SCORE_FOR_MERCHANTS=false. */
+  creditScoreForMerchants(): boolean {
+    return (
+      this.config
+        .get<string>('CREDIT_SCORE_FOR_MERCHANTS')
+        ?.trim()
+        .toLowerCase() !== 'false'
+    );
   }
   metadata() {
     return this.request('/v1/model/metadata');

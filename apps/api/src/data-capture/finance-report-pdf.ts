@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import {
+  CREDIT_GRADE_BANDS,
   CREDIT_INPUT_LABELS,
   CREDIT_STAGE_LABELS,
   MERCHANT_CATEGORY_LABELS,
@@ -23,6 +24,7 @@ type Credit = {
   status: string;
   modelVersion?: string;
   financialProfile: { score: number } | null;
+  creditScore?: { score: number; grade: string } | null;
   profileConfidence: {
     label: string;
     fieldsFilled: number;
@@ -577,6 +579,7 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
   const digital = Number(an.digitalSales.minor);
   const cash = Number(an.cashSales.minor);
   const score = credit?.financialProfile?.score;
+  const creditScore = credit?.creditScore ?? null;
   const missing = Object.entries(credit?.missingReasons ?? {});
   const counts: Record<MissingInputKind, number> = {
     declare: 0,
@@ -658,7 +661,41 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
   }
 
   // Result banner
-  if (typeof score === 'number') {
+  if (creditScore) {
+    const conf = credit?.profileConfidence;
+    w.box('green', [
+      { text: 'CREDIT SCORE', size: 8, bold: true, color: C.green },
+      {
+        text: `${creditScore.score}  ·  ${creditScore.grade}`,
+        size: 28,
+        bold: true,
+        color: C.ink,
+        gapBefore: 4,
+      },
+      {
+        text: `On a scale of 300 to 850: ${CREDIT_GRADE_BANDS.slice()
+          .reverse()
+          .map((b) =>
+            b.from === 300
+              ? `${b.grade} below ${b.to + 1}`
+              : b.to === 850
+                ? `${b.grade} ${b.from}+`
+                : `${b.grade} ${b.from}–${b.to}`,
+          )
+          .join(
+            ', ',
+          )}.${conf ? ` Calculated from ${conf.fieldsFilled} of ${conf.fieldsTotal} inputs.` : ''}`,
+        size: 9.5,
+        gapBefore: 4,
+      },
+      {
+        text: 'Calculated by MCBuse from the business’s recorded sales and declared information. It is not a loan approval or lending decision.',
+        size: 8.5,
+        color: C.muted,
+        gapBefore: 3,
+      },
+    ]);
+  } else if (typeof score === 'number') {
     const conf = credit?.profileConfidence;
     w.box('green', [
       { text: 'FINANCIAL PROFILE SCORE', size: 8, bold: true, color: C.green },
@@ -691,7 +728,7 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
           ? 'The scoring service was temporarily unavailable when the assessment ran.'
           : credit
             ? `${missing.length} required ${missing.length === 1 ? 'input was' : 'inputs were'} missing when the assessment ran.`
-            : 'This assessment checked evidence readiness only; no financial profile score was requested.';
+            : 'This assessment checked evidence readiness only; no score was requested.';
     const breakdown = [
       counts.declare ? `${counts.declare} can be provided by the business` : '',
       counts.sales ? `${counts.sales} build up with recorded sales` : '',
@@ -700,7 +737,7 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
       .filter(Boolean)
       .join('  ·  ');
     w.box('amber', [
-      { text: 'FINANCIAL PROFILE SCORE', size: 8, bold: true, color: C.amber },
+      { text: 'CREDIT SCORE', size: 8, bold: true, color: C.amber },
       {
         text: 'Not available yet',
         size: 20,
@@ -814,7 +851,7 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
   // ── Assessment detail ──────────────────────────────────────────────────
   if (a) {
     w.section(
-      'Financial profile assessment',
+      'Credit assessment',
       `Calculated from records between ${dateFmt(a.evidenceWindow.from, tz)} and ${dateFmt(a.evidenceWindow.to, tz)}${a.evidenceWindow.days ? ` (${a.evidenceWindow.days} days)` : ''}. This evidence window can differ from the reporting period above.`,
     );
     const consent = credit
@@ -827,13 +864,19 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
     w.details([
       ['Assessment date', dateFmt(a.createdAt, tz, true)],
       ['Evidence status', stageName(a.stage)],
-      [
-        'Financial profile score',
-        typeof score === 'number'
-          ? `${score.toFixed(1)} / 100`
-          : 'Not available',
-        typeof score === 'number' ? C.green : C.amber,
-      ],
+      creditScore
+        ? [
+            'Credit score',
+            `${creditScore.score} of 850 · ${creditScore.grade}`,
+            C.green,
+          ]
+        : [
+            'Financial profile score',
+            typeof score === 'number'
+              ? `${score.toFixed(1)} / 100`
+              : 'Not available',
+            typeof score === 'number' ? C.green : C.amber,
+          ],
       [
         'Confidence',
         credit?.profileConfidence
@@ -1086,7 +1129,7 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
   w.box('soft', [
     { text: 'Important information', size: 10, bold: true, color: C.ink },
     {
-      text: 'This report is prepared by MCBuse from the business’s own records, at the business’s request. It is not a credit score, loan approval or lending decision. Lenders should apply their own assessment and policies.',
+      text: 'This report is prepared by MCBuse from the business’s own records, at the business’s request. It is not a loan approval or lending decision. Lenders should apply their own assessment and policies.',
       size: 8.5,
       gapBefore: 4,
     },

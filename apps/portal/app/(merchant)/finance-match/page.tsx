@@ -154,8 +154,7 @@ export default function FinanceMatchPage() {
   return (
     <div className="grid gap-8">
       <div>
-        <p className="text-sm font-medium text-blue-700">Finance Match</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
           Share your assessment
         </h1>
         <p className="mt-2 max-w-prose text-sm text-slate-600">

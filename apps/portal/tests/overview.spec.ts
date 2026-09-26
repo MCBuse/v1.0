@@ -244,7 +244,7 @@ test("summarises the latest assessment and email without a Business insights pan
   });
   await page.unroute("**/api/merchant/me/assessments");
   await page.route("**/api/merchant/me/assessments", (route) =>
-    route.fulfill({ json: { assessments: [assessment({ score: 64.25 })] } }),
+    route.fulfill({ json: { assessments: [assessment({ score: 64.25, creditScore: { score: 712, grade: "Good", scale: "300-850" } })] } }),
   );
   await page.unroute("**/api/merchant/me/finance-packages/email-attempts");
   await page.route("**/api/merchant/me/finance-packages/email-attempts", (route) =>
@@ -257,11 +257,15 @@ test("summarises the latest assessment and email without a Business insights pan
     }),
   );
   await page.goto("/overview");
-  const credit = page.locator("#overview-credit");
+  const credit = page.getByRole("region", { name: "Credit Assessment" });
   await expect(credit.getByText("64.3 / 100")).toBeVisible();
   await expect(credit.getByText("Medium")).toBeVisible();
-  await expect(credit.getByText("Coverage 80.0%")).toBeVisible();
-  const finance = page.locator("#overview-finance");
+  await expect(credit.getByText("Medium confidence")).toBeVisible();
+  await expect(credit.getByText("712")).toBeVisible();
+  await expect(credit.getByText("· Good")).toBeVisible();
+  await expect(credit.getByText("Out of 850", { exact: false })).toBeVisible();
+  await expect(page.getByText("experimental", { exact: false })).toHaveCount(0);
+  const finance = page.getByRole("region", { name: "Finance Match" });
   await expect(finance.getByText("Accepted by mail server")).toBeVisible();
   await expect(finance.getByText("loans@bank.example", { exact: false })).toBeVisible();
   await expect(page.getByText("Delivered", { exact: false })).toHaveCount(0);
@@ -276,14 +280,23 @@ test("names missing inputs instead of showing a profile score", async ({ page },
     route.fulfill({ json: { assessments: [assessment({ score: null, unavailableFields: ["loanAmountMinor", "commencementDate"] })] } }),
   );
   await page.goto("/overview");
-  const credit = page.locator("#overview-credit");
-  await expect(credit.getByText("Not available")).toBeVisible();
+  const credit = page.getByRole("region", { name: "Credit Assessment" });
+  // Credit score and financial profile tiles both say so.
+  await expect(credit.getByText("Not available")).toHaveCount(2);
   await expect(credit.getByText("2 required inputs missing")).toBeVisible();
   await expect(credit.getByText("Profile confidence")).toHaveCount(0);
   await expect(credit.getByText("/ 100")).toHaveCount(0);
 });
 
-function assessment({ score, unavailableFields = [] }: { score: number | null; unavailableFields?: string[] }) {
+function assessment({
+  score,
+  creditScore = null,
+  unavailableFields = [],
+}: {
+  score: number | null;
+  creditScore?: { score: number; grade: string; scale: "300-850" } | null;
+  unavailableFields?: string[];
+}) {
   return {
     id: "a1",
     modelId: "george-financial-profile-v1",
@@ -306,6 +319,7 @@ function assessment({ score, unavailableFields = [] }: { score: number | null; u
       businessAgeMonths: 18,
       unavailableFields,
       financialProfile: score === null ? null : { score, scale: "0-100", breakdown: {} },
+      creditScore,
       profileConfidence: score === null ? null : { label: "Medium", confidenceScore: 0.7, coveragePct: 80, dataReliabilityQualityPct: 90, fieldsFilled: 8, fieldsTotal: 10 },
       missingReasons: {},
       indicators: {},
