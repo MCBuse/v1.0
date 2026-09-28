@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { MerchantProfile, SavedMerchantAssessment } from "@repo/shared";
+import {
+  isProvisionalCreditScore,
+  type MerchantProfile,
+  type SavedMerchantAssessment,
+} from "@repo/shared";
 import { Card, CardContent, CardHeader } from "@repo/ui/card";
 import { Alert } from "@repo/ui/alert";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
@@ -155,6 +159,9 @@ export function CreditAssessment() {
                             {assessment.credit.creditScore.score}
                           </span>{" "}
                           · {assessment.credit.creditScore.grade}
+                          {isProvisionalCreditScore(assessment.credit)
+                            ? " · Provisional"
+                            : ""}
                         </>
                       ) : (
                         stageLabel(assessment.stage)

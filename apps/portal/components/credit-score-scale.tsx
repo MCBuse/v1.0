@@ -1,10 +1,19 @@
 import {
   CREDIT_GRADE_BANDS,
   CREDIT_SCORE_RANGE,
+  creditGradeTone,
   type CreditScore,
+  type ScoreTone,
 } from "@repo/shared";
 
 const BAND_WIDTH = 100 / CREDIT_GRADE_BANDS.length;
+
+/** The filled band follows the grade: green for Good/Excellent, blue for Acceptable, amber for Sufficient. */
+const FILL: Record<ScoreTone, string> = {
+  positive: "bg-emerald-500",
+  neutral: "bg-blue-500",
+  caution: "bg-amber-500",
+};
 /**
  * Bands are drawn equally wide so every grade name fits; the marker sits
  * proportionally inside its band.
@@ -24,10 +33,11 @@ function position(value: number) {
 
 /**
  * The 300–850 scale split into its grade bands, with a marker at the score.
- * The merchant's own band is filled; the rest stay neutral.
+ * The merchant's own band is filled in its grade colour; the rest stay neutral.
  */
 export function CreditScoreScale({ credit }: { credit: CreditScore }) {
   const at = position(credit.score);
+  const fill = FILL[creditGradeTone(credit.grade)];
   return (
     <div className="grid w-full max-w-md gap-1.5">
       <div
@@ -45,7 +55,7 @@ export function CreditScoreScale({ credit }: { credit: CreditScore }) {
             <span
               key={band.grade}
               className={
-                band.grade === credit.grade ? "bg-emerald-500" : "bg-white"
+                band.grade === credit.grade ? fill : "bg-white"
               }
               style={{ width: `${BAND_WIDTH}%` }}
             />

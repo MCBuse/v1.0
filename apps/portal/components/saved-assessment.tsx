@@ -1,8 +1,12 @@
 "use client";
 
 import {
+  creditResultTone,
   financialProfileBand,
+  financialProfileTone,
+  isProvisionalCreditScore,
   type CreditPublicResult,
+  type ScoreTone,
   type SavedMerchantAssessment,
 } from "@repo/shared";
 import { Badge } from "@repo/ui/badge";
@@ -123,7 +127,11 @@ export function SavedAssessmentDetail({
             </span>
           </p>
         </div>
-        <Badge tone={stageTone(a.stage)}>{stageLabel(a.stage)}</Badge>
+        {isProvisionalCreditScore(credit) ? (
+          <Badge tone="info">Provisional score</Badge>
+        ) : (
+          <Badge tone={stageTone(a.stage)}>{stageLabel(a.stage)}</Badge>
+        )}
       </div>
 
       <ResultHero
@@ -237,39 +245,72 @@ function ResultHero({
   const creditScore = credit?.creditScore;
   const next = nextStepFor(stage, credit);
 
-  if (creditScore)
+  if (creditScore) {
+    const provisional = isProvisionalCreditScore(credit);
+    const tone = SCORE_TONE[creditResultTone(credit)];
+    const unmetChecks = confidence?.limitedBy?.length ?? 0;
     return (
       <section
         aria-label="Result"
-        className="grid gap-6 rounded-xl border border-emerald-200 bg-emerald-50 p-6 lg:grid-cols-[1fr_minmax(0,16rem)]"
+        className={`grid gap-6 rounded-xl border p-6 lg:grid-cols-[1fr_minmax(0,16rem)] ${tone.frame}`}
       >
         <div className="grid gap-3">
-          <p className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
-            <StatusIcon status="available" /> Your credit score
+          <p
+            className={`inline-flex items-center gap-2 text-sm font-semibold ${
+              provisional ? STATUS.sales.text : tone.text
+            }`}
+          >
+            <StatusIcon status={provisional ? "sales" : "available"} /> Your
+            credit score
           </p>
-          <p className="flex items-baseline gap-3">
+          <p className="flex flex-wrap items-baseline gap-3">
             <span className="font-mono text-5xl font-semibold tabular-nums text-slate-950">
               {creditScore.score}
             </span>
             <span className="text-xl font-semibold text-slate-900">
               {creditScore.grade}
             </span>
+            {provisional ? (
+              <Badge tone="info" className="self-center px-3 py-1 text-sm">
+                Provisional
+              </Badge>
+            ) : null}
           </p>
           <CreditScoreScale credit={creditScore} />
           <p className="text-sm text-slate-600">
             On a scale of 300 to 850. Higher is stronger. Lenders make their
             own decision.
           </p>
+          {provisional ? (
+            <p className="max-w-prose text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">
+                Provisional:
+              </span>{" "}
+              {unmetChecks
+                ? `your data confidence is Low because ${
+                    unmetChecks === 1
+                      ? "1 payment history check isn't"
+                      : `${unmetChecks} payment history checks aren't`
+                  } met yet.`
+                : "your data confidence is Low because your records are still limited."}{" "}
+              This score may change as you record more payments.
+            </p>
+          ) : null}
         </div>
         {typeof score === "number" ? (
-          <ReadinessPanel score={score} confidence={confidence ?? null} />
+          <ReadinessPanel
+            score={score}
+            confidence={confidence ?? null}
+            divider={tone.divider}
+          />
         ) : null}
       </section>
     );
+  }
 
   if (typeof score === "number") {
     const band = financialProfileBand(score);
-    const tone = BAND_TONE[band.label];
+    const tone = SCORE_TONE[financialProfileTone(score)];
     return (
       <section
         aria-label="Result"
@@ -338,30 +379,32 @@ function ResultHero({
 
 type BandLabel = ReturnType<typeof financialProfileBand>["label"];
 
-/** Only a Good or Strong profile is framed as a success; the colour never outruns the number. */
-const BAND_TONE: Record<
-  BandLabel,
-  { frame: string; text: string; bar: string }
+/**
+ * One colour per result state, shared by panels and bars: green only for a
+ * Good/Strong result, slate + blue bar for a middling or provisional one,
+ * amber for a weak one. The colour never tells a better story than the number.
+ */
+const SCORE_TONE: Record<
+  ScoreTone,
+  { frame: string; text: string; bar: string; divider: string }
 > = {
-  Strong: {
+  positive: {
     frame: "border-emerald-200 bg-emerald-50",
     text: "text-emerald-800",
     bar: "bg-emerald-500",
+    divider: "border-emerald-200",
   },
-  Good: {
-    frame: "border-emerald-200 bg-emerald-50",
-    text: "text-emerald-800",
-    bar: "bg-emerald-500",
-  },
-  Fair: {
+  neutral: {
     frame: "border-slate-200 bg-slate-50",
     text: "text-slate-800",
     bar: "bg-blue-500",
+    divider: "border-slate-200",
   },
-  Weak: {
+  caution: {
     frame: "border-amber-200 bg-amber-50",
     text: "text-amber-800",
     bar: "bg-amber-500",
+    divider: "border-amber-200",
   },
 };
 
@@ -435,12 +478,17 @@ function DataConfidence({
 function ReadinessPanel({
   score,
   confidence,
+  divider,
 }: {
   score: number;
   confidence: CreditPublicResult["profileConfidence"];
+  divider: string;
 }) {
+  const band = financialProfileBand(score);
   return (
-    <div className="grid content-start gap-3 border-t border-emerald-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+    <div
+      className={`grid content-start gap-3 border-t pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 ${divider}`}
+    >
       <p className="text-sm font-semibold text-slate-700">Financial profile</p>
       <p className="flex items-baseline gap-1.5">
         <span className="font-mono text-3xl font-semibold tabular-nums text-slate-950">
@@ -448,16 +496,16 @@ function ReadinessPanel({
         </span>
         <span className="text-base text-slate-600">/ 100</span>
         <span className="ml-1 text-base font-semibold text-slate-700">
-          {financialProfileBand(score).label}
+          {band.label}
         </span>
       </p>
       <div
         className="h-2 w-full overflow-hidden rounded-full bg-white"
         role="img"
-        aria-label={`Financial profile ${score.toFixed(1)} out of 100`}
+        aria-label={`Financial profile ${score.toFixed(1)} out of 100, ${band.label}`}
       >
         <div
-          className="h-full rounded-full bg-emerald-500"
+          className={`h-full rounded-full ${SCORE_TONE[financialProfileTone(score)].bar}`}
           style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
         />
       </div>

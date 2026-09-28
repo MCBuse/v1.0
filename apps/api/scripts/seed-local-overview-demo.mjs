@@ -11,8 +11,11 @@
  *       [--allow-host api.mcbuse.com] [--manifest ./seed-manifest.json] [--undo]
  *       [--volume 1] [--merchant-type cafe_bakery] [--commenced 2021-05-03]
  *       [--existing-debt-eur 450] [--no-assess]
- *       [--digital-share 0.7] [--evidence-environment test]
+ *       [--digital-share 0.7] [--digital-days N] [--evidence-environment test]
+ *       [--mode mock|sandbox] [--float-usdc 45] [--full-profile]
  *       [--database-url postgres://…] [--allow-db-host db.example.com]
+ *
+ * Hosted demo merchant (devnet): see docs/demo-merchant-seeding.md.
  *
  * What it creates:
  *   - A 10-item café menu with ordinary SKUs and descriptions.
@@ -24,9 +27,16 @@
  *   - Digital sales (--digital-share, default 0.7): each one is a real
  *     itemised invoice paid by a seed customer account through POST /payments,
  *     so wallets, ledger, stock reservations and receipts all go through the
- *     normal code path. Needs the API running with TRANSFER_PROVIDER=mock
- *     (the local default); the customer's wallet is topped up with a mock
- *     on-ramp credit written to the database. A payment is always stamped with the moment it
+ *     normal code path. --digital-days N limits digital sales to the last N
+ *     days, as if the merchant started taking MCBuse payments then.
+ *       --mode mock (default): local API with TRANSFER_PROVIDER=mock. The
+ *         customer's wallet is topped up with a mock on-ramp credit written to
+ *         the database.
+ *       --mode sandbox: hosted devnet API. Every digital sale is a real devnet
+ *         USDC transfer. The customer is funded once through a Stripe test
+ *         checkout (the script prints the link), and whenever the float
+ *         (--float-usdc) runs low the merchant sends what it has received back
+ *         to the customer, so a few dozen test USDC carry the whole history. A payment is always stamped with the moment it
  *     settles, so once they are all paid the script moves each digital sale's
  *     timestamps back to its planned time with SQL (--database-url, or the
  *     DATABASE_* values in ./.env). It also moves each seeded product's
@@ -83,12 +93,23 @@ const EXISTING_DEBT_EUR = Number(arg('existing-debt-eur', '450'));
 const ASSESS = !flag('no-assess');
 const DIGITAL_SHARE = Math.min(Math.max(Number(arg('digital-share', '0.7')), 0), 1);
 const EVIDENCE_ENVIRONMENT = arg('evidence-environment', 'test');
+// mock: local API (TRANSFER_PROVIDER=mock). sandbox: hosted devnet API, where
+// every digital sale is a real devnet USDC transfer.
+const MODE = arg('mode', 'mock');
+// Digital sales only in the most recent N days (older days are all cash), as if
+// the merchant started taking MCBuse payments N days ago. Default: every day.
+const DIGITAL_DAYS = Number(arg('digital-days', String(DAYS)));
+// Test USDC the customer works with at once (sandbox), reused via paybacks.
+const FLOAT_USDC = Number(arg('float-usdc', '45'));
+// Also declare the optional business details (loan request, assets, debts…)
+// so the assessment has complete information.
+const FULL_PROFILE = flag('full-profile');
 const ALLOW_DB_HOST = arg('allow-db-host', '')?.trim().toLowerCase();
 const EMAIL = process.env.SEED_EMAIL?.trim().toLowerCase();
 const PASSWORD = process.env.SEED_PASSWORD;
 let TZ = 'Europe/Berlin'; // replaced by the merchant's own timezone after login
 const KEY_PREFIX = 'ovw-seed:v2';
-const PACE_MS = 700; // local throttle is 100 req/min
+const PACE_MS = 700; // the API throttle is 100 req/min
 
 const host = new URL(API).hostname.toLowerCase();
 const isLocal = ['localhost', '127.0.0.1', '::1'].includes(host);
@@ -100,6 +121,10 @@ if (!EMAIL || !PASSWORD) {
   console.error('Set SEED_EMAIL and SEED_PASSWORD for the merchant account.');
   process.exit(1);
 }
+if (!['mock', 'sandbox'].includes(MODE)) {
+  console.error('--mode must be mock or sandbox.');
+  process.exit(1);
+}
 if (!['test', 'synthetic', 'live'].includes(EVIDENCE_ENVIRONMENT)) {
   console.error('--evidence-environment must be test, synthetic or live.');
   process.exit(1);
@@ -108,6 +133,7 @@ if (!['test', 'synthetic', 'live'].includes(EVIDENCE_ENVIRONMENT)) {
 // a re-run finds the same account without anything stored.
 const PAYER_TAG = createHash('sha256').update(`${EMAIL}:${KEY_PREFIX}`).digest('hex').slice(0, 10);
 const PAYER_EMAIL = process.env.SEED_PAYER_EMAIL?.trim().toLowerCase() ?? `seed-payer-${PAYER_TAG}@example.com`;
+const PAYER_USERNAME = `seed_payer_${PAYER_TAG}`;
 const PAYER_PASSWORD =
   process.env.SEED_PAYER_PASSWORD ??
   `Sp!${createHash('sha256').update(`${PASSWORD}:${PAYER_EMAIL}`).digest('hex').slice(0, 16)}Aa9`;
@@ -208,7 +234,7 @@ function planSales(now) {
       const key = `${KEY_PREFIX}:${ymd}:${n}`;
       // The channel draws from its own stream, so every other detail of a sale
       // (and so each cash sale's idempotency fingerprint) is unchanged by it.
-      const digital = !voidReason && rng(`${key}:channel`)() < DIGITAL_SHARE;
+      const digital = !voidReason && back < DIGITAL_DAYS && rng(`${key}:channel`)() < DIGITAL_SHARE;
       sales.push({ key, occurredAt, lines, note, voidReason, channel: digital ? 'digital' : 'cash', isToday: ymd === today });
     }
   }
@@ -232,6 +258,15 @@ async function call(method, path, body, headers = {}, attempt = 0, as = null) {
     process.stdout.write(' (rate limited, waiting 60s)');
     await sleep(60_000);
     return call(method, path, body, headers, attempt + 1, as);
+  }
+  // Access tokens last 15 minutes and a seed run takes much longer: sign the
+  // same identity in again and retry once.
+  if (res.status === 401 && bearer && !path.startsWith('/auth/') && attempt < 5) {
+    const isPayer = bearer === payerToken;
+    const fresh = await call('POST', '/auth/login', isPayer ? { email: PAYER_EMAIL, password: PAYER_PASSWORD } : { email: EMAIL, password: PASSWORD }, {}, 0, '');
+    if (isPayer) payerToken = fresh.accessToken;
+    else token = fresh.accessToken;
+    return call(method, path, body, headers, attempt + 1, isPayer ? payerToken : as === null ? null : token);
   }
   const text = await res.text();
   const json = text ? JSON.parse(text) : null;
@@ -286,7 +321,11 @@ async function connectDatabase(merchantPublicId) {
   if (!['localhost', '127.0.0.1', '::1'].includes(dbHost) && dbHost !== ALLOW_DB_HOST)
     throw new Error(`Refusing to write to database host ${dbHost}. For a non-local database pass --allow-db-host ${dbHost}.`);
   const { default: pg } = await import('pg');
-  const db = new pg.Client({ connectionString: url });
+  // Same switch the API uses: DATABASE_SSL=true verifies, no-verify encrypts
+  // without checking the certificate (hosted Supabase), anything else is off.
+  const sslMode = (process.env.DATABASE_SSL ?? '').toLowerCase();
+  const ssl = sslMode === 'true' ? true : sslMode === 'no-verify' ? { rejectUnauthorized: false } : undefined;
+  const db = new pg.Client({ connectionString: url, ...(ssl ? { ssl } : {}) });
   await db.connect();
   // The API and the database must be the same system, or nothing lines up.
   const found = await db.query('select id from merchants where public_id = $1', [merchantPublicId]);
@@ -317,7 +356,7 @@ async function payerLogin() {
     password: PAYER_PASSWORD,
     firstName: 'Regular',
     lastName: 'Customer',
-    username: `seed_payer_${PAYER_TAG}`,
+    username: PAYER_USERNAME,
   }, {}, 0, '');
   console.log(`  created seed customer ${PAYER_EMAIL}`);
   return signup.accessToken;
@@ -357,6 +396,82 @@ async function fundPayer(db, euroCents) {
   console.log(`  topped up the seed customer with ${(Number(usdc) / 1e6).toFixed(2)} USDC`);
 }
 
+/* --------------------------------------------------- customer's wallet */
+// The customer pays from their routine wallet. A float covers the next few
+// payments; when it runs low the merchant sends what it has received back to
+// the customer, so a small amount of test USDC can carry a month of sales.
+const BASE_UNITS_PER_EURO_CENT = 11_500n; // EUR → USDC base units, with FX headroom
+let payerAvailable = 0n;
+
+async function routineAvailable(as) {
+  const summary = await call('GET', '/accounts', undefined, {}, 0, as);
+  const card = summary?.accounts?.find((a) => a.account === 'routine');
+  return BigInt(card?.settlement?.availableBaseUnits ?? '0');
+}
+async function holdingAvailable(as) {
+  const summary = await call('GET', '/accounts', undefined, {}, 0, as);
+  const card = summary?.accounts?.find((a) => a.account === 'holding');
+  return BigInt(card?.settlement?.availableBaseUnits ?? '0');
+}
+
+async function waitFor(check, label, timeoutMs = 15 * 60_000, everyMs = 5_000) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    if (await check()) return;
+    await sleep(everyMs);
+  }
+  throw new Error(`Timed out waiting for ${label}.`);
+}
+
+/**
+ * Sandbox: funds the customer's holding account with a Stripe test checkout
+ * (a person completes it in the browser), then moves it to routine.
+ */
+async function fundPayerSandbox(floatBaseUnits) {
+  payerAvailable = await routineAvailable(payerToken);
+  if (payerAvailable >= floatBaseUnits / 2n) return;
+  if ((await holdingAvailable(payerToken)) < floatBaseUnits) {
+    const amountCents = String((floatBaseUnits + 9_999n) / 10_000n); // USDC base units → USD cents
+    const started = await call('POST', '/accounts/funding', { method: 'card', amountCents },
+      { 'idempotency-key': uuidFrom(`${KEY_PREFIX}:funding:${PAYER_EMAIL}:${amountCents}:${new Date().toISOString().slice(0, 13)}`) }, 0, payerToken);
+    if (!started?.checkoutUrl) throw new Error(`Funding did not return a checkout link: ${JSON.stringify(started).slice(0, 300)}`);
+    console.log('\n  ACTION NEEDED: open this Stripe test checkout and pay it with a Stripe test card:');
+    console.log(`  ${started.checkoutUrl}`);
+    console.log('  Waiting for the test USDC to arrive (up to 15 minutes)…');
+    await waitFor(async () => (await holdingAvailable(payerToken)) >= floatBaseUnits - 10_000n, 'the customer funding');
+  }
+  const holding = await holdingAvailable(payerToken);
+  const cents = String(holding / 10_000n);
+  await call('POST', '/accounts/transfers', { from: 'holding', to: 'routine', amountCents: cents },
+    { 'idempotency-key': uuidFrom(`${KEY_PREFIX}:h2r:${PAYER_EMAIL}:${Date.now()}`) }, 0, payerToken);
+  await waitFor(async () => (payerAvailable = await routineAvailable(payerToken)) >= floatBaseUnits / 2n, 'the holding → routine transfer', 5 * 60_000);
+  console.log(`  customer float: ${(Number(payerAvailable) / 1e6).toFixed(2)} USDC`);
+}
+
+let paybacks = 0;
+/** Sends the merchant's received USDC back to the customer. */
+async function payBack(needed) {
+  const merchantHas = await routineAvailable(token);
+  if (merchantHas <= 0n) throw new Error('The customer has run out of USDC and the merchant has nothing to send back. Fund the customer again and re-run.');
+  const before = await routineAvailable(payerToken);
+  await call('POST', '/payments/username', { username: PAYER_USERNAME, amount: merchantHas.toString(), currency: 'USDC' },
+    {}, 0, token);
+  paybacks++;
+  await waitFor(async () => (payerAvailable = await routineAvailable(payerToken)) > before, 'the payback to arrive', 5 * 60_000, 2_000);
+  if (payerAvailable < needed) throw new Error('After a payback the customer still cannot afford the next sale; raise --float-usdc.');
+}
+
+async function ensurePayerCanPay(euroCents) {
+  const needed = BigInt(euroCents) * BASE_UNITS_PER_EURO_CENT;
+  if (payerAvailable >= needed) return;
+  payerAvailable = await routineAvailable(payerToken);
+  if (payerAvailable >= needed) return;
+  await payBack(needed);
+}
+function notePayment(euroCents) {
+  payerAvailable -= BigInt(euroCents) * BASE_UNITS_PER_EURO_CENT;
+}
+
 /** Creates the itemised invoice for one sale and pays it as the customer. */
 async function recordDigitalSale(sale, lines, manifest, productIds) {
   const existing = manifest.digital[sale.key];
@@ -381,13 +496,15 @@ async function recordDigitalSale(sale, lines, manifest, productIds) {
     // A settled payment says so; otherwise wait for the invoice to settle.
     // (The backdate step re-checks every one is completed in the database.)
     if (paid?.status === 'completed') invoice = { ...invoice, status: 'completed' };
-    for (let i = 0; i < 15 && invoice.status !== 'completed'; i++) {
+    // Devnet settlement can take a while; mock settles at once.
+    const until = Date.now() + (MODE === 'sandbox' ? 120_000 : 15_000);
+    while (invoice.status !== 'completed' && invoice.status !== 'failed' && Date.now() < until) {
       invoice = await call('GET', `/merchants/me/invoices/${invoice.id}`);
-      if (invoice.status === 'failed') break;
+      if (invoice.status !== 'completed' && MODE === 'sandbox') await sleep(1_500);
     }
   }
   if (invoice.status !== 'completed')
-    throw new Error(`Digital sale ${sale.key} ended as "${invoice.status}". Is the API running with TRANSFER_PROVIDER=mock?`);
+    throw new Error(`Digital sale ${sale.key} ended as "${invoice.status}". ${MODE === 'mock' ? ' Is the API running with TRANSFER_PROVIDER=mock?' : ''}`);
   manifest.digital[sale.key] = { ...manifest.digital[sale.key], status: 'completed' };
   return manifest.digital[sale.key];
 }
@@ -494,6 +611,19 @@ async function assess() {
     merchantType: MERCHANT_TYPE,
     commencementDate: COMMENCED,
     existingDebtMinor: String(Math.round(EXISTING_DEBT_EUR * 100)),
+    // A modest working-capital request from a café with more assets than debts.
+    ...(FULL_PROFILE
+      ? {
+          loanAmountMinor: '300000',
+          loanTermMonths: 12,
+          inventoryValueMinor: '120000',
+          collateralValueMinor: '800000',
+          businessAssetsMinor: '2500000',
+          businessDebtsMinor: '200000',
+          ownerPersonalAssetsMinor: '4000000',
+          ownerPersonalDebtsMinor: '500000',
+        }
+      : {}),
   };
   const patch = Object.fromEntries(Object.entries(wanted).filter(([k]) => current[k] === undefined || current[k] === null));
   if (Object.keys(patch).length) await call('PATCH', '/merchants/me/credit-profile', { data: patch });
@@ -570,7 +700,19 @@ async function main() {
     ({ db, merchantId } = await connectDatabase(merchantPublicId));
     if (digitalToPay.length) {
       payerToken = await payerLogin();
-      await fundPayer(db, digitalToPay.reduce((sum, s) => sum + saleCents(s), 0));
+      const floatBaseUnits = BigInt(Math.round(FLOAT_USDC * 1e6));
+      const largest = Math.max(...digitalToPay.map(saleCents));
+      if (BigInt(largest) * BASE_UNITS_PER_EURO_CENT > floatBaseUnits)
+        throw new Error(`The largest digital sale (€${(largest / 100).toFixed(2)}) is more than the --float-usdc of ${FLOAT_USDC}; raise it.`);
+      if (MODE === 'sandbox') await fundPayerSandbox(floatBaseUnits);
+      else if (arg('float-usdc', null) !== null) {
+        // A deliberately small float exercises the payback loop locally.
+        await fundPayer(db, Number(floatBaseUnits / BASE_UNITS_PER_EURO_CENT));
+        payerAvailable = await routineAvailable(payerToken);
+      } else {
+        await fundPayer(db, digitalToPay.reduce((sum, s) => sum + saleCents(s), 0));
+        payerAvailable = await routineAvailable(payerToken);
+      }
     }
   }
 
@@ -586,7 +728,10 @@ async function main() {
         : { type: 'product', productId: productIds[l.sku], quantity: l.quantity },
     );
     if (sale.channel === 'digital') {
+      if (manifest.digital[sale.key]?.status !== 'completed') await ensurePayerCanPay(saleCents(sale));
+      const before = manifest.digital[sale.key]?.status;
       await recordDigitalSale(sale, lines, manifest, productIds);
+      if (before !== 'completed') notePayment(saleCents(sale));
       digitalCount++;
       digitalMinor += saleCents(sale);
       totalMinor += saleCents(sale);
@@ -595,6 +740,13 @@ async function main() {
         writeManifest(manifest);
         process.stdout.write(`\r  sales ${done}/${sales.length} (${digitalCount} digital)`);
       }
+      continue;
+    }
+    // Already recorded by an earlier run: skip the round trip (a re-sent sale
+    // would only return the same record).
+    if (manifest.sales[sale.key] && !sale.voidReason) {
+      totalMinor += saleCents(sale);
+      done++;
       continue;
     }
     const body = { lines, ...(sale.note ? { description: sale.note } : {}), occurredAt: sale.occurredAt.toISOString() };
@@ -637,6 +789,7 @@ async function main() {
     console.log(`  sales total ≈ €${(totalMinor / 100).toFixed(2)} (re-sent sales are not double-counted)`);
     console.log(`  digital share ≈ ${Math.round((digitalMinor / totalMinor) * 100)}% of value, ${Math.round((digitalCount / Math.max(1, sales.length - voided)) * 100)}% of sales`);
   }
+  if (paybacks) console.log(`  ${paybacks} paybacks from the merchant to the seed customer kept the float moving.`);
   if (keptAsCash)
     console.log(`  ${keptAsCash} planned digital sales stayed cash because an earlier run recorded them as cash. Reset the database and re-run for the full share.`);
   console.log(`  manifest: ${MANIFEST}  (run again with --undo to void these sales)`);

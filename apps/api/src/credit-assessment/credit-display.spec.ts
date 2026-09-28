@@ -72,6 +72,31 @@ describe('credit display rules', () => {
     expect(local.financialProfileBand(12).label).toBe('Weak');
   });
 
+  it('mark a credit score provisional while data confidence is Low', () => {
+    const scored = (label: 'Low' | 'Medium' | 'High', grade = 'Good') => ({
+      ...credit(label),
+      creditScore: { score: 715, grade, scale: '300-850' as const },
+    });
+    expect(local.isProvisionalCreditScore(scored('Low'))).toBe(true);
+    expect(local.isProvisionalCreditScore(scored('Medium'))).toBe(false);
+    expect(local.isProvisionalCreditScore(credit('Low'))).toBe(false);
+    expect(local.creditResultTone(scored('High'))).toBe('positive');
+    expect(local.creditResultTone(scored('Low'))).toBe('neutral');
+    expect(local.creditResultTone(scored('Low', 'Sufficient'))).toBe('caution');
+    expect(local.creditResultTone(scored('High', 'Acceptable'))).toBe('neutral');
+    for (const label of ['Low', 'Medium', 'High'] as const)
+      for (const grade of ['Sufficient', 'Acceptable', 'Good', 'Excellent'])
+        expect(local.creditResultTone(scored(label, grade))).toBe(
+          shared.creditResultTone(scored(label, grade)),
+        );
+  });
+
+  it('colour the financial profile by band', () => {
+    expect(local.financialProfileTone(58.1)).toBe('neutral');
+    expect(local.financialProfileTone(60)).toBe('positive');
+    expect(local.financialProfileTone(20)).toBe('caution');
+  });
+
   it('match the shared rules the portal uses', () => {
     expect(local.FINANCIAL_PROFILE_BANDS).toEqual(
       shared.FINANCIAL_PROFILE_BANDS,

@@ -79,3 +79,49 @@ export function financialProfileBand(score: number): FinancialProfileBand {
     FINANCIAL_PROFILE_BANDS[FINANCIAL_PROFILE_BANDS.length - 1]
   );
 }
+
+/** The parts of a credit result the colour rules read (the PDF has its own narrower type). */
+type ScoredCredit = {
+  creditScore?: { grade: string } | null;
+  profileConfidence?: { label: string } | null;
+};
+
+export type ScoreTone = 'positive' | 'neutral' | 'caution';
+const TONE_ORDER: ScoreTone[] = ['caution', 'neutral', 'positive'];
+
+/** Colour for a 300–850 grade: only Good or Excellent reads as positive. */
+export function creditGradeTone(grade: string): ScoreTone {
+  if (grade === 'Excellent' || grade === 'Good') return 'positive';
+  if (grade === 'Acceptable') return 'neutral';
+  return 'caution';
+}
+
+/** Colour for the 0–100 financial profile: Strong/Good positive, Fair neutral, Weak caution. */
+export function financialProfileTone(score: number): ScoreTone {
+  const { label } = financialProfileBand(score);
+  if (label === 'Strong' || label === 'Good') return 'positive';
+  if (label === 'Fair') return 'neutral';
+  return 'caution';
+}
+
+/**
+ * A credit score is provisional while data confidence is Low. The model
+ * scores the inputs alone; data confidence also carries the payment history
+ * checklist, so a Good score can rest on thin evidence. We keep the score but
+ * say so, and never frame it as a success.
+ */
+export function isProvisionalCreditScore(
+  credit: ScoredCredit | null | undefined,
+): boolean {
+  return Boolean(credit?.creditScore) && credit?.profileConfidence?.label === 'Low';
+}
+
+/** Result panel colour for a credit score: the grade's tone, capped at neutral while provisional. */
+export function creditResultTone(
+  credit: ScoredCredit | null | undefined,
+): ScoreTone {
+  if (!credit?.creditScore) return 'neutral';
+  const tone = creditGradeTone(credit.creditScore.grade);
+  if (!isProvisionalCreditScore(credit)) return tone;
+  return TONE_ORDER[Math.min(TONE_ORDER.indexOf(tone), TONE_ORDER.indexOf('neutral'))];
+}

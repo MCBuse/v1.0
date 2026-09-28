@@ -7,7 +7,11 @@ import {
   missingInputKind,
   type MissingInputKind,
 } from '../credit-assessment/credit-labels';
-import { financialProfileBand } from '../credit-assessment/credit-display';
+import {
+  creditResultTone,
+  financialProfileBand,
+  isProvisionalCreditScore,
+} from '../credit-assessment/credit-display';
 
 /**
  * The financial evidence PDF: written for a person at a lender, not a parser.
@@ -30,6 +34,8 @@ type Credit = {
     label: string;
     fieldsFilled: number;
     fieldsTotal: number;
+    /** Unmet payment history checks that held the label down. */
+    limitedBy?: string[];
   } | null;
   missingReasons: Record<string, string>;
   indicators?: Record<string, number | string | null>;
@@ -664,8 +670,24 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
   // Result banner
   if (creditScore) {
     const conf = credit?.profileConfidence;
-    w.box('green', [
-      { text: 'CREDIT SCORE', size: 8, bold: true, color: C.green },
+    // Green only for a Good/Excellent score with Medium or High data
+    // confidence: a score resting on thin evidence is marked provisional.
+    const provisional = isProvisionalCreditScore(credit);
+    const tone = {
+      positive: 'green',
+      neutral: 'soft',
+      caution: 'amber',
+    }[creditResultTone(credit)] as 'green' | 'soft' | 'amber';
+    const accent =
+      tone === 'green' ? C.green : tone === 'amber' ? C.amber : C.muted;
+    const unmet = conf?.limitedBy?.length ?? 0;
+    w.box(tone, [
+      {
+        text: provisional ? 'CREDIT SCORE  ·  PROVISIONAL' : 'CREDIT SCORE',
+        size: 8,
+        bold: true,
+        color: accent,
+      },
       {
         text: `${creditScore.score}  ·  ${creditScore.grade}`,
         size: 28,
@@ -689,6 +711,21 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
         size: 9.5,
         gapBefore: 4,
       },
+      ...(provisional
+        ? [
+            {
+              text: `Provisional: data confidence is Low because ${
+                unmet
+                  ? `${unmet} payment history ${unmet === 1 ? 'check is' : 'checks are'} not yet met`
+                  : 'the records are still limited'
+              }. The score may change as more payments are recorded.`,
+              size: 9.5,
+              bold: true,
+              color: C.ink,
+              gapBefore: 4,
+            },
+          ]
+        : []),
       {
         text: 'Calculated by MCBuse from the business’s recorded sales and declared information. It is not a loan approval or lending decision.',
         size: 8.5,

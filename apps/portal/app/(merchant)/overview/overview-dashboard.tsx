@@ -5,7 +5,7 @@ import type {
   MerchantWorkspaceSummary,
   SavedMerchantAssessment,
 } from "@repo/shared";
-import { financialProfileBand } from "@repo/shared";
+import { financialProfileBand, isProvisionalCreditScore } from "@repo/shared";
 import { Alert } from "@repo/ui/alert";
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
@@ -335,7 +335,7 @@ export function OverviewDashboard() {
               !latestAssessment
                 ? undefined
                 : latestCredit?.creditScore
-                  ? `Out of 850 · saved ${DATE_TIME.format(new Date(latestAssessment.createdAt))}`
+                  ? `${isProvisionalCreditScore(latestCredit) ? "Provisional · " : ""}Out of 850 · saved ${DATE_TIME.format(new Date(latestAssessment.createdAt))}`
                   : latestCredit?.unavailableFields.length
                     ? `${latestCredit.unavailableFields.length} required ${latestCredit.unavailableFields.length === 1 ? "input" : "inputs"} missing`
                     : "No score saved"
