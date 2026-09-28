@@ -156,7 +156,7 @@ test("V.8 — turnover says why it is unavailable rather than showing a blank", 
   await page.goto("/analytics/general?tab=inventory");
   const table = page.getByRole("table", { name: "Inventory turnover" });
   await expect(table.getByText("Not available")).toBeVisible();
-  await expect(table.getByText("2.3529")).toBeVisible();
+  await expect(table.getByText("2.35×")).toBeVisible();
 });
 
 test("V.2 — stock value is never presented as cost or profit", async ({

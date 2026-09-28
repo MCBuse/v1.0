@@ -10,3 +10,4 @@ export * from './sse';
 export * from './merchant-assessment';
 export * from './credit-assessment';
 export * from './credit-labels';
+export * from './credit-display';

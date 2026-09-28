@@ -54,6 +54,10 @@ export interface CreditPublicResult {
     dataReliabilityQualityPct: number | null;
     fieldsFilled: number;
     fieldsTotal: number;
+    /** The model's own label, present only when the evidence checklist lowered it. */
+    modelLabel?: "Low" | "Medium" | "High";
+    /** The unmet evidence checks that lowered the label. */
+    limitedBy?: string[];
   } | null;
   missingReasons: Record<string, string>;
   indicators: Record<string, number | string | null>;

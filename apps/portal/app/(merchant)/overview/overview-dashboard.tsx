@@ -5,6 +5,7 @@ import type {
   MerchantWorkspaceSummary,
   SavedMerchantAssessment,
 } from "@repo/shared";
+import { financialProfileBand } from "@repo/shared";
 import { Alert } from "@repo/ui/alert";
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
@@ -355,7 +356,7 @@ export function OverviewDashboard() {
             }
             detail={
               latestCredit?.profileConfidence
-                ? `${latestCredit.profileConfidence.label} confidence`
+                ? `${latestCredit.financialProfile ? `${financialProfileBand(latestCredit.financialProfile.score).label} · ` : ""}${latestCredit.profileConfidence.label} data confidence`
                 : undefined
             }
           />

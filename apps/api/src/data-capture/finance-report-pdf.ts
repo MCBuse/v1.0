@@ -7,6 +7,7 @@ import {
   missingInputKind,
   type MissingInputKind,
 } from '../credit-assessment/credit-labels';
+import { financialProfileBand } from '../credit-assessment/credit-display';
 
 /**
  * The financial evidence PDF: written for a person at a lender, not a parser.
@@ -684,7 +685,7 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
           )
           .join(
             ', ',
-          )}.${conf ? ` Calculated from ${conf.fieldsFilled} of ${conf.fieldsTotal} inputs.` : ''}`,
+          )}.${conf ? ` Calculated from ${conf.fieldsFilled} of ${conf.fieldsTotal} inputs. Data confidence: ${conf.label}.` : ''}`,
         size: 9.5,
         gapBefore: 4,
       },
@@ -697,10 +698,24 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
     ]);
   } else if (typeof score === 'number') {
     const conf = credit?.profileConfidence;
-    w.box('green', [
-      { text: 'FINANCIAL PROFILE SCORE', size: 8, bold: true, color: C.green },
+    const band = financialProfileBand(score);
+    // Only a Good or Strong profile gets the green "positive" banner, so the
+    // colour never tells a better story than the number does.
+    const tone =
+      band.label === 'Strong' || band.label === 'Good'
+        ? 'green'
+        : band.label === 'Fair'
+          ? 'soft'
+          : 'amber';
+    const accent =
+      tone === 'green' ? C.green : tone === 'amber' ? C.amber : C.muted;
+    const checksTotal =
+      (a?.passedRequirements.length ?? 0) +
+      (a?.missingRequirements.length ?? 0);
+    w.box(tone, [
+      { text: 'FINANCIAL PROFILE SCORE', size: 8, bold: true, color: accent },
       {
-        text: `${score.toFixed(1)} / 100`,
+        text: `${score.toFixed(1)} / 100  ·  ${band.label}`,
         size: 28,
         bold: true,
         color: C.ink,
@@ -708,7 +723,11 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
       },
       {
         text: conf
-          ? `Confidence: ${conf.label}. ${conf.fieldsFilled} of ${conf.fieldsTotal} inputs were available. Higher scores indicate a stronger recorded business profile.`
+          ? `Data confidence: ${conf.label}. ${conf.fieldsFilled} of ${conf.fieldsTotal} inputs were available${
+              checksTotal
+                ? ` and ${a?.passedRequirements.length ?? 0} of ${checksTotal} evidence checks were met`
+                : ''
+            }. Data confidence describes how complete and reliable the records are, not how strong the business is.`
           : 'Higher scores indicate a stronger recorded business profile.',
         size: 9.5,
         gapBefore: 4,
@@ -873,12 +892,12 @@ function draw(doc: Doc, s: FinanceReportSnapshot, id: string) {
         : [
             'Financial profile score',
             typeof score === 'number'
-              ? `${score.toFixed(1)} / 100`
+              ? `${score.toFixed(1)} / 100 · ${financialProfileBand(score).label}`
               : 'Not available',
             typeof score === 'number' ? C.green : C.amber,
           ],
       [
-        'Confidence',
+        'Data confidence',
         credit?.profileConfidence
           ? `${credit.profileConfidence.label} (${credit.profileConfidence.fieldsFilled} of ${credit.profileConfidence.fieldsTotal} inputs available)`
           : 'Not available',

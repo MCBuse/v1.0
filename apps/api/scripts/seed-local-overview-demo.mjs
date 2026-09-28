@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * Seeds a merchant account with a realistic café trading history so the
- * Overview, readiness and credit-evidence views have data to work with.
+ * Overview, analytics, readiness and credit-evidence views have data to work
+ * with. By default about 70% of sales are digital MCBuse payments and the
+ * rest are merchant-recorded cash.
  *
  *   SEED_EMAIL=you@example.com SEED_PASSWORD='…' \
  *     node scripts/seed-local-overview-demo.mjs \
@@ -9,14 +11,31 @@
  *       [--allow-host api.mcbuse.com] [--manifest ./seed-manifest.json] [--undo]
  *       [--volume 1] [--merchant-type cafe_bakery] [--commenced 2021-05-03]
  *       [--existing-debt-eur 450] [--no-assess]
+ *       [--digital-share 0.7] [--evidence-environment test]
+ *       [--database-url postgres://…] [--allow-db-host db.example.com]
  *
- * What it creates (all through the public merchant API, never raw SQL):
+ * What it creates:
  *   - A 10-item café menu with ordinary SKUs and descriptions.
- *   - Backdated merchant-recorded cash sales over the last N days (default 32)
- *     with a real café rhythm: morning rush, lunch peak, slow Mondays, busy
- *     Fridays/Saturdays, mostly closed Sundays, the odd quiet (rainy) day,
- *     occasional catering orders, sparse till notes and a few voided
- *     double-rings.
+ *   - N days (default 32) of sales with a real café rhythm: morning rush,
+ *     lunch peak, slow Mondays, busy Fridays/Saturdays, mostly closed Sundays,
+ *     the odd quiet (rainy) day, occasional catering orders, sparse till notes.
+ *   - Cash sales: backdated merchant-recorded cash sales through the public
+ *     API, including a few voided double-rings.
+ *   - Digital sales (--digital-share, default 0.7): each one is a real
+ *     itemised invoice paid by a seed customer account through POST /payments,
+ *     so wallets, ledger, stock reservations and receipts all go through the
+ *     normal code path. Needs the API running with TRANSFER_PROVIDER=mock
+ *     (the local default); the customer's wallet is topped up with a mock
+ *     on-ramp credit written to the database. A payment is always stamped with the moment it
+ *     settles, so once they are all paid the script moves each digital sale's
+ *     timestamps back to its planned time with SQL (--database-url, or the
+ *     DATABASE_* values in ./.env). It also moves each seeded product's
+ *     opening stock to before the first sale so stock history reconstructs.
+ *
+ * Digital sales are recorded with evidence environment "test" by default,
+ * which is what a devnet payment records. Pass --evidence-environment
+ * synthetic to label them as demonstration data, or live to have the credit
+ * model count them as live sales (credit inputs ignore anything but live).
  *
  * After seeding it fills any empty business credit-profile fields (category,
  * trading start date, existing debt), grants evidence-assessment consent if
@@ -25,20 +44,25 @@
  * (see credit-evidence.service.ts); without it the score stays empty.
  *
  * Nothing user-visible marks the records as seeded. Traceability lives only
- * in the Idempotency-Key prefix and the local manifest file, so the history
- * can be voided later with --undo (or removed wholesale by a DB reset).
+ * in the Idempotency-Key prefix and the local manifest file. --undo voids the
+ * seeded cash sales; digital payments are real settled payments and can only
+ * be removed with a DB reset.
  *
  * GO-LIVE: history seeded into a hosted database must be removed before launch
- * (DB reset or --undo); see docs/go-live-checklist.md.
+ * (DB reset); see docs/go-live-checklist.md.
  *
  * Safety:
- *   - Local API by default. A remote API is refused unless its exact hostname
- *     is passed with --allow-host.
+ *   - Local API and local database by default. A remote API is refused unless
+ *     its exact hostname is passed with --allow-host, a remote database unless
+ *     its hostname is passed with --allow-db-host.
  *   - Deterministic and idempotent: re-running on the same or a later day
- *     never duplicates sales; later runs only add the days since.
- *   - Does not touch wallets, balances, digital payments, assessments,
- *     consent or Finance Match. Those stay as they really are.
+ *     never duplicates sales; later runs only add the days since. A sale that
+ *     an earlier run already recorded as cash stays cash, so for the full
+ *     digital share run it against a freshly reset database.
+ *   - Does not touch the merchant's wallets directly, assessments already
+ *     saved, or Finance Match.
  */
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import process from 'node:process';
 
@@ -57,6 +81,9 @@ const MERCHANT_TYPE = arg('merchant-type', 'cafe_bakery');
 const COMMENCED = arg('commenced', '2021-05-03');
 const EXISTING_DEBT_EUR = Number(arg('existing-debt-eur', '450'));
 const ASSESS = !flag('no-assess');
+const DIGITAL_SHARE = Math.min(Math.max(Number(arg('digital-share', '0.7')), 0), 1);
+const EVIDENCE_ENVIRONMENT = arg('evidence-environment', 'test');
+const ALLOW_DB_HOST = arg('allow-db-host', '')?.trim().toLowerCase();
 const EMAIL = process.env.SEED_EMAIL?.trim().toLowerCase();
 const PASSWORD = process.env.SEED_PASSWORD;
 let TZ = 'Europe/Berlin'; // replaced by the merchant's own timezone after login
@@ -73,6 +100,17 @@ if (!EMAIL || !PASSWORD) {
   console.error('Set SEED_EMAIL and SEED_PASSWORD for the merchant account.');
   process.exit(1);
 }
+if (!['test', 'synthetic', 'live'].includes(EVIDENCE_ENVIRONMENT)) {
+  console.error('--evidence-environment must be test, synthetic or live.');
+  process.exit(1);
+}
+// The customer who pays the digital sales. Derived from the merchant login so
+// a re-run finds the same account without anything stored.
+const PAYER_TAG = createHash('sha256').update(`${EMAIL}:${KEY_PREFIX}`).digest('hex').slice(0, 10);
+const PAYER_EMAIL = process.env.SEED_PAYER_EMAIL?.trim().toLowerCase() ?? `seed-payer-${PAYER_TAG}@example.com`;
+const PAYER_PASSWORD =
+  process.env.SEED_PAYER_PASSWORD ??
+  `Sp!${createHash('sha256').update(`${PASSWORD}:${PAYER_EMAIL}`).digest('hex').slice(0, 16)}Aa9`;
 
 /* ------------------------------------------------------------ catalogue */
 // price in EUR cents; weight = relative popularity; endStock = stock left after seeding
@@ -167,7 +205,11 @@ function planSales(now) {
         note = r() < 0.5 ? 'Collected' : note;
       }
       const voidReason = r() < 0.006 ? VOID_REASONS[Math.floor(r() * VOID_REASONS.length)] : null;
-      sales.push({ key: `${KEY_PREFIX}:${ymd}:${n}`, occurredAt, lines, note, voidReason, isToday: ymd === today });
+      const key = `${KEY_PREFIX}:${ymd}:${n}`;
+      // The channel draws from its own stream, so every other detail of a sale
+      // (and so each cash sale's idempotency fingerprint) is unchanged by it.
+      const digital = !voidReason && rng(`${key}:channel`)() < DIGITAL_SHARE;
+      sales.push({ key, occurredAt, lines, note, voidReason, channel: digital ? 'digital' : 'cash', isToday: ymd === today });
     }
   }
   // Only the past can be recorded.
@@ -177,17 +219,19 @@ function planSales(now) {
 /* ----------------------------------------------------------------- HTTP */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let token = '';
-async function call(method, path, body, headers = {}, attempt = 0) {
+let payerToken = '';
+async function call(method, path, body, headers = {}, attempt = 0, as = null) {
   await sleep(PACE_MS);
+  const bearer = as ?? token;
   const res = await fetch(`${API}${path}`, {
     method,
-    headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
+    headers: { ...(bearer ? { authorization: `Bearer ${bearer}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (res.status === 429 && attempt < 5) {
     process.stdout.write(' (rate limited, waiting 60s)');
     await sleep(60_000);
-    return call(method, path, body, headers, attempt + 1);
+    return call(method, path, body, headers, attempt + 1, as);
   }
   const text = await res.text();
   const json = text ? JSON.parse(text) : null;
@@ -210,12 +254,219 @@ async function listAllProducts() {
   return all;
 }
 
+/* ------------------------------------------------------------- database */
+// Only the digital history needs the database: to move settled payments back
+// to their planned times. Everything else goes through the public API.
+function databaseUrl() {
+  const explicit = arg('database-url', process.env.DATABASE_URL);
+  if (explicit) return explicit;
+  let env = {};
+  try {
+    env = Object.fromEntries(
+      fs.readFileSync('.env', 'utf8').split('\n')
+        .map((line) => line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/))
+        .filter(Boolean)
+        .map(([, k, v]) => [k, v.replace(/^(['"])(.*)\1$/, '$2')]),
+    );
+  } catch {
+    return null;
+  }
+  if (env.DATABASE_URL) return env.DATABASE_URL;
+  if (!env.DATABASE_HOST) return null;
+  const user = encodeURIComponent(env.DATABASE_USER ?? 'postgres');
+  const pass = encodeURIComponent(env.DATABASE_PASSWORD ?? '');
+  return `postgres://${user}:${pass}@${env.DATABASE_HOST}:${env.DATABASE_PORT ?? 5432}/${env.DATABASE_NAME ?? 'postgres'}`;
+}
+
+/** Connects and resolves the merchant's internal id from its public id. */
+async function connectDatabase(merchantPublicId) {
+  const url = databaseUrl();
+  if (!url) throw new Error('Digital sales need the database to backdate them. Pass --database-url or run from apps/api with DATABASE_* in .env (or use --digital-share 0).');
+  const dbHost = new URL(url).hostname.toLowerCase();
+  if (!['localhost', '127.0.0.1', '::1'].includes(dbHost) && dbHost !== ALLOW_DB_HOST)
+    throw new Error(`Refusing to write to database host ${dbHost}. For a non-local database pass --allow-db-host ${dbHost}.`);
+  const { default: pg } = await import('pg');
+  const db = new pg.Client({ connectionString: url });
+  await db.connect();
+  // The API and the database must be the same system, or nothing lines up.
+  const found = await db.query('select id from merchants where public_id = $1', [merchantPublicId]);
+  if (!found.rowCount) {
+    await db.end();
+    throw new Error('The merchant from the API was not found in that database. Is --database-url the database this API uses?');
+  }
+  return { db, merchantId: found.rows[0].id };
+}
+
+/* ------------------------------------------------------- digital sales */
+/** A stable UUID v4 from text, so a retried payment reuses its idempotency key. */
+function uuidFrom(text) {
+  const h = createHash('sha256').update(text).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${((parseInt(h[16], 16) & 3) | 8).toString(16)}${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+/** Signs the seed customer in (creating the account the first time). */
+async function payerLogin() {
+  try {
+    const login = await call('POST', '/auth/login', { email: PAYER_EMAIL, password: PAYER_PASSWORD }, {}, 0, '');
+    return login.accessToken;
+  } catch (e) {
+    if (e.status !== 401 && e.status !== 404) throw e;
+  }
+  const signup = await call('POST', '/auth/signup', {
+    email: PAYER_EMAIL,
+    password: PAYER_PASSWORD,
+    firstName: 'Regular',
+    lastName: 'Customer',
+    username: `seed_payer_${PAYER_TAG}`,
+  }, {}, 0, '');
+  console.log(`  created seed customer ${PAYER_EMAIL}`);
+  return signup.accessToken;
+}
+
+/**
+ * Tops the customer's routine wallet (the one QR payments spend) up for the
+ * payments still to make. Local mock mode has no API route into that wallet
+ * (savings → routine needs sandbox mode), so this writes the same balance
+ * credit and "on_ramp" ledger entry the mock on-ramp writes, straight into
+ * the routine wallet.
+ */
+async function fundPayer(db, euroCents) {
+  if (euroCents <= 0) return;
+  // EUR cents → USDC base units (6 dp) with a generous margin for the FX quote.
+  const usdc = BigInt(Math.ceil(euroCents * 1.3)) * 10_000n;
+  await db.query('begin');
+  try {
+    const wallet = await db.query(
+      `select w.id from wallets w join users u on u.id = w.user_id
+        where u.email = $1 and w.type = 'routine' limit 1`, [PAYER_EMAIL]);
+    const walletId = wallet.rows[0]?.id;
+    if (!walletId) throw new Error(`No routine wallet found for ${PAYER_EMAIL}.`);
+    const credited = await db.query(
+      `update balances set available = available + $2::bigint where wallet_id = $1 and currency = 'USDC' returning id`,
+      [walletId, usdc.toString()]);
+    if (credited.rowCount !== 1) throw new Error('The seed customer has no USDC balance row.');
+    await db.query(
+      `insert into ledger_entries (debit_wallet_id, credit_wallet_id, amount, currency, type, status, idempotency_key, metadata)
+       values ($1, $1, $2::bigint, 'USDC', 'on_ramp', 'completed', $3, $4)`,
+      [walletId, usdc.toString(), uuidFrom(`${KEY_PREFIX}:fund:${PAYER_EMAIL}:${Date.now()}`), JSON.stringify({ provider: 'mock', purpose: 'seed-local-overview-demo' })]);
+    await db.query('commit');
+  } catch (e) {
+    await db.query('rollback');
+    throw e;
+  }
+  console.log(`  topped up the seed customer with ${(Number(usdc) / 1e6).toFixed(2)} USDC`);
+}
+
+/** Creates the itemised invoice for one sale and pays it as the customer. */
+async function recordDigitalSale(sale, lines, manifest, productIds) {
+  const existing = manifest.digital[sale.key];
+  if (existing?.status === 'completed') return existing;
+  let invoice = existing?.requestId ? await call('GET', `/merchants/me/invoices/${existing.requestId}`) : null;
+  if (!invoice || ['expired', 'cancelled', 'failed'].includes(invoice.status)) {
+    const body = { lines, ...(sale.note ? { description: sale.note } : {}), expiresInSeconds: 3600 };
+    try {
+      invoice = await call('POST', '/merchants/me/invoices', body);
+    } catch (e) {
+      if (!(e.status === 409 && /stock/i.test(e.message))) throw e;
+      for (const l of sale.lines) if (l.sku)
+        await call('POST', `/merchants/me/products/${productIds[l.sku]}/stock-adjustments`, { reason: 'restock', change: 50 });
+      invoice = await call('POST', '/merchants/me/invoices', body);
+    }
+    manifest.digital[sale.key] = { requestId: invoice.id, occurredAt: sale.occurredAt.toISOString(), status: invoice.status, backdated: false };
+    writeManifest(manifest);
+  }
+  if (invoice.status !== 'completed') {
+    const nonce = new URL(invoice.qrPayload).searchParams.get('nonce');
+    const paid = await call('POST', '/payments', { nonce, idempotencyKey: uuidFrom(`${sale.key}:pay`) }, {}, 0, payerToken);
+    // A settled payment says so; otherwise wait for the invoice to settle.
+    // (The backdate step re-checks every one is completed in the database.)
+    if (paid?.status === 'completed') invoice = { ...invoice, status: 'completed' };
+    for (let i = 0; i < 15 && invoice.status !== 'completed'; i++) {
+      invoice = await call('GET', `/merchants/me/invoices/${invoice.id}`);
+      if (invoice.status === 'failed') break;
+    }
+  }
+  if (invoice.status !== 'completed')
+    throw new Error(`Digital sale ${sale.key} ended as "${invoice.status}". Is the API running with TRANSFER_PROVIDER=mock?`);
+  manifest.digital[sale.key] = { ...manifest.digital[sale.key], status: 'completed' };
+  return manifest.digital[sale.key];
+}
+
+/**
+ * Moves settled digital sales from the moment they were paid to their planned
+ * sale time, across every table that dates them, in one transaction. Also
+ * sets their evidence environment and moves seeded products' opening stock to
+ * before the first sale.
+ */
+async function backdate(db, merchantId, manifest, firstSaleAt) {
+  const pending = Object.values(manifest.digital).filter((d) => d.status === 'completed' && !d.backdated);
+  const productIds = Object.values(manifest.products ?? {});
+  await db.query('begin');
+  try {
+    if (pending.length) {
+      await db.query('create temp table seed_backdate (id uuid primary key, at timestamptz not null) on commit drop');
+      await db.query('insert into seed_backdate select * from unnest($1::uuid[], $2::timestamptz[])', [
+        pending.map((d) => d.requestId),
+        pending.map((d) => d.occurredAt),
+      ]);
+      const owned = await db.query(
+        `select count(*)::int as n from payment_requests pr join seed_backdate t on t.id = pr.id
+          where pr.merchant_id = $1 and pr.status = 'completed'`, [merchantId]);
+      if (owned.rows[0].n !== pending.length) throw new Error('Some manifest payments are not completed payments of this merchant; nothing was changed.');
+      const q = (sql, params = []) => db.query(sql, params);
+      // Reservations carry no reference; they were written in the same
+      // transaction as the invoice, so they share its original created_at.
+      await q(`update merchant_stock_movements m set occurred_at = t.at - interval '45 seconds'
+                 from seed_backdate t join payment_requests pr on pr.id = t.id
+                where m.merchant_id = pr.merchant_id and m.kind = 'invoice_reservation'
+                  and m.reference_id is null and m.occurred_at = pr.created_at`);
+      await q(`update merchant_stock_movements m set occurred_at = t.at
+                 from seed_backdate t where m.reference_id = t.id and m.kind = 'digital_sale'`);
+      await q(`update merchant_invoice_items i set created_at = t.at - interval '45 seconds'
+                 from seed_backdate t where i.payment_request_id = t.id`);
+      await q(`update merchant_payment_attempts a
+                  set claimed_at = t.at - interval '6 seconds', submitted_at = t.at - interval '4 seconds',
+                      finalized_at = t.at, updated_at = t.at
+                 from seed_backdate t where a.payment_request_id = t.id`);
+      await q(`update merchant_capture_exceptions c
+                  set created_at = t.at - interval '5 seconds',
+                      resolved_at = case when c.resolved_at is null then null else t.at end
+                 from seed_backdate t where c.payment_request_id = t.id`);
+      await q(`update ledger_entries l set created_at = t.at from seed_backdate t where l.payment_request_id = t.id`);
+      await q(`update merchant_events e set created_at = t.at from seed_backdate t where e.payment_request_id = t.id`);
+      await q(`update payment_requests pr
+                  set created_at = t.at - interval '45 seconds', quoted_at = t.at - interval '45 seconds',
+                      processing_at = t.at - interval '6 seconds', completed_at = t.at,
+                      expires_at = t.at + interval '1 hour' - interval '45 seconds'
+                 from seed_backdate t where pr.id = t.id`);
+      await q(`update merchant_transactions x
+                  set occurred_at = t.at, finalized_at = t.at, created_at = t.at, evidence_environment = $1
+                 from seed_backdate t where x.payment_request_id = t.id`, [EVIDENCE_ENVIRONMENT]);
+    }
+    if (productIds.length && firstSaleAt) {
+      await db.query(
+        `update merchant_stock_movements set occurred_at = $3
+          where merchant_id = $1 and kind = 'opening_balance' and reference_type = 'product'
+            and reference_id = any($2::uuid[]) and occurred_at > $3`,
+        [merchantId, productIds, new Date(firstSaleAt.getTime() - 86_400_000)],
+      );
+    }
+    await db.query('commit');
+  } catch (e) {
+    await db.query('rollback');
+    throw e;
+  }
+  for (const d of pending) d.backdated = true;
+  writeManifest(manifest);
+  return pending.length;
+}
+
 /* ----------------------------------------------------------------- main */
 function readManifest() {
   try {
     return JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
   } catch {
-    return { api: API, email: EMAIL, products: {}, sales: {} };
+    return { api: API, email: EMAIL, products: {}, sales: {}, digital: {} };
   }
 }
 function writeManifest(m) {
@@ -232,6 +483,8 @@ async function undo() {
     if (++n % 25 === 0 || n === ids.length) process.stdout.write(`\r  voided ${n}/${ids.length}`);
   }
   console.log('\nDone. Products were left in place; archive them from the portal if needed.');
+  const digital = Object.keys(m.digital ?? {}).length;
+  if (digital) console.log(`  ${digital} digital sales are settled payments and stay; reset the database to remove them.`);
 }
 
 async function assess() {
@@ -262,6 +515,7 @@ async function main() {
   token = login.accessToken;
   if (!token) throw new Error('Login did not return an access token');
   const me = await call('GET', '/merchants/me'); // fails early if the account has no merchant
+  const merchantPublicId = me?.id;
   if (me?.timezone) TZ = me.timezone;
   if (UNDO) return undo();
 
@@ -269,6 +523,7 @@ async function main() {
   const manifest = readManifest();
   manifest.sales ??= {};
   manifest.products ??= {};
+  manifest.digital ??= {};
   const now = new Date();
   const sales = planSales(now);
 
@@ -299,15 +554,49 @@ async function main() {
   }
   writeManifest(manifest);
 
+  // A sale an earlier run already recorded as cash stays cash.
+  let keptAsCash = 0;
+  for (const sale of sales)
+    if (sale.channel === 'digital' && manifest.sales[sale.key]) {
+      sale.channel = 'cash';
+      keptAsCash++;
+    }
+  const priceOf = Object.fromEntries(CATALOGUE.map((p) => [p.sku, p.price]));
+  const saleCents = (sale) => sale.lines.reduce((sum, l) => sum + (l.custom ? Number(l.unitPriceMinor) : priceOf[l.sku]) * l.quantity, 0);
+  const digitalToPay = sales.filter((s) => s.channel === 'digital' && manifest.digital[s.key]?.status !== 'completed');
+  let db = null;
+  let merchantId = null;
+  if (sales.some((s) => s.channel === 'digital')) {
+    ({ db, merchantId } = await connectDatabase(merchantPublicId));
+    if (digitalToPay.length) {
+      payerToken = await payerLogin();
+      await fundPayer(db, digitalToPay.reduce((sum, s) => sum + saleCents(s), 0));
+    }
+  }
+
   let done = 0;
   let voided = 0;
   let totalMinor = 0;
+  let digitalCount = 0;
+  let digitalMinor = 0;
   for (const sale of sales) {
     const lines = sale.lines.map((l) =>
       l.custom
         ? { type: 'custom', name: l.name, unitPriceMinor: l.unitPriceMinor, quantity: l.quantity }
         : { type: 'product', productId: productIds[l.sku], quantity: l.quantity },
     );
+    if (sale.channel === 'digital') {
+      await recordDigitalSale(sale, lines, manifest, productIds);
+      digitalCount++;
+      digitalMinor += saleCents(sale);
+      totalMinor += saleCents(sale);
+      done++;
+      if (done % 25 === 0 || done === sales.length) {
+        writeManifest(manifest);
+        process.stdout.write(`\r  sales ${done}/${sales.length} (${digitalCount} digital)`);
+      }
+      continue;
+    }
     const body = { lines, ...(sale.note ? { description: sale.note } : {}), occurredAt: sale.occurredAt.toISOString() };
     let res;
     try {
@@ -329,13 +618,27 @@ async function main() {
     done++;
     if (done % 25 === 0 || done === sales.length) {
       writeManifest(manifest);
-      process.stdout.write(`\r  cash sales ${done}/${sales.length}`);
+      process.stdout.write(`\r  sales ${done}/${sales.length} (${digitalCount} digital)`);
     }
   }
   writeManifest(manifest);
+  if (db) {
+    try {
+      const moved = await backdate(db, merchantId, manifest, sales[0]?.occurredAt);
+      console.log(`\n  moved ${moved} digital sales to their sale times (evidence environment: ${EVIDENCE_ENVIRONMENT})`);
+    } finally {
+      await db.end();
+    }
+  }
   if (ASSESS) await assess();
-  console.log(`\nDone. ${sales.length} cash sales across ${DAYS} days (${sales.filter((s) => s.isToday).length} today, ${voided} voided).`);
-  if (totalMinor) console.log(`  sales total ≈ €${(totalMinor / 100).toFixed(2)} (re-sent sales are not double-counted)`);
+  const cashCount = sales.length - digitalCount;
+  console.log(`\nDone. ${sales.length} sales across ${DAYS} days: ${digitalCount} digital, ${cashCount} cash (${sales.filter((s) => s.isToday).length} today, ${voided} voided).`);
+  if (totalMinor) {
+    console.log(`  sales total ≈ €${(totalMinor / 100).toFixed(2)} (re-sent sales are not double-counted)`);
+    console.log(`  digital share ≈ ${Math.round((digitalMinor / totalMinor) * 100)}% of value, ${Math.round((digitalCount / Math.max(1, sales.length - voided)) * 100)}% of sales`);
+  }
+  if (keptAsCash)
+    console.log(`  ${keptAsCash} planned digital sales stayed cash because an earlier run recorded them as cash. Reset the database and re-run for the full share.`);
   console.log(`  manifest: ${MANIFEST}  (run again with --undo to void these sales)`);
 }
 

@@ -112,7 +112,11 @@ export function SortableTable<T>({
                 >
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 font-semibold hover:text-slate-950"
+                    // Numeric columns put the sort icon first so the label's
+                    // right edge lines up with the right-aligned figures.
+                    className={`inline-flex items-center gap-1 font-semibold hover:text-slate-950 ${
+                      column.numeric ? "flex-row-reverse" : ""
+                    }`}
                     onClick={() => toggle(column.key)}
                   >
                     {column.label}

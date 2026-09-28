@@ -4,6 +4,7 @@ import {
   CreditEvidenceService,
 } from '../../credit-assessment/credit-evidence.service';
 import type { CreditPublicResult } from '@repo/shared';
+import { alignConfidenceWithEvidence } from '../../credit-assessment/credit-display';
 import {
   BadRequestException,
   ConflictException,
@@ -227,7 +228,16 @@ export class MerchantAssessmentService {
       modelVersion: row.modelVersion,
       stage: row.stage,
       score: result.score ?? null,
-      ...(result.credit ? { credit: publicCreditSnapshot(result.credit) } : {}),
+      // Data confidence is capped by the evidence checklist on every read, so
+      // saved assessments and their PDFs tell one consistent story.
+      ...(result.credit
+        ? {
+            credit: alignConfidenceWithEvidence(
+              publicCreditSnapshot(result.credit),
+              result.missingRequirements ?? [],
+            ),
+          }
+        : {}),
       evidenceWindow: {
         from: row.evidenceFrom.toISOString(),
         to: row.evidenceTo.toISOString(),

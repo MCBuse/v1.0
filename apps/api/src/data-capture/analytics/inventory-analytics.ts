@@ -50,6 +50,7 @@ interface ProductRanking {
   availableQuantity: number;
   productId: string;
   name: string;
+  category: string | null;
   unitsSold: number;
   unitsPerDay: number;
   onHandQuantity: number;
@@ -106,6 +107,8 @@ export interface InventoryAnalytics {
     note: string;
   };
   movementsByKind: Array<{ kind: string; quantity: number; entries: number }>;
+  /** Every product with its current stock and units sold in the period. */
+  stock: ProductRanking[];
   fastMoving: ProductRanking[];
   slowMoving: ProductRanking[];
   stockedButUnsold: ProductRanking[];
@@ -246,6 +249,7 @@ export function buildInventoryAnalytics(
     return {
       productId: p.id,
       name: p.name,
+      category: p.category,
       unitsSold: units,
       unitsPerDay: dayCount === 0 ? 0 : round(units / dayCount, 4),
       onHandQuantity: p.onHandQuantity,
@@ -393,6 +397,11 @@ export function buildInventoryAnalytics(
     movementsByKind: [...kindTotals.entries()]
       .map(([kind, entry]) => ({ kind, ...entry }))
       .sort((a, b) => b.quantity - a.quantity || a.kind.localeCompare(b.kind)),
+    stock: [...rankings].sort(
+      (a, b) =>
+        (a.category ?? '\uffff').localeCompare(b.category ?? '\uffff') ||
+        a.name.localeCompare(b.name),
+    ),
     fastMoving,
     slowMoving,
     stockedButUnsold,

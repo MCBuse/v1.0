@@ -1,0 +1,81 @@
+/**
+ * Runtime copy of `packages/shared/src/credit-display.ts` for the API.
+ *
+ * `@repo/shared` ships TypeScript source with no build step, so the compiled
+ * API may only import *types* from it. `credit-display.spec.ts` fails if this
+ * copy and the shared one (used by the portal) ever disagree.
+ */
+import type { CreditPublicResult } from '@repo/shared';
+
+type ConfidenceLabel = 'Low' | 'Medium' | 'High';
+const CONFIDENCE_ORDER: ConfidenceLabel[] = ['Low', 'Medium', 'High'];
+
+/** The readiness check that, when unmet, always means low data confidence. */
+export const CRITICAL_EVIDENCE_CHECK = 'No unresolved critical exception';
+
+/**
+ * Data confidence can never be higher than the evidence checklist supports.
+ *
+ * The scoring model rates confidence from how many inputs are filled and how
+ * reliable they look on a sliding scale, while the checklist uses hard
+ * thresholds (for example capture quality of at least 98%). Without this
+ * ceiling a merchant could fail three checks and still read 'High'.
+ *
+ * All checks met → up to High · one or two unmet → up to Medium ·
+ * three or more unmet, or an unresolved critical issue → Low.
+ */
+export function confidenceCeiling(
+  missingRequirements: string[],
+): ConfidenceLabel {
+  if (missingRequirements.includes(CRITICAL_EVIDENCE_CHECK)) return 'Low';
+  if (missingRequirements.length >= 3) return 'Low';
+  if (missingRequirements.length >= 1) return 'Medium';
+  return 'High';
+}
+
+export function alignConfidenceWithEvidence(
+  credit: CreditPublicResult,
+  missingRequirements: string[],
+): CreditPublicResult {
+  const confidence = credit.profileConfidence;
+  if (!confidence) return credit;
+  const ceiling = confidenceCeiling(missingRequirements);
+  const label =
+    CONFIDENCE_ORDER[
+      Math.min(
+        CONFIDENCE_ORDER.indexOf(confidence.label),
+        CONFIDENCE_ORDER.indexOf(ceiling),
+      )
+    ] ?? confidence.label;
+  if (label === confidence.label) return credit;
+  return {
+    ...credit,
+    profileConfidence: {
+      ...confidence,
+      label,
+      modelLabel: confidence.modelLabel ?? confidence.label,
+      limitedBy: [...missingRequirements],
+    },
+  };
+}
+
+export type FinancialProfileBand = {
+  label: 'Strong' | 'Good' | 'Fair' | 'Weak';
+  /** Lower bound of the band on the 0–100 scale. */
+  from: number;
+};
+
+export const FINANCIAL_PROFILE_BANDS: FinancialProfileBand[] = [
+  { label: 'Strong', from: 80 },
+  { label: 'Good', from: 60 },
+  { label: 'Fair', from: 40 },
+  { label: 'Weak', from: 0 },
+];
+
+/** Plain-language band for the 0–100 financial profile score. */
+export function financialProfileBand(score: number): FinancialProfileBand {
+  return (
+    FINANCIAL_PROFILE_BANDS.find((band) => score >= band.from) ??
+    FINANCIAL_PROFILE_BANDS[FINANCIAL_PROFILE_BANDS.length - 1]
+  );
+}

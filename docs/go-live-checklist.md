@@ -22,8 +22,12 @@ grep -rn "GO-LIVE" --exclude-dir=node_modules --exclude-dir=dist .
 
 ## 2. Seeded history
 
-- [ ] Reset the production database, or run the seeder with `--undo` against each seeded
-      account using its `seed-manifest.json`.
+- [ ] Reset the production database. `--undo` only voids seeded cash sales: seeded digital
+      sales are settled payments (with ledger entries and a seed customer account,
+      `seed-payer-…@example.com`) and only a reset removes them.
+- [ ] Seeded digital sales are recorded with evidence environment `test` unless the seeder
+      ran with `--evidence-environment synthetic|live`. Relabel or remove them before any
+      real assessment is shown to a lender.
 - [ ] Archive/remove the seeded café products if the account is kept.
 - [ ] Delete local `seed-manifest*.json` files.
 

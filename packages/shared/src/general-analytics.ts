@@ -92,6 +92,7 @@ export type ProductRanking = {
   availableQuantity: number;
   productId: string;
   name: string;
+  category: string | null;
   unitsSold: number;
   unitsPerDay: number;
   onHandQuantity: number;
@@ -140,6 +141,8 @@ export type InventoryAnalytics = {
     note: string;
   };
   movementsByKind: Array<{ kind: string; quantity: number; entries: number }>;
+  /** Every product with its current stock and units sold in the period. */
+  stock: ProductRanking[];
   fastMoving: ProductRanking[];
   slowMoving: ProductRanking[];
   stockedButUnsold: ProductRanking[];

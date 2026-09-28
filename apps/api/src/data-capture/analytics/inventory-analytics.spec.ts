@@ -156,6 +156,41 @@ describe('inventory analytics', () => {
       expect(result.stockedButUnsold.map((p) => p.productId)).toEqual(['b']);
     });
 
+    it('lists every product with its current stock and category', () => {
+      const result = build({
+        products: [
+          product({
+            id: 'a',
+            name: 'Latte',
+            category: 'Coffee',
+            onHandQuantity: 7,
+          }),
+          product({
+            id: 'b',
+            name: 'Scone',
+            category: 'Bakery',
+            onHandQuantity: 0,
+          }),
+          product({
+            id: 'c',
+            name: 'Water',
+            category: null,
+            onHandQuantity: 4,
+          }),
+        ],
+        soldLines: [sold('a', 3, '2026-09-02T10:00:00')],
+      });
+      // Sold, out of stock and unsold products all appear, grouped by category.
+      expect(result.stock.map((p) => p.productId)).toEqual(['b', 'a', 'c']);
+      expect(result.stock[1]).toMatchObject({
+        name: 'Latte',
+        category: 'Coffee',
+        onHandQuantity: 7,
+        unitsSold: 3,
+      });
+      expect(result.stock[2]?.category).toBeNull();
+    });
+
     it('does not call an out-of-stock product unsold stock', () => {
       const result = build({
         products: [product({ id: 'b', onHandQuantity: 0 })],

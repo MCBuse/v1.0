@@ -260,7 +260,7 @@ test("summarises the latest assessment and email without a Business insights pan
   const credit = page.getByRole("region", { name: "Credit Assessment" });
   await expect(credit.getByText("64.3 / 100")).toBeVisible();
   await expect(credit.getByText("Medium")).toBeVisible();
-  await expect(credit.getByText("Medium confidence")).toBeVisible();
+  await expect(credit.getByText("Medium data confidence")).toBeVisible();
   await expect(credit.getByText("712")).toBeVisible();
   await expect(credit.getByText("· Good")).toBeVisible();
   await expect(credit.getByText("Out of 850", { exact: false })).toBeVisible();

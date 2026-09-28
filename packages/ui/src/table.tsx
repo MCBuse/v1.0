@@ -33,8 +33,13 @@ export function TableBody(
 export function TableRow(props: React.HTMLAttributes<HTMLTableRowElement>) {
   return <tr className="hover:bg-slate-50" {...props} />;
 }
-export function TableHead(props: React.ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th className="px-4 py-3 font-semibold" {...props} />;
+export function TableHead({
+  className,
+  ...props
+}: React.ThHTMLAttributes<HTMLTableCellElement>) {
+  // Merge rather than replace, so a caller's `text-right` keeps the padding
+  // and the header lines up with the cells beneath it.
+  return <th className={cn("px-4 py-3 font-semibold", className)} {...props} />;
 }
 export function TableCell({
   className,

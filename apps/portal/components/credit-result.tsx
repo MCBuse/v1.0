@@ -32,7 +32,7 @@ export function CreditResult({
           </dd>
         </div>
         <div>
-          <dt>Confidence</dt>
+          <dt>Data confidence</dt>
           <dd className="mt-1 text-xl font-semibold">
             {c.profileConfidence?.label ?? "Not available"}
           </dd>
@@ -55,7 +55,7 @@ export function CreditResult({
         </p>
       ) : null}
       <p className="text-xs leading-5 text-slate-500">
-        Confidence reflects how complete and reliable your records are.
+        Data confidence reflects how complete and reliable the records are, not how strong the business is.
         Information you declare is not independently verified. This is not a
         lending decision.
       </p>

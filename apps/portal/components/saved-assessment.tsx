@@ -1,7 +1,14 @@
-import type { CreditPublicResult, SavedMerchantAssessment } from "@repo/shared";
+"use client";
+
+import {
+  financialProfileBand,
+  type CreditPublicResult,
+  type SavedMerchantAssessment,
+} from "@repo/shared";
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Info, X } from "lucide-react";
+import { useId, useState } from "react";
 import { fieldLabel, stageLabel, stageTone } from "./assessment-labels";
 import { CreditScoreScale } from "./credit-score-scale";
 import {
@@ -260,67 +267,49 @@ function ResultHero({
       </section>
     );
 
-  if (typeof score === "number")
+  if (typeof score === "number") {
+    const band = financialProfileBand(score);
+    const tone = BAND_TONE[band.label];
     return (
       <section
         aria-label="Result"
-        className="grid gap-5 rounded-xl border border-emerald-200 bg-emerald-50 p-6 sm:grid-cols-[1fr_auto] sm:items-end"
+        className={`grid gap-5 rounded-xl border p-6 sm:grid-cols-[1fr_auto] sm:items-end ${tone.frame}`}
       >
         <div className="grid gap-3">
-          <p className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
+          <p
+            className={`inline-flex items-center gap-2 text-sm font-semibold ${tone.text}`}
+          >
             <StatusIcon status="available" /> Your financial profile score
           </p>
-          <p className="flex items-baseline gap-2">
+          <p className="flex flex-wrap items-baseline gap-2">
             <span className="font-mono text-5xl font-semibold tabular-nums text-slate-950">
               {score.toFixed(1)}
             </span>
             <span className="text-lg text-slate-600">/ 100</span>
+            <span className={`ml-1 text-xl font-semibold ${tone.text}`}>
+              {band.label}
+            </span>
           </p>
           <div
-            className="h-2.5 w-full max-w-md overflow-hidden rounded-full bg-white"
+            className="h-2.5 w-full max-w-md overflow-hidden rounded-full bg-white ring-1 ring-slate-200/60"
             role="img"
-            aria-label={`Score ${score.toFixed(1)} out of 100`}
+            aria-label={`Score ${score.toFixed(1)} out of 100, ${band.label}`}
           >
             <div
-              className="h-full rounded-full bg-emerald-500"
+              className={`h-full rounded-full ${tone.bar}`}
               style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
             />
           </div>
           <p className="text-sm text-slate-600">
-            Higher is stronger. This is not a lending decision.
+            {BAND_COPY[band.label]} This is not a lending decision.
           </p>
         </div>
         {confidence ? (
-          <div className="grid gap-1 sm:text-right">
-            <p className="text-sm text-slate-600">Confidence</p>
-            <p>
-              <Badge
-                tone={
-                  confidence.label === "High"
-                    ? "success"
-                    : confidence.label === "Medium"
-                      ? "info"
-                      : "warning"
-                }
-                className="px-3 py-1 text-sm"
-              >
-                {confidence.label}
-              </Badge>
-            </p>
-            <p className="text-xs text-slate-500">
-              <span className="font-mono tabular-nums">
-                {confidence.fieldsFilled}
-              </span>{" "}
-              of{" "}
-              <span className="font-mono tabular-nums">
-                {confidence.fieldsTotal}
-              </span>{" "}
-              items provided
-            </p>
-          </div>
+          <DataConfidence confidence={confidence} align="end" />
         ) : null}
       </section>
     );
+  }
 
   if (!next) return null;
   return (
@@ -347,6 +336,101 @@ function ResultHero({
   );
 }
 
+type BandLabel = ReturnType<typeof financialProfileBand>["label"];
+
+/** Only a Good or Strong profile is framed as a success; the colour never outruns the number. */
+const BAND_TONE: Record<
+  BandLabel,
+  { frame: string; text: string; bar: string }
+> = {
+  Strong: {
+    frame: "border-emerald-200 bg-emerald-50",
+    text: "text-emerald-800",
+    bar: "bg-emerald-500",
+  },
+  Good: {
+    frame: "border-emerald-200 bg-emerald-50",
+    text: "text-emerald-800",
+    bar: "bg-emerald-500",
+  },
+  Fair: {
+    frame: "border-slate-200 bg-slate-50",
+    text: "text-slate-800",
+    bar: "bg-blue-500",
+  },
+  Weak: {
+    frame: "border-amber-200 bg-amber-50",
+    text: "text-amber-800",
+    bar: "bg-amber-500",
+  },
+};
+
+const BAND_COPY: Record<BandLabel, string> = {
+  Strong: "A strong recorded business profile.",
+  Good: "A good recorded business profile, with room to grow.",
+  Fair: "A fair profile: steady activity, with clear ways to strengthen it.",
+  Weak: "An early profile: more recorded activity will strengthen it.",
+};
+
+const CONFIDENCE_TONE = {
+  High: "success",
+  Medium: "info",
+  Low: "warning",
+} as const;
+
+/**
+ * Data confidence, named as such: it rates how complete and reliable the
+ * records are, not how strong the business is, so a mid score with high data
+ * confidence reads as "we are sure of this middling result", not a
+ * contradiction. When unmet evidence checks lowered the label, it says so.
+ */
+function DataConfidence({
+  confidence,
+  align = "start",
+}: {
+  confidence: NonNullable<CreditPublicResult["profileConfidence"]>;
+  align?: "start" | "end";
+}) {
+  const limitedBy = confidence.limitedBy ?? [];
+  return (
+    <div
+      className={`grid max-w-xs gap-1 text-sm text-slate-600 ${
+        align === "end" ? "sm:justify-items-end sm:text-right" : ""
+      }`}
+    >
+      <p className="flex flex-wrap items-center gap-2">
+        Data confidence
+        <Badge
+          tone={CONFIDENCE_TONE[confidence.label]}
+          className={align === "end" ? "px-3 py-1 text-sm" : undefined}
+        >
+          {confidence.label}
+        </Badge>
+      </p>
+      <p className="text-xs text-slate-500">
+        How complete and reliable your records are.{" "}
+        <span className="font-mono tabular-nums">
+          {confidence.fieldsFilled}
+        </span>{" "}
+        of{" "}
+        <span className="font-mono tabular-nums">
+          {confidence.fieldsTotal}
+        </span>{" "}
+        items provided.
+      </p>
+      {limitedBy.length ? (
+        <p className="text-xs text-slate-500">
+          Held at {confidence.label} until{" "}
+          {limitedBy.length === 1
+            ? "1 payment history check is"
+            : `${limitedBy.length} payment history checks are`}{" "}
+          met.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** The 0–100 financial profile, shown to the merchant as how ready they are. */
 function ReadinessPanel({
   score,
@@ -363,6 +447,9 @@ function ReadinessPanel({
           {score.toFixed(1)}
         </span>
         <span className="text-base text-slate-600">/ 100</span>
+        <span className="ml-1 text-base font-semibold text-slate-700">
+          {financialProfileBand(score).label}
+        </span>
       </p>
       <div
         className="h-2 w-full overflow-hidden rounded-full bg-white"
@@ -377,32 +464,7 @@ function ReadinessPanel({
       <p className="text-sm text-slate-600">
         How ready your records are to show a lender.
       </p>
-      {confidence ? (
-        <p className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-          Confidence
-          <Badge
-            tone={
-              confidence.label === "High"
-                ? "success"
-                : confidence.label === "Medium"
-                  ? "info"
-                  : "warning"
-            }
-          >
-            {confidence.label}
-          </Badge>
-          <span className="text-xs text-slate-500">
-            <span className="font-mono tabular-nums">
-              {confidence.fieldsFilled}
-            </span>{" "}
-            of{" "}
-            <span className="font-mono tabular-nums">
-              {confidence.fieldsTotal}
-            </span>{" "}
-            items provided
-          </span>
-        </p>
-      ) : null}
+      {confidence ? <DataConfidence confidence={confidence} /> : null}
     </div>
   );
 }
@@ -437,12 +499,7 @@ function InformationBreakdown({
 
   return (
     <section aria-labelledby="information-breakdown" className="grid gap-5">
-      <h4
-        id="information-breakdown"
-        className="text-lg font-semibold text-slate-950"
-      >
-        Information behind your score
-      </h4>
+      <ScoreExplainer />
       <AvailabilityBar
         counts={counts}
         label="Items the score is calculated from"
@@ -535,6 +592,80 @@ function InformationBreakdown({
   );
 }
 
+/**
+ * The "Information behind your score" heading, with an info button that opens
+ * a short plain-language note on what moves the score and how it is built.
+ */
+function ScoreExplainer() {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  return (
+    <div className="grid gap-3">
+      <div className="flex items-center gap-2">
+        <h4
+          id="information-breakdown"
+          className="text-lg font-semibold text-slate-950"
+        >
+          Information behind your score
+        </h4>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          aria-label={
+            open ? "Hide how the score works" : "How the score works"
+          }
+          onClick={() => setOpen((value) => !value)}
+          className="inline-flex size-7 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-blue-700"
+        >
+          {open ? (
+            <X className="size-4" aria-hidden="true" />
+          ) : (
+            <Info className="size-4" aria-hidden="true" />
+          )}
+        </button>
+      </div>
+      <div
+        id={panelId}
+        hidden={!open}
+        className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 text-sm leading-6 text-slate-700"
+      >
+        <p className="font-semibold text-slate-950">How your score works</p>
+        <dl className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <dt className="font-medium text-slate-950">What it measures</dt>
+            <dd className="mt-1">
+              The score summarises your recorded business on a 0–100 scale:
+              how long you have traded, how often and how steadily you sell,
+              your sales trend and your existing debt compared with sales.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-slate-950">What moves it</dt>
+            <dd className="mt-1">
+              Regular sales on more days, steady or growing revenue and
+              verified MCBuse payments raise it. Gaps in trading, failed or
+              unresolved payments and high debt lower it.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-slate-950">Data confidence</dt>
+            <dd className="mt-1">
+              A separate rating of how complete and reliable your records are.
+              It can only be High once every payment history check below is
+              met.
+            </dd>
+          </div>
+        </dl>
+        <p className="text-xs text-slate-500">
+          Items you declare are used as given and are not independently
+          verified. Missing items are never estimated.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ReadinessChecklist({
   assessment: a,
   hasCredit,
@@ -595,6 +726,11 @@ function ReadinessChecklist({
           <span className="font-mono tabular-nums">{rows.length}</span> met
         </p>
       </div>
+      <p className="-mt-2 text-sm text-slate-600">
+        {metCount === rows.length
+          ? "Every check is met, so your data confidence can reach High."
+          : `Data confidence stays below High until every check is met. ${rows.length - metCount} still to go.`}
+      </p>
       <ul className="grid divide-y divide-slate-200 rounded-xl border border-slate-200">
         {rows.map((row) => {
           const status: InputStatus = row.met ? "available" : "sales";

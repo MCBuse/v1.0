@@ -523,68 +523,53 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
         />
       </div>
 
+      <NeedsAttention inventory={v} />
+
       <Card>
         <CardHeader>
-          <h2 className="font-semibold">Selected-period stock position</h2>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          {v.periodPosition?.eligible ? (
-            <>
-              <Stat
-                label="Opening on hand"
-                value={String(v.periodPosition.openingOnHand)}
-              />
-              <Stat
-                label="Closing on hand"
-                value={String(v.periodPosition.closingOnHand)}
-              />
-            </>
-          ) : (
-            <p>
-              {v.periodPosition?.reason ??
-                "Reliable stock history is unavailable for this period."}
+          <div>
+            <h2 className="font-semibold">Current stock by product</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Every product with what is on the shelf now and what sold in the
+              selected period.
             </p>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold">Products</h2>
+          </div>
         </CardHeader>
         <CardContent>
           <SortableTable
-            caption="Product performance"
-            rows={v.fastMoving}
+            caption="Current stock by product"
+            rows={v.stock ?? []}
             rowKey={(row) => row.productId}
-            initialSort={{ key: "unitsPerDay", direction: "desc" }}
-            emptyMessage="No product-linked sales in this period."
+            initialSort={{ key: "status", direction: "asc" }}
+            emptyMessage="No products in the catalogue yet."
             columns={[
               {
                 key: "name",
                 label: "Product",
                 sortValue: (row) => row.name,
-                render: (row) => row.name,
+                render: (row) => (
+                  <span className="font-medium text-slate-950">{row.name}</span>
+                ),
               },
               {
-                key: "unitsSold",
-                label: "Units sold",
-                numeric: true,
-                sortValue: (row) => row.unitsSold,
-                render: (row) => row.unitsSold,
-              },
-              {
-                key: "unitsPerDay",
-                label: "Per day",
-                numeric: true,
-                sortValue: (row) => row.unitsPerDay,
-                render: (row) => row.unitsPerDay,
+                key: "category",
+                label: "Category",
+                sortValue: (row) => row.category ?? "",
+                render: (row) => row.category ?? "Uncategorised",
               },
               {
                 key: "onHand",
-                label: "On hand",
+                label: "In stock",
                 numeric: true,
                 sortValue: (row) => row.onHandQuantity,
                 render: (row) => row.onHandQuantity,
+              },
+              {
+                key: "available",
+                label: "Available",
+                numeric: true,
+                sortValue: (row) => available(row),
+                render: (row) => available(row),
               },
               {
                 key: "threshold",
@@ -593,6 +578,22 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
                 sortValue: (row) => row.lowStockThreshold,
                 render: (row) => row.lowStockThreshold,
               },
+              {
+                key: "unitsSold",
+                label: "Sold",
+                numeric: true,
+                sortValue: (row) => row.unitsSold,
+                render: (row) => row.unitsSold,
+              },
+              {
+                key: "status",
+                label: "Status",
+                sortValue: (row) => stockStatus(row).rank,
+                render: (row) => {
+                  const status = stockStatus(row);
+                  return <Badge tone={status.tone}>{status.label}</Badge>;
+                },
+              },
             ]}
           />
         </CardContent>
@@ -600,25 +601,30 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
 
       <Card>
         <CardHeader>
-          <h2 className="font-semibold">Categories</h2>
+          <h2 className="font-semibold">Units sold by category</h2>
         </CardHeader>
-        <CardContent>
+        <CardContent className="grid gap-6">
+          <CategoryUnits rows={v.byCategory} />
           <SortableTable
             caption="Sales by category"
             rows={v.byCategory}
             rowKey={(row) => row.category}
-            initialSort={{ key: "amount", direction: "desc" }}
+            initialSort={{ key: "unitsSold", direction: "desc" }}
             emptyMessage="No category-linked sales in this period."
             columns={[
               {
                 key: "category",
                 label: "Category",
                 sortValue: (row) => row.category,
-                render: (row) => row.category,
+                render: (row) => (
+                  <span className="font-medium text-slate-950">
+                    {row.category}
+                  </span>
+                ),
               },
               {
                 key: "unitsSold",
-                label: "Units",
+                label: "Units sold",
                 numeric: true,
                 sortValue: (row) => row.unitsSold,
                 render: (row) => row.unitsSold,
@@ -660,40 +666,80 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <h2 className="font-semibold">Best sellers</h2>
+        </CardHeader>
+        <CardContent>
+          <SortableTable
+            caption="Product performance"
+            rows={v.fastMoving}
+            rowKey={(row) => row.productId}
+            initialSort={{ key: "unitsPerDay", direction: "desc" }}
+            emptyMessage="No product-linked sales in this period."
+            columns={[
+              {
+                key: "name",
+                label: "Product",
+                sortValue: (row) => row.name,
+                render: (row) => row.name,
+              },
+              {
+                key: "unitsSold",
+                label: "Units sold",
+                numeric: true,
+                sortValue: (row) => row.unitsSold,
+                render: (row) => row.unitsSold,
+              },
+              {
+                key: "unitsPerDay",
+                label: "Per day",
+                numeric: true,
+                sortValue: (row) => row.unitsPerDay,
+                render: (row) => row.unitsPerDay.toFixed(1),
+              },
+              {
+                key: "onHand",
+                label: "In stock",
+                numeric: true,
+                sortValue: (row) => row.onHandQuantity,
+                render: (row) => row.onHandQuantity,
+              },
+              {
+                key: "threshold",
+                label: "Reorder at",
+                numeric: true,
+                sortValue: (row) => row.lowStockThreshold,
+                render: (row) => row.lowStockThreshold,
+              },
+            ]}
+          />
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold">Needs attention</h2>
+            <h2 className="font-semibold">Selected-period stock position</h2>
           </CardHeader>
-          <CardContent className="grid gap-4 text-sm">
-            <List
-              title="At or below minimum"
-              items={v.atOrBelowMinimum.map(
-                (entry) =>
-                  `${entry.name}: ${entry.availableQuantity} available (${entry.onHandQuantity} on hand, ${entry.reservedQuantity} reserved), reorder at ${entry.lowStockThreshold}`,
-              )}
-              empty="Nothing is at its minimum."
-            />
-            <List
-              title="Approaching minimum"
-              items={v.approachingMinimum.map(
-                (entry) =>
-                  `${entry.name}: ${entry.availableQuantity} available (${entry.onHandQuantity} on hand, ${entry.reservedQuantity} reserved), reorder at ${entry.lowStockThreshold}`,
-              )}
-              empty="Nothing is close to its minimum."
-            />
-            <List
-              title="Out of stock now"
-              items={v.currentStockOuts.map((entry) => entry.name)}
-              empty="Nothing is out of stock."
-            />
-            <List
-              title="Stocked but unsold"
-              items={v.stockedButUnsold.map(
-                (entry) => `${entry.name}: ${entry.onHandQuantity} on hand`,
-              )}
-              empty="Everything stocked has sold at least once."
-            />
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            {v.periodPosition?.eligible ? (
+              <>
+                <Stat
+                  label="Opening on hand"
+                  value={String(v.periodPosition.openingOnHand)}
+                />
+                <Stat
+                  label="Closing on hand"
+                  value={String(v.periodPosition.closingOnHand)}
+                />
+              </>
+            ) : (
+              <p>
+                {v.periodPosition?.reason ??
+                  "Reliable stock history is unavailable for this period."}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -732,7 +778,13 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
 
       <Card>
         <CardHeader>
-          <h2 className="font-semibold">Turnover</h2>
+          <div>
+            <h2 className="font-semibold">Turnover</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Units sold ÷ average stock on hand. A higher figure means stock
+              sells through faster.
+            </p>
+          </div>
         </CardHeader>
         <CardContent>
           <SortableTable
@@ -746,7 +798,18 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
                 key: "name",
                 label: "Product",
                 sortValue: (row) => row.name,
-                render: (row) => row.name,
+                render: (row) => (
+                  <div className="grid gap-0.5">
+                    <span className="font-medium text-slate-950">
+                      {row.name}
+                    </span>
+                    {row.reason ? (
+                      <span className="text-xs text-slate-500">
+                        {row.reason}
+                      </span>
+                    ) : null}
+                  </div>
+                ),
               },
               {
                 key: "unitsSold",
@@ -761,9 +824,11 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
                 numeric: true,
                 sortValue: (row) => row.averageDailyOnHand ?? -1,
                 render: (row) =>
-                  row.averageDailyOnHand === null
-                    ? "—"
-                    : row.averageDailyOnHand,
+                  row.averageDailyOnHand === null ? (
+                    <span className="text-slate-400">—</span>
+                  ) : (
+                    row.averageDailyOnHand.toFixed(1)
+                  ),
               },
               {
                 key: "ratio",
@@ -772,20 +837,13 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
                 sortValue: (row) => row.turnoverRatio ?? -1,
                 render: (row) =>
                   row.turnoverRatio === null ? (
-                    <span className="text-slate-500">Not available</span>
+                    <span className="font-sans text-slate-500">
+                      Not available
+                    </span>
                   ) : (
-                    row.turnoverRatio
-                  ),
-              },
-              {
-                key: "reason",
-                label: "Why not",
-                sortValue: (row) => row.reason ?? "",
-                render: (row) =>
-                  row.reason ? (
-                    <span className="text-xs text-slate-500">{row.reason}</span>
-                  ) : (
-                    ""
+                    <span className="font-semibold text-slate-950">
+                      {row.turnoverRatio.toFixed(2)}×
+                    </span>
                   ),
               },
             ]}
@@ -796,33 +854,207 @@ function InventorySection({ data }: { data: GeneralAnalyticsResponse }) {
   );
 }
 
-function List({
-  title,
-  items,
-  empty,
-}: {
-  title: string;
-  items: string[];
-  empty: string;
-}) {
+type InventoryData = GeneralAnalyticsResponse["inventory"];
+type StockRow = InventoryData["fastMoving"][number];
+type BadgeTone = "neutral" | "success" | "info" | "warning" | "danger";
+
+/** How close to the reorder level still counts as "running low". */
+const RUNNING_LOW_MARGIN = 5;
+
+function stockStatus(row: StockRow): {
+  label: string;
+  tone: BadgeTone;
+  rank: number;
+} {
+  const availableNow = available(row);
+  if (availableNow <= 0)
+    return { label: "Out of stock", tone: "warning", rank: 0 };
+  if (availableNow <= row.lowStockThreshold)
+    return { label: "Reorder", tone: "warning", rank: 1 };
+  if (availableNow <= row.lowStockThreshold + RUNNING_LOW_MARGIN)
+    return { label: "Running low", tone: "info", rank: 2 };
+  if (row.unitsSold === 0)
+    return { label: "Not selling", tone: "neutral", rank: 3 };
+  return { label: "In stock", tone: "success", rank: 4 };
+}
+
+/** Available stock; derived from on hand minus reserved if a row predates the field. */
+function available(row: StockRow) {
+  return typeof row.availableQuantity === "number"
+    ? row.availableQuantity
+    : Math.max(0, row.onHandQuantity - (row.reservedQuantity ?? 0));
+}
+
+/** Whole days of stock left at the period's selling pace, when it has one. */
+function daysOfCover(row: StockRow) {
+  if (!(row.unitsPerDay > 0)) return null;
+  return Math.floor(available(row) / row.unitsPerDay);
+}
+
+function plural(count: number, word: string) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+type Issue = {
+  key: string;
+  name: string;
+  kind: string;
+  tone: BadgeTone;
+  detail: string;
+  action: string;
+};
+
+function attentionIssues(v: InventoryData): Issue[] {
+  const issues: Issue[] = [];
+  const seen = new Set<string>();
+  const add = (row: StockRow, issue: Omit<Issue, "key" | "name">) => {
+    if (seen.has(row.productId)) return;
+    seen.add(row.productId);
+    issues.push({ key: row.productId, name: row.name, ...issue });
+  };
+  const pace = (row: StockRow) => {
+    const cover = daysOfCover(row);
+    return cover === null
+      ? "."
+      : `. About ${plural(cover, "day")} left at the current pace.`;
+  };
+  for (const row of v.currentStockOuts)
+    add(row, {
+      kind: "Out of stock",
+      tone: "warning",
+      detail: row.unitsSold
+        ? `Nothing available. ${plural(row.unitsSold, "unit")} sold in this period, so sales are being missed.`
+        : "Nothing available to sell.",
+      action: "Restock now",
+    });
+  for (const row of v.atOrBelowMinimum)
+    add(row, {
+      kind: "Below reorder level",
+      tone: "warning",
+      detail: `${available(row)} available against a reorder level of ${row.lowStockThreshold}${
+        row.reservedQuantity ? ` (${row.reservedQuantity} reserved)` : ""
+      }${pace(row)}`,
+      action: "Reorder this week",
+    });
+  for (const row of v.approachingMinimum)
+    add(row, {
+      kind: "Close to reorder level",
+      tone: "info",
+      detail: `${available(row)} available, reorder level ${row.lowStockThreshold}${pace(row)}`,
+      action: "Plan the next order",
+    });
+  for (const row of v.stockedButUnsold)
+    add(row, {
+      kind: "Not selling",
+      tone: "neutral",
+      detail: `${row.onHandQuantity} in stock and no sales in this period.`,
+      action: "Review price or placement",
+    });
+  return issues;
+}
+
+const ATTENTION_LIMIT = 8;
+
+/**
+ * Stock issues as one numbered list, most urgent first, each with what is
+ * wrong, the figures behind it and the next step, so the merchant can work
+ * down it rather than decode four separate sentences.
+ */
+function NeedsAttention({ inventory }: { inventory: InventoryData }) {
+  const issues = attentionIssues(inventory);
+  const visible = issues.slice(0, ATTENTION_LIMIT);
   return (
-    <div>
-      <p className="text-xs uppercase tracking-wide text-slate-500">{title}</p>
-      {items.length ? (
-        <ul className="mt-1 grid gap-1 text-slate-700">
-          {items.slice(0, 8).map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-          {items.length > 8 ? (
-            <li className="text-xs text-slate-500">
-              and {items.length - 8} more
-            </li>
-          ) : null}
-        </ul>
-      ) : (
-        <p className="mt-1 text-slate-500">{empty}</p>
-      )}
-    </div>
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-950">
+            Needs attention
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Stock issues to act on, most urgent first.
+          </p>
+        </div>
+        <Badge tone={issues.length ? "warning" : "success"}>
+          {issues.length ? plural(issues.length, "issue") : "All clear"}
+        </Badge>
+      </CardHeader>
+      <CardContent className="pt-4">
+        {visible.length ? (
+          <ol className="grid divide-y divide-slate-100">
+            {visible.map((issue, index) => (
+              <li
+                key={issue.key}
+                className="grid grid-cols-[2rem_1fr] gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[2rem_1fr_auto]"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-7 items-center justify-center rounded-full bg-slate-100 font-mono text-sm font-semibold tabular-nums text-slate-700"
+                >
+                  {index + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-slate-950">
+                      {issue.name}
+                    </span>
+                    <Badge tone={issue.tone}>{issue.kind}</Badge>
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">{issue.detail}</p>
+                </div>
+                <p className="col-start-2 text-sm font-medium text-slate-950 sm:col-start-3 sm:self-center sm:text-right">
+                  {issue.action}
+                </p>
+              </li>
+            ))}
+            {issues.length > ATTENTION_LIMIT ? (
+              <li className="pt-3 text-sm text-slate-500">
+                and {issues.length - ATTENTION_LIMIT} more, listed under Current
+                stock by product below.
+              </li>
+            ) : null}
+          </ol>
+        ) : (
+          <p className="text-sm text-slate-500">
+            Nothing needs attention: every product is above its reorder level
+            and selling.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Units per category as labelled horizontal bars, largest first. */
+function CategoryUnits({ rows }: { rows: InventoryData["byCategory"] }) {
+  const sorted = [...rows].sort((a, b) => b.unitsSold - a.unitsSold);
+  const total = sorted.reduce((sum, row) => sum + row.unitsSold, 0);
+  const max = Math.max(1, ...sorted.map((row) => row.unitsSold));
+  if (!sorted.length) return null;
+  return (
+    <ul className="grid gap-2.5" aria-label="Units sold by category">
+      {sorted.map((row) => (
+        <li
+          key={row.category}
+          className="grid grid-cols-[minmax(6rem,10rem)_1fr_auto] items-center gap-3 text-sm"
+        >
+          <span className="truncate font-medium text-slate-950">
+            {row.category}
+          </span>
+          <span className="h-3 overflow-hidden rounded-sm bg-slate-100">
+            <span
+              className="block h-full rounded-sm bg-blue-400"
+              style={{ width: `${Math.max(2, (row.unitsSold / max) * 100)}%` }}
+            />
+          </span>
+          <span className="w-28 text-right font-mono tabular-nums text-slate-700">
+            {row.unitsSold}{" "}
+            <span className="text-slate-400">
+              ({total ? Math.round((row.unitsSold / total) * 100) : 0}%)
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
