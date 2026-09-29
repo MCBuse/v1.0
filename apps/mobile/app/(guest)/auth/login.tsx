@@ -18,8 +18,7 @@ import type { LoginFormValues } from '@/lib/validation/auth';
 import { loginSchema } from '@/lib/validation/auth';
 import { Eye, EyeSlash } from 'iconsax-react-native';
 
-import { useLogin, useLoginPhone } from '@/features/auth/hooks';
-import { usePendingAuthStore } from '@/features/auth/pending-store';
+import { useCompleteAuth, useLogin, useLoginPhone } from '@/features/auth/hooks';
 
 import type { Theme } from '@/theme';
 import { Box, Button, Input, PhoneInput, Text } from '@/components/ui';
@@ -31,9 +30,9 @@ export default function LoginScreen() {
   const insets     = useSafeAreaInsets();
   const [showPassword, setShowPassword] = useState(false);
 
-  const setPending = usePendingAuthStore((s) => s.set);
-  const login      = useLogin();
-  const loginPhone = useLoginPhone();
+  const completeAuth = useCompleteAuth();
+  const login        = useLogin();
+  const loginPhone   = useLoginPhone();
 
   const {
     control,
@@ -61,17 +60,8 @@ export default function LoginScreen() {
         ? await login.mutateAsync({ email: data.identifier, password: data.password })
         : await loginPhone.mutateAsync({ phone: data.identifier, password: data.password });
 
-      setPending({
-        tokens,
-        identifier: data.identifier,
-        channel:    data.mode,
-        flow:       'login',
-      });
-
-      router.push({
-        pathname: '/(guest)/auth/otp',
-        params:   { identifier: data.identifier, flow: 'login' },
-      });
+      await completeAuth(tokens);
+      router.replace('/(tabs)');
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
