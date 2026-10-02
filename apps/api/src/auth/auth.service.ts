@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -19,6 +20,7 @@ import type { OtpProvider } from '../otp/otp-provider.interface';
 import { OTP_PROVIDER } from '../otp/otp-provider.interface';
 import { WalletsService } from '../wallets/wallets.service';
 import { SignupDto } from './dto/signup.dto';
+import { IssuerSignupDto } from './dto/issuer-signup.dto';
 
 const BCRYPT_ROUNDS = 12;
 const RESET_CODE_TTL_MINUTES = 15;
@@ -65,6 +67,83 @@ export class AuthService {
 
     this.logger.log('User registered: ' + user.id);
     return this.issueTokens(user.id, user.email ?? null);
+  }
+
+  async signupIssuer(dto: IssuerSignupDto): Promise<AuthTokens> {
+    const username = this.usersService.validateUsername(dto.username);
+    const availability = await this.usersService.checkUsernameAvailability(username);
+    if (!availability.available) {
+      throw new ConflictException({
+        message: 'Username is not available',
+        suggestions: availability.suggestions,
+      });
+    }
+
+    const organizationName = dto.organizationName.trim();
+    const firstName = dto.firstName.trim();
+    const lastName = dto.lastName.trim();
+    const email = dto.email.trim().toLowerCase();
+    if (!organizationName || !firstName || !lastName) {
+      throw new BadRequestException('Organization name and contact name are required');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    let userId: string;
+
+    try {
+      userId = await this.db.transaction(async (tx) => {
+        const [user] = await tx
+          .insert(schema.users)
+          .values({
+            email,
+            username,
+            firstName,
+            lastName,
+            passwordHash,
+            isEmailVerified: true,
+          })
+          .returning({ id: schema.users.id });
+
+        const slugBase = organizationName
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+          .slice(0, 75) || 'issuer';
+        const [organization] = await tx
+          .insert(schema.issuerOrganizations)
+          .values({
+            legalName: organizationName,
+            slug: `${slugBase}-${randomUUID().slice(0, 8)}`,
+            verificationStatus: 'pending',
+            lifecycleStatus: 'active',
+          })
+          .returning({ id: schema.issuerOrganizations.id });
+
+        await tx.insert(schema.issuerMemberships).values({
+          organizationId: organization.id,
+          userId: user.id,
+          role: 'issuer_admin',
+          status: 'active',
+        });
+
+        return user.id;
+      });
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code: string }).code === '23505'
+      ) {
+        throw new ConflictException('An account with this email or username already exists');
+      }
+      throw error;
+    }
+
+    this.logger.log('Issuer account registered: ' + userId);
+    return this.issueTokens(userId, email);
   }
 
   async login(user: { id: string; email: string | null }): Promise<AuthTokens> {
