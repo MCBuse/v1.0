@@ -10,6 +10,7 @@ import { useSignOut } from '@/features/auth';
 import { useProfile } from '@/features/users';
 import { useWallets } from '@/features/wallets';
 import { displayCurrencyLabel, truncateAddress } from '@/lib/currency';
+import { useDemoStore } from '@/store/demo-store';
 import type { Theme } from '@/theme';
 
 export default function ProfileScreen() {
@@ -18,6 +19,7 @@ export default function ProfileScreen() {
   const profile = useProfile();
   const wallets = useWallets();
   const signOut = useSignOut();
+  const demo = useDemoStore();
   const user = profile.data;
 
   const handleShare = async () => {
@@ -160,11 +162,20 @@ export default function ProfileScreen() {
           <DemoPanel />
 
           <Box gap="m">
-            <Button
-              label="Issuer Portal"
-              variant="secondary"
-              onPress={() => router.push('/(flows)/scoin-store/issuer-profile' as never)}
-            />
+            {(!demo.isDemoMode || demo.userRole === 'issuer') && (
+              <Button
+                label="Issuer Portal"
+                variant="secondary"
+                onPress={() => router.push('/(flows)/scoin-store/issuer-profile' as never)}
+              />
+            )}
+            {demo.isDemoMode && demo.userRole === 'merchant' && (
+              <Button
+                label="Merchant Tools"
+                variant="secondary"
+                onPress={() => router.push('/(flows)/offline-pay/merchant-receive' as never)}
+              />
+            )}
             <Button
               label="Edit Profile"
               variant="secondary"

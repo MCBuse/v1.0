@@ -3,8 +3,11 @@ import { create } from 'zustand';
 import type { ConnectivityMode } from '@/features/offline/models';
 import { setDemoConnectivityMode } from '@/hooks/use-connectivity-mode';
 
+export type UserRole = 'consumer' | 'issuer' | 'merchant';
+
 interface DemoState {
   isDemoMode: boolean;
+  userRole: UserRole;
   simulatedConnectivity: ConnectivityMode | null;
   smsDelivered: boolean;
   settlementComplete: boolean;
@@ -13,6 +16,7 @@ interface DemoState {
 interface DemoActions {
   enableDemoMode: () => void;
   disableDemoMode: () => void;
+  setUserRole: (role: UserRole) => void;
   setConnectivity: (mode: ConnectivityMode | null) => void;
   simulateSmsDelivery: () => void;
   simulateSettlement: () => void;
@@ -21,6 +25,7 @@ interface DemoActions {
 
 export const useDemoStore = create<DemoState & DemoActions>((set) => ({
   isDemoMode: false,
+  userRole: 'consumer',
   simulatedConnectivity: null,
   smsDelivered: false,
   settlementComplete: false,
@@ -33,10 +38,15 @@ export const useDemoStore = create<DemoState & DemoActions>((set) => ({
     setDemoConnectivityMode(null);
     set({
       isDemoMode: false,
+      userRole: 'consumer',
       simulatedConnectivity: null,
       smsDelivered: false,
       settlementComplete: false,
     });
+  },
+
+  setUserRole: (role) => {
+    set({ userRole: role });
   },
 
   setConnectivity: (mode) => {
@@ -55,6 +65,7 @@ export const useDemoStore = create<DemoState & DemoActions>((set) => ({
   resetDemo: () => {
     setDemoConnectivityMode(null);
     set({
+      userRole: 'consumer',
       simulatedConnectivity: null,
       smsDelivered: false,
       settlementComplete: false,

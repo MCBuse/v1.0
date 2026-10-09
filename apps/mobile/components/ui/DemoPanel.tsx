@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useDemoStore } from '@/store/demo-store';
+import { useDemoStore, type UserRole } from '@/store/demo-store';
 import type { ConnectivityMode } from '@/features/offline/models';
 import { t } from '@/lib/i18n';
 
@@ -12,6 +12,12 @@ const MODES: { key: ConnectivityMode; label: string; color: string }[] = [
   { key: 'online', label: 'Online', color: '#22C55E' },
   { key: 'poor', label: 'Poor', color: '#F59E0B' },
   { key: 'offline', label: 'Offline', color: '#EF4444' },
+];
+
+const ROLES: { key: UserRole; label: string; color: string }[] = [
+  { key: 'consumer', label: 'Consumer', color: '#3B82F6' },
+  { key: 'issuer', label: 'Issuer', color: '#8B5CF6' },
+  { key: 'merchant', label: 'Merchant', color: '#10B981' },
 ];
 
 export function DemoPanel() {
@@ -42,6 +48,37 @@ export function DemoPanel() {
             Disable
           </Text>
         </Pressable>
+      </Box>
+
+      <Text variant="caption" color="textSecondary">
+        User Role
+      </Text>
+      <Box flexDirection="row" gap="s">
+        {ROLES.map((r) => (
+          <Pressable
+            key={r.key}
+            onPress={() => demo.setUserRole(r.key)}
+            style={[
+              styles.modeChip,
+              {
+                backgroundColor:
+                  demo.userRole === r.key
+                    ? r.color
+                    : 'rgba(150,150,150,0.15)',
+              },
+            ]}
+          >
+            <Text
+              variant="caption"
+              style={{
+                color: demo.userRole === r.key ? '#fff' : '#888',
+                fontWeight: '600',
+              }}
+            >
+              {r.label}
+            </Text>
+          </Pressable>
+        ))}
       </Box>
 
       <Text variant="caption" color="textSecondary">
