@@ -59,13 +59,6 @@ export default function ReceiveScreen() {
     }
   }, [amount, currency, create]);
 
-  const handleCopy = useCallback(async () => {
-    if (!paymentReq) return;
-    await Share.share({ message: extractQrValue(paymentReq) });
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [paymentReq]);
-
   const handleShare = useCallback(async () => {
     if (!paymentReq) return;
     await Share.share({ message: extractQrValue(paymentReq) });

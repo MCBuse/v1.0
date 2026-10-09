@@ -13,12 +13,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ApiError } from '@/lib/api';
+import { ApiError, authSession } from '@/lib/api';
 import type { RegisterFormValues } from '@/lib/validation/auth';
 import { registerSchema } from '@/lib/validation/auth';
 import { Eye, EyeSlash } from 'iconsax-react-native';
 
 import { useCompleteAuth, useSignup } from '@/features/auth/hooks';
+import { usePendingAuthStore } from '@/features/auth/pending-store';
 import {
   isUsernameFormatValid,
   normalizeUsernameInput,
@@ -48,6 +49,7 @@ export default function RegisterScreen() {
 
   const completeAuth = useCompleteAuth();
   const signup       = useSignup();
+  const setPending   = usePendingAuthStore((s) => s.set);
 
   const {
     control,
@@ -108,8 +110,14 @@ export default function RegisterScreen() {
           : { phone: data.identifier }),
       });
 
-      await completeAuth(tokens);
-      router.replace('/(tabs)');
+      if (data.mode === 'phone') {
+        await authSession.set(tokens);
+        setPending({ tokens, identifier: data.identifier, channel: 'phone', flow: 'register' });
+        router.push({ pathname: '/(guest)/auth/otp', params: { identifier: data.identifier, flow: 'register' } });
+      } else {
+        await completeAuth(tokens);
+        router.replace('/(tabs)');
+      }
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';

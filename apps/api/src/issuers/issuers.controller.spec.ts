@@ -9,6 +9,9 @@ import { IssuersService } from './issuers.persistence.service';
 type HttpTestResponse = { body: unknown };
 type HttpRequestBuilder = {
   get(path: string): { expect(status: number): Promise<HttpTestResponse> };
+  patch(path: string): {
+    send(body: unknown): { expect(status: number): Promise<HttpTestResponse> };
+  };
   post(path: string): {
     send(body: unknown): { expect(status: number): Promise<HttpTestResponse> };
     expect(status: number): Promise<HttpTestResponse>;
@@ -35,6 +38,15 @@ const issuerService = {
   submitForReview: jest.fn().mockResolvedValue({
     id: 'req-created',
     status: 'in_review',
+  }),
+  updateSubmission: jest.fn().mockResolvedValue({
+    id: 'req-created',
+    status: 'needs_changes',
+  }),
+  decideSubmission: jest.fn().mockResolvedValue({
+    id: 'req-test',
+    status: 'needs_changes',
+    reviewReason: 'Please update the reserve attestation.',
   }),
 };
 
@@ -122,6 +134,41 @@ describe('Issuers API', () => {
     expect(issuerService.submitForReview).toHaveBeenCalledWith(
       'test-issuer-user',
       'req-created',
+    );
+  });
+
+  it('updates a returned submission before resubmission', async () => {
+    const response = await request(app.getHttpServer<Server>() as Server)
+      .patch('/issuer/submissions/req-created')
+      .send({ name: 'Harbor Dollar Revised' })
+      .expect(200);
+
+    expect(response.body).toMatchObject({ status: 'needs_changes' });
+    expect(issuerService.updateSubmission).toHaveBeenCalledWith(
+      'test-issuer-user',
+      'req-created',
+      expect.objectContaining({ name: 'Harbor Dollar Revised' }),
+    );
+  });
+
+  it('records a reviewer request for changes with its reason', async () => {
+    const response = await request(app.getHttpServer<Server>() as Server)
+      .post('/admin/issuer/submissions/req-test/decision')
+      .send({
+        decision: 'changes_requested',
+        reason: 'Please update the reserve attestation.',
+        checklist: ['Token contract matches the submitted details'],
+      })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      status: 'needs_changes',
+      reviewReason: 'Please update the reserve attestation.',
+    });
+    expect(issuerService.decideSubmission).toHaveBeenCalledWith(
+      'test-issuer-user',
+      'req-test',
+      expect.objectContaining({ decision: 'changes_requested' }),
     );
   });
 });

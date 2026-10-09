@@ -14,9 +14,9 @@ import {
   useSignOfframpUrl,
   type CreateOfframpSessionResponse,
 } from '@/features/offramp';
+import { takeOfframpWidgetSession } from '@/lib/offramp-widget-cache';
 
 type MoonpaySession = Extract<CreateOfframpSessionResponse, { provider: 'moonpay' }>;
-import { takeOfframpWidgetSession } from '@/lib/offramp-widget-cache';
 import type { Theme } from '@/theme';
 
 type InitiateDepositProps = {

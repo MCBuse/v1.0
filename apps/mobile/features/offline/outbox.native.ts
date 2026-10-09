@@ -1,10 +1,9 @@
 import * as SQLite from 'expo-sqlite';
-
 import type { OutboxEntry, OutboxStatus, PaymentInstruction } from './models';
 
-let db: SQLite.SQLiteDatabase | null = null;
+let db: any | null = null;
 
-async function getDb(): Promise<SQLite.SQLiteDatabase> {
+async function getDb(): Promise<any> {
   if (!db) {
     db = await SQLite.openDatabaseAsync('mcbuse_outbox.db');
     await db.execAsync(`

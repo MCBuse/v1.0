@@ -1,15 +1,12 @@
-import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { Theme } from '@/theme';
 import { SocialButton } from '@/components/auth/SocialButton';
-import { Box, Button, Divider, Text } from '@/components/ui';
+import { Box, Button, Text } from '@/components/ui';
 
 export default function AuthLandingScreen() {
-  const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
 
   return (

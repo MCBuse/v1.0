@@ -40,6 +40,7 @@ export const issuerMembershipStatus = pgEnum('issuer_membership_status', [
 export const stablecoinSubmissionStatus = pgEnum('stablecoin_submission_status', [
   'draft',
   'in_review',
+  'needs_changes',
   'approved',
   'rejected',
   'withdrawn',
@@ -52,6 +53,7 @@ export const registryPublicationStatus = pgEnum('registry_publication_status', [
 
 export const submissionReviewAction = pgEnum('submission_review_action', [
   'submitted',
+  'changes_requested',
   'approved',
   'rejected',
   'published',

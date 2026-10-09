@@ -5,6 +5,7 @@ import {
   ArrowSwapHorizontal,
   Send2,
 } from 'iconsax-react-native';
+import { router } from 'expo-router';
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -316,7 +317,11 @@ export default function ActivityScreen() {
   const renderEntry = useCallback<ListRenderItem<LedgerEntry | null>>(
     ({ item }) => {
       if (!item) return <TxSkeleton colors={skeletonColors} />;
-      return <TxRow entry={item} colors={rowColors} walletIds={ownWalletIds} />;
+      return (
+        <Pressable onPress={() => router.push({ pathname: '/(flows)/receipt', params: { id: item.id } })}>
+          <TxRow entry={item} colors={rowColors} walletIds={ownWalletIds} />
+        </Pressable>
+      );
     },
     [ownWalletIds, rowColors, skeletonColors],
   );

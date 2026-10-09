@@ -1,6 +1,6 @@
 import { useTheme } from '@shopify/restyle';
 import { Tabs } from 'expo-router';
-import { Clock, Home2, ProfileCircle } from 'iconsax-react-native';
+import { Clock, Home2, ProfileCircle, Shop } from 'iconsax-react-native';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
@@ -54,10 +54,14 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* Keep explore route registered but hidden from tab bar */}
       <Tabs.Screen
         name="explore"
-        options={{ href: null }}
+        options={{
+          title: 'Store',
+          tabBarIcon: ({ color }) => (
+            <Shop size={24} color={color} variant="Linear" />
+          ),
+        }}
       />
     </Tabs>
   );

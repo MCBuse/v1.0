@@ -2,10 +2,9 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 
-type RequestStatus = "In review" | "Approved" | "Rejected";
-type RequestRole = "issuer" | "admin";
+type RequestStatus = "Draft" | "In review" | "Needs changes" | "Approved" | "Rejected" | "Withdrawn";
 type AuthMode = "signin" | "signup";
-type ApiSubmissionStatus = "draft" | "in_review" | "approved" | "rejected";
+type ApiSubmissionStatus = "draft" | "in_review" | "needs_changes" | "approved" | "rejected" | "withdrawn";
 type AuthTokens = { accessToken: string; refreshToken: string };
 
 type StablecoinRequest = {
@@ -19,6 +18,7 @@ type StablecoinRequest = {
   reserve: string;
   attestation: string;
   submitted: string;
+  submittedAt: string | null;
   status: RequestStatus;
   rejectionReason?: string;
 };
@@ -34,7 +34,9 @@ type ApiSubmission = {
   reserve: string;
   attestation: string;
   submitted?: string;
+  submittedAt?: string | null;
   status: ApiSubmissionStatus;
+  reviewReason?: string;
   rejectionReason?: string;
 };
 
@@ -47,12 +49,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/a
 const ACCESS_TOKEN_KEY = "mcbuse.issuer.access-token";
 const REFRESH_TOKEN_KEY = "mcbuse.issuer.refresh-token";
 const ACCOUNT_EMAIL_KEY = "mcbuse.issuer.email";
-const reviewChecks = [
-  "Token contract matches the submitted details",
-  "Reserve model and disclosures are clear",
-  "Latest attestation is accessible and current",
-];
-
 class ApiError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
@@ -91,14 +87,30 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 function normalizeStatus(status: ApiSubmissionStatus | string): RequestStatus {
   switch (status) {
+    case "draft":
+      return "Draft";
+    case "needs_changes":
+      return "Needs changes";
     case "approved":
       return "Approved";
     case "rejected":
       return "Rejected";
-    case "draft":
+    case "withdrawn":
+      return "Withdrawn";
     case "in_review":
     default:
       return "In review";
+  }
+}
+
+function statusClass(status: RequestStatus): string {
+  switch (status) {
+    case "Approved": return "current";
+    case "Rejected": return "rejected";
+    case "In review": return "review";
+    case "Needs changes": return "needs-changes";
+    case "Draft": return "draft";
+    case "Withdrawn": return "withdrawn";
   }
 }
 
@@ -107,7 +119,7 @@ function normalizeRequest(item: ApiSubmission): StablecoinRequest {
     id: item.id,
     name: item.name,
     ticker: item.ticker,
-    issuer: item.issuer ?? "Northstar Labs",
+    issuer: item.issuer ?? "Unknown issuer",
     owner: item.owner ?? true,
     network: item.network,
     contract: item.contract,
@@ -116,37 +128,34 @@ function normalizeRequest(item: ApiSubmission): StablecoinRequest {
     submitted: item.submitted
       ? new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(item.submitted))
       : "—",
+    submittedAt: item.submittedAt ?? null,
     status: normalizeStatus(item.status),
-    rejectionReason: item.rejectionReason,
+    rejectionReason: item.reviewReason ?? item.rejectionReason,
   };
 }
 
 export default function DashboardPage() {
-  const [role, setRole] = useState<RequestRole>("issuer");
-  const [canIssue, setCanIssue] = useState(false);
-  const [canReview, setCanReview] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [accountEmail, setAccountEmail] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
   const [dashboardReady, setDashboardReady] = useState(false);
+  const [issuerAccessDenied, setIssuerAccessDenied] = useState(false);
   const [loginPending, setLoginPending] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>("signin");
   const [issuerRequests, setIssuerRequests] = useState<StablecoinRequest[]>([]);
-  const [adminRequests, setAdminRequests] = useState<StablecoinRequest[]>([]);
   const [activeNav, setActiveNav] = useState("primary");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [dialog, setDialog] = useState<"submit" | "review" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [checkedItems, setCheckedItems] = useState<string[]>([]);
-  const [rejectionMode, setRejectionMode] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
+  const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
+  const [submissionPending, setSubmissionPending] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDashboard = async (requestedRole?: RequestRole) => {
+  const loadDashboard = async () => {
     setIsLoading(true);
     setError(null);
 
@@ -158,31 +167,18 @@ export default function DashboardPage() {
       const issuerOrganizations = activeOrganizations.filter(
         (organization) => organization.role === "issuer_admin" || organization.role === "issuer_member",
       );
-      const reviewerOrganizations = activeOrganizations.filter(
-        (organization) => organization.role === "reviewer",
-      );
-      const hasIssuerAccess = issuerOrganizations.length > 0;
-      const hasReviewerAccess = reviewerOrganizations.length > 0;
-      const nextRole = requestedRole ?? (hasIssuerAccess ? "issuer" : "admin");
-      if ((nextRole === "issuer" && !hasIssuerAccess) || (nextRole === "admin" && !hasReviewerAccess)) {
-        throw new ApiError("This account is not authorized for that workspace.", 403);
+      if (!issuerOrganizations.length) {
+        throw new ApiError("This account does not have an active issuer organization.", 403);
       }
 
-      setCanIssue(hasIssuerAccess);
-      setCanReview(hasReviewerAccess);
-      setRole(nextRole);
-      setWorkspaceName(
-        nextRole === "issuer"
-          ? issuerOrganizations[0]?.name ?? "Issuer workspace"
-          : reviewerOrganizations[0]?.name ?? "Review workspace",
-      );
+      setIssuerAccessDenied(false);
+      setWorkspaceName(issuerOrganizations[0]?.name ?? "Issuer workspace");
       setIssuerRequests((profile.submissions ?? []).map(normalizeRequest));
-      const adminData = hasReviewerAccess
-        ? await fetchJson<ApiSubmission[]>("/admin/issuer/submissions")
-        : [];
-      setAdminRequests(adminData.map(normalizeRequest));
       setActiveNav("primary");
     } catch (loadError) {
+      if (loadError instanceof ApiError && loadError.status === 403) {
+        setIssuerAccessDenied(true);
+      }
       if (loadError instanceof ApiError && loadError.status === 401) {
         window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
         window.sessionStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -215,40 +211,43 @@ export default function DashboardPage() {
     void loadDashboard();
   }, [accessToken, sessionReady]);
 
-  const relevantRequests = role === "issuer" ? issuerRequests : adminRequests;
-  const navItems = role === "issuer"
-    ? [{ key: "primary", label: "My stablecoins", symbol: "◉" }, { key: "history", label: "Submission history", symbol: "▤" }]
-    : [{ key: "primary", label: "Review queue", symbol: "◫" }, { key: "history", label: "All submissions", symbol: "▤" }];
+  const relevantRequests = issuerRequests;
+  const navItems = [
+    { key: "primary", label: "My stablecoins", symbol: "◉" },
+    { key: "history", label: "Submission history", symbol: "▤" },
+  ];
   const visibleRequests = relevantRequests.filter((request) => {
-    const matchesNav = activeNav !== "primary"
-      || role !== "admin"
-      || request.status === "In review";
     const matchesHistory = activeNav !== "history"
-      || role !== "issuer"
       || request.status !== "In review";
-    const matchesSearch = `${request.name} ${request.ticker} ${request.issuer}`
+    const matchesSearch = `${request.name} ${request.ticker} ${request.issuer} ${request.network} ${request.contract}`
       .toLowerCase()
       .includes(query.toLowerCase());
     const matchesStatus = statusFilter === "All statuses" || request.status === statusFilter;
-    return matchesNav && matchesHistory && matchesSearch && matchesStatus;
+    return matchesHistory && matchesSearch && matchesStatus;
   });
   const selectedRequest = relevantRequests.find((request) => request.id === selectedId);
+  const editingSubmission = relevantRequests.find((request) => request.id === editingSubmissionId);
   const inReviewCount = relevantRequests.filter((request) => request.status === "In review").length;
   const approvedCount = relevantRequests.filter((request) => request.status === "Approved").length;
   const rejectedCount = relevantRequests.filter((request) => request.status === "Rejected").length;
-  const heading = role === "issuer" ? "My stablecoins" : "Review queue";
+  const heading = "My stablecoins";
 
   function openReview(requestId: string) {
     setSelectedId(requestId);
-    setCheckedItems([]);
-    setRejectionMode(false);
-    setRejectionReason("");
     setDialog("review");
+  }
+
+  function openSubmissionForm(request?: StablecoinRequest) {
+    setEditingSubmissionId(request?.id ?? null);
+    setError(null);
+    setDialog("submit");
   }
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    setSubmissionPending(true);
+    setError(null);
 
     try {
       const payload = {
@@ -261,51 +260,33 @@ export default function DashboardPage() {
         attestation: String(formData.get("attestation") ?? ""),
       };
 
-      const created = await fetchJson<ApiSubmission>("/issuer/submissions", {
+      const saved = editingSubmissionId
+        ? await fetchJson<ApiSubmission>(`/issuer/submissions/${editingSubmissionId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        })
+        : await fetchJson<ApiSubmission>("/issuer/submissions", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+
+      await fetchJson(`/issuer/submissions/${saved.id}/submit`, {
         method: "POST",
-        body: JSON.stringify(payload),
       });
 
-      await fetchJson(`/issuer/submissions/${created.id}/submit`, {
-        method: "POST",
-      });
-
+      setEditingSubmissionId(null);
       setQuery("");
       setStatusFilter("All statuses");
       setDialog(null);
-      await loadDashboard("issuer");
+      await loadDashboard();
     } catch (submitError) {
       setError(
         submitError instanceof Error
           ? submitError.message
           : "Unable to submit the stablecoin application.",
       );
-    }
-  }
-
-  async function decideRequest(status: "Approved" | "Rejected") {
-    if (!selectedRequest || (status === "Rejected" && !rejectionReason.trim())) return;
-
-    try {
-      await fetchJson(`/admin/issuer/submissions/${selectedRequest.id}/decision`, {
-        method: "POST",
-        body: JSON.stringify({
-          decision: status.toLowerCase(),
-          reason: status === "Rejected" ? rejectionReason.trim() : undefined,
-          checklist: checkedItems,
-        }),
-      });
-
-      setDialog(null);
-      setRejectionMode(false);
-      setRejectionReason("");
-      await loadDashboard("admin");
-    } catch (decisionError) {
-      setError(
-        decisionError instanceof Error
-          ? decisionError.message
-          : "Unable to record the review decision.",
-      );
+    } finally {
+      setSubmissionPending(false);
     }
   }
 
@@ -396,16 +377,9 @@ export default function DashboardPage() {
     setAccessToken(null);
     setAccountEmail("");
     setIssuerRequests([]);
-    setAdminRequests([]);
-    setCanIssue(false);
-    setCanReview(false);
     setDashboardReady(false);
+    setIssuerAccessDenied(false);
     setLoginError(null);
-  }
-
-  function switchWorkspace(nextRole: RequestRole) {
-    setActiveNav("primary");
-    void loadDashboard(nextRole);
   }
 
   if (!sessionReady || (accessToken && !dashboardReady)) {
@@ -423,7 +397,7 @@ export default function DashboardPage() {
           <div className="auth-heading">
             <p className="eyebrow">ISSUER SERVICES</p>
             <h1 id="login-title">{isSignUp ? "Create issuer account" : "Sign in"}</h1>
-            <p>{isSignUp ? "Set up access for your organization." : "Access your issuer or review workspace."}</p>
+            <p>{isSignUp ? "Set up access for your organization." : "Access your issuer workspace."}</p>
           </div>
           <form className="auth-form" onSubmit={isSignUp ? signUpIssuer : signIn}>
             {isSignUp && <>
@@ -457,6 +431,24 @@ export default function DashboardPage() {
     );
   }
 
+  if (dashboardReady && issuerAccessDenied) {
+    return (
+      <main className="auth-screen">
+        <section aria-labelledby="issuer-access-title" className="auth-panel">
+          <a className="brand auth-brand" href="#issuer-access-title" aria-label="MCBuse issuer services">
+            <span className="brand-mark">M</span><span>MCBuse</span>
+          </a>
+          <div className="auth-heading">
+            <p className="eyebrow">ISSUER PORTAL</p>
+            <h1 id="issuer-access-title">Issuer access required</h1>
+            <p>This workspace is for active issuer members. MCBuse reviewers use the internal admin dashboard.</p>
+          </div>
+          <button className="signout-button" onClick={() => void signOut()} type="button">Sign out</button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -466,10 +458,10 @@ export default function DashboardPage() {
         </a>
 
         <div className="workspace-switcher">
-          <span className="workspace-icon">{role === "issuer" ? "I" : "R"}</span>
+          <span className="workspace-icon">I</span>
           <span className="workspace-label">
             <strong>{workspaceName}</strong>
-            <small>{role === "issuer" ? "Issuer account" : "Admin workspace"}</small>
+            <small>Issuer account</small>
           </span>
           <span className="chevron">⌄</span>
         </div>
@@ -481,12 +473,11 @@ export default function DashboardPage() {
               aria-current={activeNav === item.key ? "page" : undefined}
               className={`nav-item${activeNav === item.key ? " active" : ""}`}
               key={item.key}
-              onClick={() => setActiveNav(item.key)}
+              onClick={() => { setActiveNav(item.key); setStatusFilter("All statuses"); setQuery(""); }}
               type="button"
             >
               <span className="nav-symbol" aria-hidden="true">{item.symbol}</span>
               {item.label}
-              {role === "admin" && item.key === "primary" && inReviewCount > 0 && <span className="nav-count">{inReviewCount}</span>}
             </button>
           ))}
         </nav>
@@ -494,24 +485,20 @@ export default function DashboardPage() {
         <div className="sidebar-bottom">
           <div className="plan-note">
             <span className="plan-kicker">SUBMISSION PROCESS</span>
-            <strong>Review usually takes 2–3 days</strong>
-            <span className="sync-indicator"><i /> Status updates appear here</span>
+            <strong>Track your review status here</strong>
+            <span className="sync-indicator"><i />Status updates appear here</span>
           </div>
           <div className="profile-button">
-            <span className="avatar">{role === "issuer" ? "IS" : "RV"}</span>
-            <span className="profile-label"><strong>{accountEmail}</strong><small>{role === "issuer" ? "Issuer" : "Reviewer"}</small></span>
+            <span className="avatar">IS</span>
+            <span className="profile-label"><strong>{accountEmail}</strong><small>Issuer</small></span>
           </div>
         </div>
       </aside>
 
       <section className="main-panel" id="dashboard">
         <header className="topbar">
-          <div className="breadcrumbs"><span>{role === "issuer" ? "Issuer portal" : "Administration"}</span><b>/</b><strong>{heading}</strong></div>
+          <div className="breadcrumbs"><span>Issuer portal</span><b>/</b><strong>{heading}</strong></div>
           <div className="topbar-actions">
-            {canIssue && canReview && <div className="role-toggle" aria-label="Choose workspace" role="group">
-              <button aria-pressed={role === "issuer"} className={role === "issuer" ? "selected" : ""} onClick={() => switchWorkspace("issuer")} type="button">Issuer</button>
-              <button aria-pressed={role === "admin"} className={role === "admin" ? "selected" : ""} onClick={() => switchWorkspace("admin")} type="button">Reviewer</button>
-            </div>}
             <button className="signout-button" onClick={() => void signOut()} type="button">Sign out</button>
           </div>
         </header>
@@ -519,23 +506,23 @@ export default function DashboardPage() {
         <div className="content-wrap">
           <div className="page-heading">
             <div>
-              <p className="eyebrow">{role === "issuer" ? "ISSUER PORTAL" : "MCBUSE OPERATIONS"} <span>·</span> STABLECOIN REGISTRY</p>
+              <p className="eyebrow">ISSUER PORTAL <span>·</span> STABLECOIN REGISTRY</p>
               <h1>{heading}</h1>
-              <p className="heading-copy">{role === "issuer" ? "Submit a stablecoin and track its review from one place." : "Review issuer submissions and record a clear decision."}</p>
+              <p className="heading-copy">Submit a stablecoin and track its review from one place.</p>
             </div>
-            {role === "issuer" && <button className="export-button" onClick={() => setDialog("submit")} type="button"><span>＋</span> Submit stablecoin</button>}
+            <button className="export-button" onClick={() => openSubmissionForm()} type="button"><span>＋</span> Submit stablecoin</button>
           </div>
 
           <section className="metrics-grid" aria-label="Submission summary">
             <article className="metric-card featured-metric">
-              <div className="metric-topline"><span>{role === "issuer" ? "Submitted stablecoins" : "Total submissions"}</span><span className="metric-icon">◉</span></div>
+              <div className="metric-topline"><span>Submitted stablecoins</span><span className="metric-icon">◉</span></div>
               <strong className="metric-value">{relevantRequests.length.toString().padStart(2, "0")}</strong>
-              <div className="metric-footer"><span className="neutral-change">{role === "issuer" ? "Across your account" : "Across all issuers"}</span></div>
+              <div className="metric-footer"><span className="neutral-change">Across your account</span></div>
             </article>
             <article className="metric-card">
               <div className="metric-topline"><span>In review</span><span className="metric-icon icon-yellow">◷</span></div>
               <strong className="metric-value">{inReviewCount.toString().padStart(2, "0")}</strong>
-              <div className="metric-footer"><span className="attention-change">{role === "admin" ? "Awaiting a decision" : "Being checked by MCBuse"}</span></div>
+              <div className="metric-footer"><span className="attention-change">Being checked by MCBuse</span></div>
             </article>
             <article className="metric-card">
               <div className="metric-topline"><span>Approved</span><span className="metric-icon icon-coral">✓</span></div>
@@ -545,15 +532,15 @@ export default function DashboardPage() {
             <article className="metric-card attention-metric">
               <div className="metric-topline"><span>Rejected</span><span className="metric-icon icon-orange">!</span></div>
               <strong className="metric-value">{rejectedCount.toString().padStart(2, "0")}</strong>
-              <div className="metric-footer"><span className="neutral-change">{role === "issuer" ? "Review the decision notes" : "Decision recorded"}</span></div>
+              <div className="metric-footer"><span className="neutral-change">Review the decision notes</span></div>
             </article>
           </section>
 
           <section className="issuer-section workflow-section" aria-labelledby="requests-title">
             <div className="section-heading">
               <div>
-                <div className="title-with-count"><h2 id="requests-title">{role === "admin" && activeNav === "primary" ? "Waiting for review" : role === "issuer" ? (activeNav === "history" ? "Previous submissions" : "Your submissions") : "All submissions"}</h2><span className="result-count">{visibleRequests.length}</span></div>
-                <p>{role === "issuer" ? "Check the status and details of every stablecoin request." : "Open a request to verify its details and record your decision."}</p>
+                <div className="title-with-count"><h2 id="requests-title">{activeNav === "history" ? "Previous submissions" : "Your submissions"}</h2><span className="result-count">{visibleRequests.length}</span></div>
+                <p>Check the status and details of every stablecoin request.</p>
               </div>
               <div className="table-actions">
                 <label className="search-field">
@@ -562,9 +549,12 @@ export default function DashboardPage() {
                 </label>
                 <select aria-label="Filter by status" className="status-filter" onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
                   <option>All statuses</option>
+                  <option>Draft</option>
                   <option>In review</option>
+                  <option>Needs changes</option>
                   <option>Approved</option>
                   <option>Rejected</option>
+                  <option>Withdrawn</option>
                 </select>
               </div>
             </div>
@@ -574,7 +564,6 @@ export default function DashboardPage() {
                 <thead>
                   <tr>
                     <th>STABLECOIN</th>
-                    {role === "admin" && <th>ISSUER</th>}
                     <th>NETWORK</th>
                     <th>SUBMITTED</th>
                     <th>STATUS</th>
@@ -582,8 +571,8 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {isLoading && <tr><td className="empty-state" colSpan={role === "admin" ? 6 : 5}>Loading submissions…</td></tr>}
-                  {!isLoading && error && <tr><td className="empty-state" colSpan={role === "admin" ? 6 : 5}>{error}</td></tr>}
+                  {isLoading && <tr><td className="empty-state" colSpan={5}>Loading submissions…</td></tr>}
+                  {!isLoading && error && <tr><td className="empty-state" colSpan={5}>{error}</td></tr>}
                   {!isLoading && !error && visibleRequests.map((request) => (
                     <tr key={request.id}>
                       <td>
@@ -592,18 +581,17 @@ export default function DashboardPage() {
                           <span className="issuer-name"><strong>{request.name}</strong><small>{request.ticker} · {request.id}</small></span>
                         </div>
                       </td>
-                      {role === "admin" && <td><span className="attestation-date">{request.issuer}</span></td>}
                       <td><span className="network-tag">{request.network}</span></td>
                       <td><span className="attestation-date">{request.submitted}</span></td>
-                      <td><span className={`status-pill ${request.status === "Approved" ? "current" : request.status === "Rejected" ? "rejected" : "review"}`}><i />{request.status}</span></td>
-                      <td><button aria-label={`${role === "admin" && request.status === "In review" ? "Review" : "View"} ${request.name}`} className="row-action" onClick={() => openReview(request.id)} type="button">{role === "admin" && request.status === "In review" ? "Review →" : "View →"}</button></td>
+                      <td><span className={`status-pill ${statusClass(request.status)}`}><i />{request.status}</span></td>
+                      <td><button aria-label={`View ${request.name}`} className="row-action" onClick={() => openReview(request.id)} type="button">View →</button></td>
                     </tr>
                   ))}
-                  {!isLoading && !error && visibleRequests.length === 0 && <tr><td className="empty-state" colSpan={role === "admin" ? 6 : 5}>No submissions match these filters.</td></tr>}
+                  {!isLoading && !error && visibleRequests.length === 0 && <tr><td className="empty-state" colSpan={5}>No submissions match these filters.</td></tr>}
                 </tbody>
               </table>
             </div>
-            <footer className="table-footer"><span>Showing <strong>{visibleRequests.length}</strong> {role === "issuer" ? "of your submissions" : "submissions"}</span><span>{role === "admin" ? "Decisions are recorded in the request history." : "Need to update a request? Contact issuer support."}</span></footer>
+            <footer className="table-footer"><span>Showing <strong>{visibleRequests.length}</strong> of your submissions</span><span>Draft and returned submissions can be edited from their details.</span></footer>
           </section>
 
           <footer className="page-footer"><span>Submitting a stablecoin does not guarantee approval or listing.</span><span>MCBuse <b>·</b> Issuer services</span></footer>
@@ -614,21 +602,22 @@ export default function DashboardPage() {
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null); }}>
           <section aria-labelledby="submit-title" aria-modal="true" className="modal-card submission-modal" role="dialog">
             <header className="modal-heading">
-              <div><p className="eyebrow">NEW APPLICATION</p><h2 id="submit-title">Submit a stablecoin</h2><p>Share the token and reserve details for MCBuse review.</p></div>
-              <button aria-label="Close submission form" className="modal-close" onClick={() => setDialog(null)} type="button">×</button>
+              <div><p className="eyebrow">{editingSubmission ? "UPDATE APPLICATION" : "NEW APPLICATION"}</p><h2 id="submit-title">{editingSubmission ? "Update stablecoin" : "Submit a stablecoin"}</h2><p>{editingSubmission?.status === "Needs changes" ? "Update the requested details, then send the submission back for review." : "Share the token and reserve details for MCBuse review."}</p></div>
+              <button aria-label="Close submission form" className="modal-close" onClick={() => { setDialog(null); setEditingSubmissionId(null); setError(null); }} type="button">×</button>
             </header>
             <form className="submission-form" onSubmit={submitRequest}>
               <div className="form-grid">
-                <label>Issuer legal name<input autoComplete="organization" name="issuer" placeholder="e.g. Northstar Labs" required /></label>
-                <label>Stablecoin name<input name="name" placeholder="e.g. Northstar Dollar" required /></label>
-                <label>Ticker symbol<input autoCapitalize="characters" maxLength={10} name="ticker" placeholder="e.g. NSD" required /></label>
-                <label>Network<select defaultValue="" name="network" required><option disabled value="">Select network</option><option>Ethereum</option><option>Solana</option><option>Base</option><option>Polygon</option><option>Other</option></select></label>
-                <label className="form-span">Token contract address<input autoCapitalize="none" name="contract" placeholder="Contract address or mint address" required /></label>
-                <label className="form-span">Reserve composition<input name="reserve" placeholder="Describe the assets backing this stablecoin" required /></label>
-                <label className="form-span">Latest reserve attestation URL<input name="attestation" placeholder="https://" type="url" required /></label>
+                <label>Issuer legal name<input autoComplete="organization" defaultValue={editingSubmission?.issuer ?? workspaceName} name="issuer" placeholder="e.g. Northstar Labs" readOnly={Boolean(editingSubmission)} required /></label>
+                <label>Stablecoin name<input defaultValue={editingSubmission?.name} name="name" placeholder="e.g. Northstar Dollar" required /></label>
+                <label>Ticker symbol<input autoCapitalize="characters" defaultValue={editingSubmission?.ticker} maxLength={10} name="ticker" placeholder="e.g. NSD" required /></label>
+                <label>Network<select defaultValue={editingSubmission?.network ?? ""} name="network" required><option disabled value="">Select network</option><option>Ethereum</option><option>Solana</option><option>Base</option><option>Polygon</option><option>Other</option></select></label>
+                <label className="form-span">Token contract address<input autoCapitalize="none" defaultValue={editingSubmission?.contract} name="contract" placeholder="Contract address or mint address" required /></label>
+                <label className="form-span">Reserve composition<input defaultValue={editingSubmission?.reserve} name="reserve" placeholder="Describe the assets backing this stablecoin" required /></label>
+                <label className="form-span">Latest reserve attestation URL<input defaultValue={editingSubmission?.attestation} name="attestation" placeholder="https://" type="url" required /></label>
               </div>
+              {error && <p className="auth-error" role="alert">{error}</p>}
               <p className="form-note">By submitting, you confirm these details are accurate and authorize MCBuse to review the provided disclosures.</p>
-              <div className="modal-actions"><button className="secondary-button" onClick={() => setDialog(null)} type="button">Cancel</button><button className="primary-button" type="submit">Submit for review</button></div>
+              <div className="modal-actions"><button className="secondary-button" onClick={() => { setDialog(null); setEditingSubmissionId(null); setError(null); }} type="button">Cancel</button><button className="primary-button" disabled={submissionPending} type="submit">{submissionPending ? "Submitting…" : editingSubmission ? "Update and resubmit" : "Submit for review"}</button></div>
             </form>
           </section>
         </div>
@@ -638,7 +627,7 @@ export default function DashboardPage() {
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null); }}>
           <section aria-labelledby="review-title" aria-modal="true" className="modal-card review-modal" role="dialog">
             <header className="modal-heading">
-              <div><p className="eyebrow">{role === "admin" ? "SUBMISSION REVIEW" : "SUBMISSION DETAILS"}</p><h2 id="review-title">{selectedRequest.name} <span>{selectedRequest.ticker}</span></h2><p>{selectedRequest.issuer} · submitted {selectedRequest.submitted}</p></div>
+              <div><p className="eyebrow">SUBMISSION DETAILS</p><h2 id="review-title">{selectedRequest.name} <span>{selectedRequest.ticker}</span></h2><p>{selectedRequest.issuer} · submitted {selectedRequest.submitted}</p></div>
               <button aria-label="Close request details" className="modal-close" onClick={() => setDialog(null)} type="button">×</button>
             </header>
             <div className="request-details">
@@ -646,25 +635,18 @@ export default function DashboardPage() {
               <div><span>Reserve composition</span><strong>{selectedRequest.reserve}</strong></div>
               <div><span>Token contract / mint</span><strong className="contract-value">{selectedRequest.contract}</strong></div>
               <div><span>Latest attestation</span><a href={selectedRequest.attestation} rel="noreferrer" target="_blank">Open issuer disclosure ↗</a></div>
-              <div><span>Current status</span><strong><span className={`status-pill ${selectedRequest.status === "Approved" ? "current" : selectedRequest.status === "Rejected" ? "rejected" : "review"}`}><i />{selectedRequest.status}</span></strong></div>
-              {selectedRequest.rejectionReason && <div className="decision-note"><span>Decision note</span><strong>{selectedRequest.rejectionReason}</strong></div>}
+              <div><span>Current status</span><strong><span className={`status-pill ${statusClass(selectedRequest.status)}`}><i />{selectedRequest.status}</span></strong></div>
+              {selectedRequest.rejectionReason && <div className="decision-note"><span>Reviewer note</span><strong>{selectedRequest.rejectionReason}</strong></div>}
             </div>
-            {role === "admin" && selectedRequest.status === "In review" && (
-              <div className="review-controls">
-                <h3>Verification checklist</h3>
-                <p>Complete each check before validating this submission.</p>
-                <div className="checklist">
-                  {reviewChecks.map((check) => <label key={check}><input checked={checkedItems.includes(check)} onChange={(event) => setCheckedItems((current) => event.target.checked ? [...current, check] : current.filter((item) => item !== check))} type="checkbox" />{check}</label>)}
-                </div>
-                {rejectionMode && <label className="rejection-field">Reason for rejection<textarea onChange={(event) => setRejectionReason(event.target.value)} placeholder="Explain what needs to change for the issuer." required value={rejectionReason} /></label>}
-                <div className="modal-actions decision-actions">
-                  <button className="reject-button" onClick={() => rejectionMode ? decideRequest("Rejected") : setRejectionMode(true)} type="button">{rejectionMode ? "Confirm rejection" : "Reject"}</button>
-                  <button className="primary-button" disabled={checkedItems.length !== reviewChecks.length || rejectionMode} onClick={() => decideRequest("Approved")} type="button">Validate submission</button>
-                </div>
-                {rejectionMode && !rejectionReason.trim() && <p className="validation-hint">Add a reason to confirm rejection.</p>}
+            {(selectedRequest.status === "Draft" || selectedRequest.status === "Needs changes") && (
+              <div className="modal-actions">
+                <button className="primary-button" onClick={() => openSubmissionForm(selectedRequest)} type="button">
+                  {selectedRequest.status === "Needs changes" ? "Edit and resubmit" : "Edit draft and submit"}
+                </button>
               </div>
             )}
-            {role === "issuer" && selectedRequest.status === "Rejected" && <p className="issuer-next-step">Review the decision note and update your disclosures before submitting again.</p>}
+            {selectedRequest.status === "Needs changes" && <p className="issuer-next-step">Address the reviewer note, then resubmit this application.</p>}
+            {selectedRequest.status === "Rejected" && <p className="issuer-next-step">This submission was rejected. Contact issuer support if you need help understanding the decision.</p>}
           </section>
         </div>
       )}

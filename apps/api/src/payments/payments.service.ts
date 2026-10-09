@@ -90,18 +90,26 @@ export class PaymentsService {
   }
 
   async executeByUsername(payerUserId: string, dto: ExecuteUsernamePaymentDto) {
+    this.logger.log(`[executeByUsername] Starting payment from ${payerUserId} to @${dto.username}`);
+
     const recipient = await this.usersService.findByUsername(dto.username);
-    if (!recipient || !recipient.isActive) throw new NotFoundException('Recipient not found');
+    if (!recipient || !recipient.isActive) {
+      this.logger.warn(`[executeByUsername] Recipient not found or inactive: ${dto.username}`);
+      throw new NotFoundException('Recipient not found');
+    }
     if (recipient.id === payerUserId) throw new BadRequestException('Cannot send payment to yourself');
 
     const amount = BigInt(dto.amount);
     if (amount <= 0n) throw new BadRequestException('Amount must be positive');
     const currency = dto.currency.toUpperCase();
 
+    this.logger.log(`[executeByUsername] Fetching wallets for payer ${payerUserId} and payee ${recipient.id}`);
     const [payerWallet, payeeWallet] = await Promise.all([
       this.getRoutineWalletForUser(payerUserId),
       this.getRoutineWalletForUser(recipient.id),
     ]);
+
+    this.logger.log(`[executeByUsername] Wallets fetched. Payer: ${payerWallet.id}, Payee: ${payeeWallet.id}`);
 
     const result = await this.executeRoutineTransfer({
       payerWallet,
@@ -158,18 +166,31 @@ export class PaymentsService {
     const { payerWallet, payeeWallet, amount, currency, metadata, dynamicPaymentRequestId } = params;
     const idempotencyKey = randomUUID();
 
+    this.logger.log(`[executeRoutineTransfer] Checking balance for wallet ${payerWallet.id}, currency ${currency}, amount ${amount}`);
     await this.assertAvailableBalance(payerWallet.id, currency, amount);
 
-    const transferResult = await this.transferProvider.execute({
-      payerWalletId: payerWallet.id,
-      payerPubkey: payerWallet.solanaPubkey,
-      payerEncryptedKeypair: payerWallet.encryptedKeypair,
-      payeeWalletId: payeeWallet.id,
-      payeePubkey: payeeWallet.solanaPubkey,
-      amount,
-      currency,
-      idempotencyKey,
-    });
+    this.logger.log(`[executeRoutineTransfer] Executing transfer via provider`);
+    let transferResult;
+    try {
+      transferResult = await this.transferProvider.execute({
+        payerWalletId: payerWallet.id,
+        payerPubkey: payerWallet.solanaPubkey,
+        payerEncryptedKeypair: payerWallet.encryptedKeypair,
+        payeeWalletId: payeeWallet.id,
+        payeePubkey: payeeWallet.solanaPubkey,
+        amount,
+        currency,
+        idempotencyKey,
+      });
+    } catch (error) {
+      this.logger.error(`[executeRoutineTransfer] Transfer provider error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (error instanceof Error && error.message.includes('encryption')) {
+        throw new BadRequestException(
+          'Wallet encryption error. This wallet may need to be regenerated. Please contact support.'
+        );
+      }
+      throw new InternalServerErrorException('Transfer failed — no DB state was mutated');
+    }
 
     if (transferResult.status === 'failed') {
       throw new InternalServerErrorException('Transfer failed — no DB state was mutated');
@@ -177,7 +198,9 @@ export class PaymentsService {
 
     const txSignature = transferResult.txSignature;
 
+    this.logger.log(`[executeRoutineTransfer] Starting database transaction`);
     await this.db.transaction(async (tx) => {
+      this.logger.log(`[executeRoutineTransfer] Deducting ${amount} ${currency} from payer wallet ${payerWallet.id}`);
       const deducted = await tx
         .update(schema.balances)
         .set({ available: sql`${schema.balances.available} - ${amount}` })
@@ -190,8 +213,12 @@ export class PaymentsService {
         )
         .returning({ id: schema.balances.id });
 
-      if (deducted.length === 0) throw new BadRequestException('Insufficient balance');
+      if (deducted.length === 0) {
+        this.logger.error(`[executeRoutineTransfer] Insufficient balance for payer wallet ${payerWallet.id}`);
+        throw new BadRequestException('Insufficient balance');
+      }
 
+      this.logger.log(`[executeRoutineTransfer] Crediting ${amount} ${currency} to payee wallet ${payeeWallet.id}`);
       const credited = await tx
         .update(schema.balances)
         .set({ available: sql`${schema.balances.available} + ${amount}` })
@@ -204,6 +231,7 @@ export class PaymentsService {
         .returning({ id: schema.balances.id });
 
       if (credited.length !== 1) {
+        this.logger.error(`[executeRoutineTransfer] Payee balance record not found. Wallet: ${payeeWallet.id}, Currency: ${currency}, Credited rows: ${credited.length}`);
         throw new BadRequestException(`Payee balance record not found for currency ${currency}`);
       }
 

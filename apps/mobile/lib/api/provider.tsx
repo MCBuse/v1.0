@@ -23,6 +23,7 @@ export function ApiProvider({ children }: Props) {
   const clientRef = useRef(createQueryClient());
 
   const setIsAuthenticated = useAppStore((s) => s.setIsAuthenticated);
+  const hydrateOnboarding  = useAppStore((s) => s.hydrateOnboarding);
   const signOut            = useAppStore((s) => s.signOut);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export function ApiProvider({ children }: Props) {
       signOut();
     });
 
-    authSession.hydrate().then((tokens) => {
+    Promise.all([authSession.hydrate(), hydrateOnboarding()]).then(([tokens]) => {
       if (cancelled) return;
       setIsAuthenticated(Boolean(tokens));
       setReady(true);
@@ -43,7 +44,7 @@ export function ApiProvider({ children }: Props) {
       cancelled = true;
       setOnAuthExpired(null);
     };
-  }, [setIsAuthenticated, signOut]);
+  }, [setIsAuthenticated, hydrateOnboarding, signOut]);
 
   if (!ready) return null;
 

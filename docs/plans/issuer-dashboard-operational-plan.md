@@ -4,7 +4,15 @@
 
 Make the MCBuse Issuer Portal a secure, usable system for issuer onboarding, stablecoin submissions, internal review, and publication of approved registry entries.
 
-The issuer portal is a separate Next.js application at `apps/issuers-dashboard`. The API is a NestJS monolith using PostgreSQL and Drizzle ORM. The current portal is a client-side prototype: submissions are hard-coded in page state, the issuer/admin switch is local UI state, and submit/review decisions do not call the API. The API currently has no issuer domain module, organization/membership model, or issuer-specific authorization.
+The issuer portal (`apps/issuers-dashboard`) and internal MCBuse due-diligence dashboard (`apps/admin-dashboard`) are separate Next.js applications sharing the NestJS API and its PostgreSQL database. The API owns issuer organizations, memberships, submissions, review events, and published registry entries.
+
+## Implementation Status — 5 October 2026
+
+Implemented: separate issuer and reviewer applications; membership-checked issuer and reviewer access; issuer submission creation, status tracking, and draft/returned-submission editing; reviewer approve, reject, and request-changes decisions; persisted review reasons; automatic registry publication on approval; and a public read-only stablecoin registry endpoint.
+
+Still required before production: an issuer-organization verification workflow and policy; evidence handling appropriate to KYB and reserve attestations; reviewer assignment, server-side queue pagination, and visible decision history; a decision on whether approval should publish immediately or require a separate publication action; end-to-end and security testing; and production deployment, monitoring, and operational readiness.
+
+The phases below describe the target controls and delivery gates. Treat the implementation status above as the current baseline where it differs from the original sequencing.
 
 ## Scope and Non-Goals
 

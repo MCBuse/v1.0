@@ -22,6 +22,7 @@ const requiredReviewChecks = [
 type IssuerSubmissionStatus =
   | 'draft'
   | 'in_review'
+  | 'needs_changes'
   | 'approved'
   | 'rejected'
   | 'withdrawn';
@@ -188,8 +189,10 @@ export class IssuersService {
     );
     const current = rows[0];
     if (!current) throw new NotFoundException(`Submission ${id} not found`);
-    if (current.status !== 'draft') {
-      throw new BadRequestException('Only draft submissions can be updated');
+    if (current.status !== 'draft' && current.status !== 'needs_changes') {
+      throw new BadRequestException(
+        'Only draft or returned submissions can be updated',
+      );
     }
 
     const network = dto.network
@@ -216,13 +219,18 @@ export class IssuersService {
             schema.stablecoinSubmissions.organizationId,
             membership.organizationId,
           ),
-          eq(schema.stablecoinSubmissions.status, 'draft'),
+          inArray(schema.stablecoinSubmissions.status, [
+            'draft',
+            'needs_changes',
+          ]),
         ),
       )
       .returning({ id: schema.stablecoinSubmissions.id });
 
     if (!updated.length) {
-      throw new BadRequestException('Only draft submissions can be updated');
+      throw new BadRequestException(
+        'Only draft or returned submissions can be updated',
+      );
     }
     await this.db.insert(schema.auditLogs).values({
       userId,
@@ -250,7 +258,10 @@ export class IssuersService {
             schema.stablecoinSubmissions.organizationId,
             membership.organizationId,
           ),
-          eq(schema.stablecoinSubmissions.status, 'draft'),
+          inArray(schema.stablecoinSubmissions.status, [
+            'draft',
+            'needs_changes',
+          ]),
         ),
       )
       .returning({ id: schema.stablecoinSubmissions.id });
@@ -270,7 +281,9 @@ export class IssuersService {
         )
         .limit(1);
       if (!existing) throw new NotFoundException(`Submission ${id} not found`);
-      throw new BadRequestException('Only draft submissions can be submitted');
+      throw new BadRequestException(
+        'Only draft or returned submissions can be submitted',
+      );
     }
 
     await this.db.insert(schema.auditLogs).values({
@@ -298,15 +311,24 @@ export class IssuersService {
 
   async decideSubmission(userId: string, id: string, dto: ReviewDecisionDto) {
     await this.requireReviewerMembership(userId);
-    const decision = dto.decision.toLowerCase();
-    if (decision !== 'approved' && decision !== 'rejected') {
-      throw new BadRequestException('Decision must be approved or rejected');
+    const decision = dto.decision.toLowerCase() as
+      | 'approved'
+      | 'rejected'
+      | 'changes_requested';
+    if (
+      decision !== 'approved' &&
+      decision !== 'rejected' &&
+      decision !== 'changes_requested'
+    ) {
+      throw new BadRequestException(
+        'Decision must be approved, rejected, or changes_requested',
+      );
     }
     const reason = dto.reason?.trim();
     const checklist = dto.checklist ?? [];
-    if (decision === 'rejected' && !reason) {
+    if (decision !== 'approved' && !reason) {
       throw new BadRequestException(
-        'A reason is required when rejecting a submission',
+        'A reason is required when rejecting or requesting changes',
       );
     }
     if (
@@ -317,6 +339,8 @@ export class IssuersService {
         'Complete every required review check before approval',
       );
     }
+
+    const nextStatus = decision === 'changes_requested' ? 'needs_changes' : decision;
 
     await this.db.transaction(async (tx) => {
       const [submission] = await tx
@@ -337,7 +361,7 @@ export class IssuersService {
       const [updated] = await tx
         .update(schema.stablecoinSubmissions)
         .set({
-          status: decision,
+          status: nextStatus,
           updatedAt: now,
           version: sql`${schema.stablecoinSubmissions.version} + 1`,
         })
@@ -357,7 +381,7 @@ export class IssuersService {
         reviewerId: userId,
         action: decision,
         checklist,
-        reason: decision === 'rejected' ? reason : null,
+        reason: decision === 'approved' ? null : reason,
       });
 
       if (decision === 'approved') {
@@ -560,6 +584,8 @@ export class IssuersService {
       status: row.status,
       owner: true,
       submitted: formatSubmittedDate(row.submittedAt),
+      submittedAt: row.submittedAt?.toISOString() ?? null,
+      reviewReason: latestReasons.get(row.id),
       rejectionReason: latestReasons.get(row.id),
     }));
   }
