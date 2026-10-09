@@ -16,3 +16,8 @@ apps/mobile
 apps/web
 docs
 out
+# Local data that must never leave the machine (prod DB dumps, scratch output)
+backups
+tmp
+output
+Claude outputs

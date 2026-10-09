@@ -13,6 +13,7 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { PhoneAuthGuard } from './guards/phone-auth.guard';
@@ -27,6 +28,10 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
+// Credential and code-guessing endpoints: 5 requests per minute per client IP.
+// The global default (THROTTLE_LIMIT) is far too loose for these.
+const AUTH_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -34,6 +39,7 @@ export class AuthController {
 
   @Public()
   @Post('signup')
+  @Throttle(AUTH_THROTTLE)
   @ApiOperation({ summary: 'Register a new account' })
   @ApiCreatedResponse({ description: 'Returns access and refresh tokens' })
   signup(@Body() dto: SignupDto) {
@@ -42,6 +48,7 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.OK)
   @UseGuards(LocalAuthGuard)
   @ApiOperation({ summary: 'Login with email and password' })
@@ -55,6 +62,7 @@ export class AuthController {
 
   @Public()
   @Post('login/phone')
+  @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.OK)
   @UseGuards(PhoneAuthGuard)
   @ApiOperation({ summary: 'Login with phone number and password' })
@@ -88,6 +96,7 @@ export class AuthController {
 
   @Public()
   @Post('forgot-password')
+  @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Request a password reset code via email or phone' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
@@ -96,6 +105,7 @@ export class AuthController {
 
   @Public()
   @Post('reset-password')
+  @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Reset password using a previously issued reset code' })
   resetPassword(@Body() dto: ResetPasswordDto) {
@@ -108,6 +118,7 @@ export class AuthController {
   }
 
   @Post('phone/send-otp')
+  @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Send OTP to phone number' })
@@ -119,6 +130,7 @@ export class AuthController {
   }
 
   @Post('phone/verify-otp')
+  @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Verify OTP and mark phone as verified' })

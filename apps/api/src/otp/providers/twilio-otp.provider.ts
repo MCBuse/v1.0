@@ -42,6 +42,7 @@ export class TwilioOtpProvider implements OtpProvider {
           ),
       },
       body: new URLSearchParams({ To: phone, Channel: 'sms' }).toString(),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!res.ok) {
@@ -63,6 +64,7 @@ export class TwilioOtpProvider implements OtpProvider {
           ),
       },
       body: new URLSearchParams({ To: phone, Code: code }).toString(),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!res.ok) return false;

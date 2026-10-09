@@ -233,6 +233,7 @@ export class MoonpayOfframpProvider {
       headers: {
         Accept: 'application/json',
       },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
       throw new BadRequestException(`MoonPay sell transaction lookup failed (${response.status})`);

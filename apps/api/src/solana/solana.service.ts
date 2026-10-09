@@ -187,7 +187,12 @@ export class SolanaService implements OnModuleInit {
     );
 
     const rpcUrl = this.config.getOrThrow<string>('SOLANA_RPC_URL');
-    this.connection = new Connection(rpcUrl, 'confirmed');
+    // web3.js has no default timeout; a hung RPC node would hang the request.
+    this.connection = new Connection(rpcUrl, {
+      commitment: 'confirmed',
+      fetch: (input, init) =>
+        fetch(input, { ...init, signal: AbortSignal.timeout(10_000) }),
+    });
     this.logger.log(`Solana connection: ${rpcUrl}`);
   }
 

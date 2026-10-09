@@ -1,4 +1,5 @@
 import { http } from '@/lib/api';
+import { finishMoneyIntent, moneyIntent } from '@/lib/api/money-intent';
 
 import {
   cancelPaymentRequestResponse,
@@ -56,7 +57,11 @@ export const paymentRepository = {
   },
 
   async topUp(input: OnRampInput): Promise<OnRampResponse> {
-    const raw = await http.post<unknown>('/onramp', input);
+    const intent = await moneyIntent('onramp', input);
+    const raw = await http.post<unknown>('/onramp', input, {
+      headers: { 'Idempotency-Key': intent.key },
+    });
+    await finishMoneyIntent('onramp');
     return onRampResponse.parse(raw);
   },
 };

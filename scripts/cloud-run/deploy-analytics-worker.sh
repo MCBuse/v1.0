@@ -11,13 +11,16 @@ service_account_email="${service_account_name}@${project_id}.iam.gserviceaccount
 scheduler_service_account_name="${MCBUSE_ANALYTICS_SCHEDULER_ACCOUNT:-mcbuse-analytics-scheduler}"
 scheduler_service_account_email="${scheduler_service_account_name}@${project_id}.iam.gserviceaccount.com"
 job="${service}-analytics"
-scheduler="${service}-analytics-every-10-minutes"
-# Keep the existing Scheduler ID so deployments update it rather than duplicate it.
+# Cadence-neutral Scheduler IDs. Scheduler IDs cannot be renamed, so each legacy
+# cadence-named job is deleted below once its replacement is in place.
+scheduler="${service}-analytics-sweep-schedule"
+legacy_scheduler="${service}-analytics-every-10-minutes"
 analytics_schedule="${MCBUSE_ANALYTICS_SCHEDULE:-0 */6 * * *}"
 worker_args="dist/src/analytics-intelligence/worker.js"
 if [[ "${MCBUSE_ANALYTICS_MODE:-sweep}" == "queue" ]]; then
   job="${service}-analytics-queue"
-  scheduler="${service}-analytics-queue-every-minute"
+  scheduler="${service}-analytics-queue-schedule"
+  legacy_scheduler="${service}-analytics-queue-every-minute"
   analytics_schedule="${MCBUSE_ANALYTICS_QUEUE_SCHEDULE:-0 * * * *}"
   worker_args="dist/src/analytics-intelligence/worker.js,--queue"
 fi
@@ -113,6 +116,12 @@ if [[ "$analytics_scheduler_enabled" == "true" ]]; then
   fi
 elif [[ -n "$scheduler_state" && "$scheduler_state" != "PAUSED" ]]; then
   gcloud scheduler jobs pause "$scheduler" --project="$project_id" --location="$region"
+fi
+# Remove the legacy Scheduler job after its replacement is created (or, when
+# scheduling is disabled, so the legacy job cannot keep running on its own).
+if gcloud scheduler jobs describe "$legacy_scheduler" --project="$project_id" --location="$region" >/dev/null 2>&1; then
+  gcloud scheduler jobs delete "$legacy_scheduler" --project="$project_id" --location="$region" --quiet
+  echo "deleted legacy scheduler $legacy_scheduler"
 fi
 
 # A deployment changes the enablement/allowlist. Seed the leased queue once now;

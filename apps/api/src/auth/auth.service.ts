@@ -9,7 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gt, isNull, desc } from 'drizzle-orm';
+import { eq, and, gt, gte, lt, isNull, desc, count, sql } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import { randomInt, randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
@@ -22,6 +22,10 @@ import { SignupDto } from './dto/signup.dto';
 
 const BCRYPT_ROUNDS = 12;
 const RESET_CODE_TTL_MINUTES = 15;
+// A 6-digit code is only safe if guesses are capped: 5 guesses per code and 5
+// codes per user per hour bound an attacker to ~25 guesses/hour out of 900k.
+const RESET_CODE_MAX_ATTEMPTS = 5;
+const RESET_CODES_PER_HOUR = 5;
 
 export interface AuthTokens {
   accessToken: string;
@@ -163,16 +167,47 @@ export class AuthService {
       return;
     }
 
+    const [{ recent }] = await this.db
+      .select({ recent: count() })
+      .from(schema.passwordResetCodes)
+      .where(
+        and(
+          eq(schema.passwordResetCodes.userId, user.id),
+          gte(
+            schema.passwordResetCodes.createdAt,
+            new Date(Date.now() - 60 * 60_000),
+          ),
+        ),
+      );
+    // Silent, like the unknown-identifier case: each new code is a fresh set
+    // of guesses, so issuance has to be capped per user, not just per IP.
+    if (recent >= RESET_CODES_PER_HOUR) {
+      this.logger.warn('Password reset issuance cap hit for user: ' + user.id);
+      return;
+    }
+
     const code = String(randomInt(100000, 1000000));
     const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
     const expiresAt = new Date(Date.now() + RESET_CODE_TTL_MINUTES * 60_000);
     const channel: 'email' | 'phone' = input.email ? 'email' : 'phone';
 
-    await this.db.insert(schema.passwordResetCodes).values({
-      userId: user.id,
-      channel,
-      codeHash,
-      expiresAt,
+    await this.db.transaction(async (tx) => {
+      // Only the newest code is ever valid.
+      await tx
+        .update(schema.passwordResetCodes)
+        .set({ consumedAt: new Date() })
+        .where(
+          and(
+            eq(schema.passwordResetCodes.userId, user.id),
+            isNull(schema.passwordResetCodes.consumedAt),
+          ),
+        );
+      await tx.insert(schema.passwordResetCodes).values({
+        userId: user.id,
+        channel,
+        codeHash,
+        expiresAt,
+      });
     });
 
     if (channel === 'phone' && input.phone) {
@@ -236,17 +271,48 @@ export class AuthService {
       .limit(1);
 
     const candidate = rows[0] ?? null;
-    if (!candidate || !(await bcrypt.compare(input.code, candidate.codeHash))) {
+    if (!candidate) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    // Claim a guess BEFORE comparing. The conditional UPDATE is atomic, so even
+    // parallel requests can't get more than RESET_CODE_MAX_ATTEMPTS compares.
+    const claimed = await this.db
+      .update(schema.passwordResetCodes)
+      .set({ attempts: sql`${schema.passwordResetCodes.attempts} + 1` })
+      .where(
+        and(
+          eq(schema.passwordResetCodes.id, candidate.id),
+          isNull(schema.passwordResetCodes.consumedAt),
+          lt(schema.passwordResetCodes.attempts, RESET_CODE_MAX_ATTEMPTS),
+        ),
+      )
+      .returning({ id: schema.passwordResetCodes.id });
+    if (claimed.length === 0) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    if (!(await bcrypt.compare(input.code, candidate.codeHash))) {
       throw new BadRequestException('Invalid or expired reset code');
     }
 
     const newHash = await bcrypt.hash(input.newPassword, BCRYPT_ROUNDS);
 
     await this.db.transaction(async (tx) => {
-      await tx
+      // Conditional so two concurrent correct submissions can't both reset.
+      const consumed = await tx
         .update(schema.passwordResetCodes)
         .set({ consumedAt: new Date() })
-        .where(eq(schema.passwordResetCodes.id, candidate.id));
+        .where(
+          and(
+            eq(schema.passwordResetCodes.id, candidate.id),
+            isNull(schema.passwordResetCodes.consumedAt),
+          ),
+        )
+        .returning({ id: schema.passwordResetCodes.id });
+      if (consumed.length === 0) {
+        throw new BadRequestException('Invalid or expired reset code');
+      }
 
       await tx
         .update(schema.users)

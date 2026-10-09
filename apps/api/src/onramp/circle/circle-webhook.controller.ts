@@ -9,6 +9,7 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { Public } from '../../auth/decorators/public.decorator';
@@ -23,6 +24,7 @@ interface CircleWebhookBody {
 }
 
 @Public()
+@SkipThrottle()
 @Controller('webhooks/circle')
 export class CircleWebhookController {
   private readonly logger = new Logger(CircleWebhookController.name);
@@ -67,7 +69,11 @@ export class CircleWebhookController {
   private verifySignature(rawBody: Buffer | undefined | null, signature: string) {
     const secret = this.config.get<string>('CIRCLE_WEBHOOK_SECRET');
     if (!secret) {
-      // Sandbox / dev — no secret configured, skip verification
+      // Fail closed: without a secret anyone could forge a "paid" event and
+      // settle an on-ramp. Only local/sandbox dev may skip verification.
+      if (process.env.NODE_ENV === 'production') {
+        throw new UnauthorizedException('Circle webhook verification is not configured');
+      }
       this.logger.warn('CIRCLE_WEBHOOK_SECRET not set — skipping signature verification');
       return;
     }

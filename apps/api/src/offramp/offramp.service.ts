@@ -6,9 +6,12 @@ import {
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, sql, gte } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
+import {
+  findLedgerEntryByKey,
+  ledgerIdempotencyKey,
+} from '../common/idempotency-key';
 import { WalletsService } from '../wallets/wallets.service';
 import type { OffRampProvider } from './offramp-provider.interface';
 import { OFFRAMP_PROVIDER } from './offramp-provider.interface';
@@ -24,7 +27,7 @@ export class OffRampService {
     private readonly walletsService: WalletsService,
   ) {}
 
-  async withdraw(userId: string, dto: InitiateOffRampDto) {
+  async withdraw(userId: string, dto: InitiateOffRampDto, clientKey?: string) {
     if (process.env.MONEY_INITIATION_ENABLED === 'false') throw new BadRequestException('New money movements are temporarily disabled');
     const amount = BigInt(dto.amount);
     if (amount <= 0n) throw new BadRequestException('Amount must be positive');
@@ -35,7 +38,22 @@ export class OffRampService {
     const savings = wallets['savings'];
     if (!savings) throw new BadRequestException('Savings wallet not found');
 
-    const idempotencyKey = randomUUID();
+    const idempotencyKey = ledgerIdempotencyKey('offramp', userId, clientKey);
+
+    // A retry of a withdrawal that already went through: return the original
+    // result instead of paying out (and debiting) a second time.
+    const prior = await findLedgerEntryByKey(this.db, idempotencyKey);
+    if (prior) {
+      const meta = JSON.parse(prior.metadata ?? '{}') as Record<string, string | null>;
+      return {
+        externalId: meta.externalId,
+        status: prior.status,
+        amount: prior.amount.toString(),
+        currency: prior.currency,
+        estimatedSettlement: meta.estimatedSettlement ?? null,
+        balance: await this.walletsService.getBalance(userId, 'savings', prior.currency),
+      };
+    }
 
     // Call provider first (external call — outside DB transaction)
     const result = await this.provider.initiateOffRamp({

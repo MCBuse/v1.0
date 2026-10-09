@@ -42,6 +42,9 @@ FROM base AS runner
 
 ENV NODE_ENV=production
 ENV PORT=4000
+# Cap the V8 heap below the 512Mi instance limit so Node GCs harder instead of
+# being OOM-killed by Cloud Run.
+ENV NODE_OPTIONS=--max-old-space-size=384
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
@@ -53,4 +56,6 @@ WORKDIR /app/apps/api
 
 EXPOSE 4000
 
-CMD ["node", "dist/src/main.js"]
+USER node
+
+CMD ["node", "--enable-source-maps", "dist/src/main.js"]

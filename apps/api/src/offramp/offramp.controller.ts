@@ -8,10 +8,12 @@ import {
   Get,
   Param,
   Query,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { OffRampService } from './offramp.service';
 import { InitiateOffRampDto } from './dto/initiate-offramp.dto';
+import { optionalIdempotencyKey } from '../common/idempotency-key';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 import { OfframpSessionsService } from './offramp-sessions.service';
@@ -56,8 +58,13 @@ export class OffRampController {
   withdraw(
     @CurrentUser() user: { id: string },
     @Body() dto: InitiateOffRampDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.offRampService.withdraw(user.id, dto);
+    return this.offRampService.withdraw(
+      user.id,
+      dto,
+      optionalIdempotencyKey(idempotencyKey),
+    );
   }
 
   @Post('sessions')

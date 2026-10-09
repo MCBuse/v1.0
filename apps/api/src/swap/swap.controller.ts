@@ -5,11 +5,13 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SwapService } from './swap.service';
 import { PreviewSwapDto } from './dto/preview-swap.dto';
 import { ExecuteSwapDto } from './dto/execute-swap.dto';
+import { optionalIdempotencyKey } from '../common/idempotency-key';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 
@@ -46,7 +48,12 @@ export class SwapController {
   execute(
     @CurrentUser() user: { id: string },
     @Body() dto: ExecuteSwapDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.swapService.execute(user.id, dto);
+    return this.swapService.execute(
+      user.id,
+      dto,
+      optionalIdempotencyKey(idempotencyKey),
+    );
   }
 }

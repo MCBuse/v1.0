@@ -28,7 +28,7 @@ pnpm analytics:run
 
 The command waits for the Cloud Run execution to finish. It defaults to project `mcbuse-hackathon-2026-fno`, region `europe-west1`, and job `mcbuse-api-analytics`. Override these with `MCBUSE_GCP_PROJECT_ID`, `MCBUSE_GCP_REGION`, and `MCBUSE_RUN_SERVICE` as needed. Google Cloud Console's Cloud Run job page also offers **Execute**.
 
-The deployment script defaults to `MCBUSE_ANALYTICS_SCHEDULER_ENABLED=true` and cron expression `0 */6 * * *`. Set that flag to `false` to pause, or override `MCBUSE_ANALYTICS_SCHEDULE` to change the interval. The existing Scheduler resource retains its historical `every-10-minutes` name to avoid duplicate jobs.
+The deployment script defaults to `MCBUSE_ANALYTICS_SCHEDULER_ENABLED=true` and cron expression `0 */6 * * *`. Set that flag to `false` to pause, or override `MCBUSE_ANALYTICS_SCHEDULE` to change the interval. The Scheduler jobs are `mcbuse-api-analytics-sweep-schedule` and `mcbuse-api-analytics-queue-schedule`; the deploy script deletes the older cadence-named jobs (`…-every-10-minutes`, `…-queue-every-minute`) once their replacements exist.
 
 `MERCHANT_INTELLIGENCE_STALE_AFTER_MINUTES` controls when the insights API marks data delayed. Its default is 375 minutes: six hours plus a 15-minute execution grace period. Existing insights retain their actual calculation timestamp; a manual run refreshes them sooner. Keep this threshold longer than the chosen schedule.
 

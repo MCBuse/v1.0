@@ -1,4 +1,5 @@
 import { http } from '@/lib/api';
+import { finishMoneyIntent, moneyIntent } from '@/lib/api/money-intent';
 
 import {
   swapPreviewResponse,
@@ -16,7 +17,12 @@ export const swapRepository = {
   },
 
   async execute(input: SwapExecuteInput): Promise<SwapExecuteResponse> {
-    const raw = await http.post<unknown>('/swap', input);
+    // Same key on every retry of this swap, so a lost response can't swap twice.
+    const intent = await moneyIntent('swap', input);
+    const raw = await http.post<unknown>('/swap', input, {
+      headers: { 'Idempotency-Key': intent.key },
+    });
+    await finishMoneyIntent('swap');
     return swapExecuteResponse.parse(raw);
   },
 };

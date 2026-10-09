@@ -25,16 +25,7 @@ import {
   StartTransferDto,
   StartWithdrawalDto,
 } from './dto/account-operations.dto';
-
-function requireIdempotencyKey(key: string | undefined): string {
-  if (!key || key.trim().length === 0) {
-    throw new BadRequestException('Idempotency-Key header is required');
-  }
-  if (key.length > 128) {
-    throw new BadRequestException('Idempotency-Key is too long');
-  }
-  return key.trim();
-}
+import { requireIdempotencyKey } from '../common/idempotency-key';
 
 function parseCents(value: string): bigint {
   let amount: bigint;

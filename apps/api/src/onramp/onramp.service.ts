@@ -4,6 +4,10 @@ import { eq, and, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
+import {
+  findLedgerEntryByKey,
+  ledgerIdempotencyKey,
+} from '../common/idempotency-key';
 import { LedgerService } from '../ledger/ledger.service';
 import { WalletsService } from '../wallets/wallets.service';
 import type { OnRampProvider } from './onramp-provider.interface';
@@ -24,7 +28,7 @@ export class OnRampService {
     private readonly circleClient: CircleClient,
   ) {}
 
-  async initiate(userId: string, dto: InitiateOnRampDto) {
+  async initiate(userId: string, dto: InitiateOnRampDto, clientKey?: string) {
     if (process.env.MONEY_INITIATION_ENABLED === 'false') throw new BadRequestException('New money movements are temporarily disabled');
     const amount = BigInt(dto.amount);
     if (amount <= 0n) throw new BadRequestException('Amount must be positive');
@@ -36,7 +40,21 @@ export class OnRampService {
     const savings = wallets['savings'];
     if (!savings) throw new BadRequestException('Savings wallet not found');
 
-    const idempotencyKey = randomUUID();
+    const idempotencyKey = ledgerIdempotencyKey('onramp', userId, clientKey);
+
+    // A retry of an on-ramp that was already recorded: return it (with its
+    // current status) instead of charging the card again.
+    const prior = await findLedgerEntryByKey(this.db, idempotencyKey);
+    if (prior) {
+      const meta = JSON.parse(prior.metadata ?? '{}') as Record<string, string>;
+      return {
+        externalId: meta.externalId,
+        status: prior.status,
+        amount: prior.amount.toString(),
+        currency: prior.currency,
+        balance: await this.walletsService.getBalance(userId, 'savings', prior.currency),
+      };
+    }
 
     const result = await this.provider.initiateOnRamp({
       walletId: savings.id,

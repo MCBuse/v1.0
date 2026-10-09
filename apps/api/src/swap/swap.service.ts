@@ -6,9 +6,12 @@ import {
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, sql, gte } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
+import {
+  findLedgerEntryByKey,
+  ledgerIdempotencyKey,
+} from '../common/idempotency-key';
 import { WalletsService } from '../wallets/wallets.service';
 import { RatesService } from '../rates/rates.service';
 import type { SwapProvider } from './swap-provider.interface';
@@ -64,7 +67,8 @@ export class SwapService {
    * Execute the swap inside the caller's savings wallet.
    * Atomically deducts fromCurrency and credits toCurrency in a single DB transaction.
    */
-  async execute(userId: string, dto: ExecuteSwapDto) {
+  async execute(userId: string, dto: ExecuteSwapDto, clientKey?: string) {
+    if (process.env.MONEY_INITIATION_ENABLED === 'false') throw new BadRequestException('New money movements are temporarily disabled');
     const fromCurrency = dto.fromCurrency.toUpperCase();
     const toCurrency = dto.toCurrency.toUpperCase();
     this.validatePair(fromCurrency, toCurrency);
@@ -75,7 +79,12 @@ export class SwapService {
     const savings = wallets['savings'];
     if (!savings) throw new BadRequestException('Savings wallet not found');
 
-    const idempotencyKey = randomUUID();
+    const idempotencyKey = ledgerIdempotencyKey('swap', userId, clientKey);
+
+    // A retry of a swap that already settled: return the original result
+    // instead of swapping again.
+    const prior = await findLedgerEntryByKey(this.db, idempotencyKey);
+    if (prior) return this.replay(userId, prior);
 
     // Get live rate (outside transaction — read-only)
     const liveRate = this.ratesService.getRate(fromCurrency, toCurrency);
@@ -100,7 +109,11 @@ export class SwapService {
       );
     }
 
-    // Atomic DB transaction: deduct source, credit target, record ledger
+    // Atomic DB transaction: deduct source, credit target, record ledger.
+    // ponytail: two concurrent requests with the same key can both reach the
+    // provider; the unique ledger key lets only one commit (the other rolls
+    // back with a 500 and its retry gets the replay). Real DEX providers get
+    // the key too and should dedupe on it.
     await this.db.transaction(async (tx) => {
       // Deduct fromCurrency (gte guard prevents overdraft — no race condition)
       const deducted = await tx
@@ -151,6 +164,7 @@ export class SwapService {
         toAmount: swapResult.toAmount.toString(),
         rate: liveRate.toFixed(6),
         fee: swapResult.fee.toString(),
+        feeCurrency: swapResult.feeCurrency,
         externalId: swapResult.externalId,
       });
       await tx.insert(schema.ledgerEntries).values([
@@ -206,6 +220,32 @@ export class SwapService {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
+
+  private async replay(
+    userId: string,
+    entry: typeof schema.ledgerEntries.$inferSelect,
+  ) {
+    const meta = JSON.parse(entry.metadata ?? '{}') as Record<string, string>;
+    const [fromBalance, toBalance] = await Promise.all([
+      this.walletsService.getBalance(userId, 'savings', meta.fromCurrency),
+      this.walletsService.getBalance(userId, 'savings', meta.toCurrency),
+    ]);
+    return {
+      fromCurrency: meta.fromCurrency,
+      toCurrency: meta.toCurrency,
+      fromAmount: meta.fromAmount,
+      toAmount: meta.toAmount,
+      rate: meta.rate,
+      fee: meta.fee,
+      feeCurrency: meta.feeCurrency,
+      externalId: meta.externalId,
+      status: entry.status,
+      balances: {
+        [meta.fromCurrency]: fromBalance,
+        [meta.toCurrency]: toBalance,
+      },
+    };
+  }
 
   private validatePair(from: string, to: string) {
     if (from === to) {

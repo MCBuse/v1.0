@@ -1,8 +1,9 @@
-import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, Headers, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OnRampService } from './onramp.service';
 import { InitiateOnRampDto } from './dto/initiate-onramp.dto';
 import { CreateCardDto } from './dto/create-card.dto';
+import { optionalIdempotencyKey } from '../common/idempotency-key';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
 
@@ -19,8 +20,13 @@ export class OnRampController {
   initiate(
     @CurrentUser() user: { id: string },
     @Body() dto: InitiateOnRampDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.onRampService.initiate(user.id, dto);
+    return this.onRampService.initiate(
+      user.id,
+      dto,
+      optionalIdempotencyKey(idempotencyKey),
+    );
   }
 
   @Get('encryption-key')

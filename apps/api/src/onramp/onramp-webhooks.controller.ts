@@ -10,6 +10,7 @@ import {
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import { OnrampSessionsService } from './onramp-sessions.service';
 import { MoonpayWidgetProvider } from './widget/moonpay-widget.provider';
@@ -22,6 +23,7 @@ import { AccountsWebhookService } from '../accounts/accounts-webhook.service';
 type ReqWithRaw = { rawBody?: Buffer };
 
 @Public()
+@SkipThrottle()
 @Controller()
 export class OnrampWebhooksController {
   private readonly logger = new Logger(OnrampWebhooksController.name);

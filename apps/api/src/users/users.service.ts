@@ -9,6 +9,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
+import { pgError, isUniqueViolation } from '../common/pg-error';
 
 export const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 export const RESERVED_USERNAMES = new Set([
@@ -55,7 +56,9 @@ export class UsersService {
     const results = await this.db
       .select()
       .from(schema.users)
-      .where(and(eq(schema.users.email, email), isNull(schema.users.deletedAt)));
+      .where(
+        and(eq(schema.users.email, email), isNull(schema.users.deletedAt)),
+      );
     return results[0] ?? null;
   }
 
@@ -63,7 +66,9 @@ export class UsersService {
     const results = await this.db
       .select()
       .from(schema.users)
-      .where(and(eq(schema.users.phone, phone), isNull(schema.users.deletedAt)));
+      .where(
+        and(eq(schema.users.phone, phone), isNull(schema.users.deletedAt)),
+      );
     return results[0] ?? null;
   }
 
@@ -100,7 +105,12 @@ export class UsersService {
         isActive: schema.users.isActive,
       })
       .from(schema.users)
-      .where(and(eq(schema.users.username, username), isNull(schema.users.deletedAt)))
+      .where(
+        and(
+          eq(schema.users.username, username),
+          isNull(schema.users.deletedAt),
+        ),
+      )
       .limit(1);
     return results[0] ?? null;
   }
@@ -150,13 +160,8 @@ export class UsersService {
         });
       return results[0];
     } catch (err: unknown) {
-      if (
-        typeof err === 'object' &&
-        err !== null &&
-        'code' in err &&
-        (err as { code: string }).code === '23505'
-      ) {
-        const constraint = (err as { constraint?: string }).constraint ?? '';
+      if (isUniqueViolation(err)) {
+        const constraint = pgError(err)?.constraint ?? '';
         if (constraint.includes('username')) {
           throw new ConflictException({
             message: 'Username is not available',
@@ -174,7 +179,8 @@ export class UsersService {
     excludeUserId?: string,
   ): Promise<UsernameAvailability> {
     const username = this.normalizeUsername(usernameInput);
-    const invalid = !USERNAME_PATTERN.test(username) || RESERVED_USERNAMES.has(username);
+    const invalid =
+      !USERNAME_PATTERN.test(username) || RESERVED_USERNAMES.has(username);
     if (invalid) {
       return {
         username,
@@ -187,13 +193,20 @@ export class UsersService {
     return {
       username,
       available,
-      suggestions: available ? [] : await this.suggestUsernames(username, excludeUserId),
+      suggestions: available
+        ? []
+        : await this.suggestUsernames(username, excludeUserId),
     };
   }
 
   async updateProfile(
     userId: string,
-    data: { firstName?: string; lastName?: string; username?: string; primaryCurrency?: 'USDC' | 'EURC' },
+    data: {
+      firstName?: string;
+      lastName?: string;
+      username?: string;
+      primaryCurrency?: 'USDC' | 'EURC';
+    },
   ) {
     const update: Partial<typeof schema.users.$inferInsert> = {
       updatedAt: new Date(),
@@ -204,7 +217,10 @@ export class UsersService {
 
     if (data.username !== undefined) {
       const username = this.validateUsername(data.username);
-      const availability = await this.checkUsernameAvailability(username, userId);
+      const availability = await this.checkUsernameAvailability(
+        username,
+        userId,
+      );
       if (!availability.available) {
         throw new ConflictException({
           message: 'Username is not available',
@@ -241,20 +257,27 @@ export class UsersService {
     return rows[0];
   }
 
-  async suggestUsernames(usernameInput: string, excludeUserId?: string): Promise<string[]> {
+  async suggestUsernames(
+    usernameInput: string,
+    excludeUserId?: string,
+  ): Promise<string[]> {
     const normalized = this.normalizeUsername(usernameInput);
     const clean = normalized
       .replace(/[^a-z0-9_]/g, '_')
       .replace(/_+/g, '_')
       .replace(/^_+|_+$/g, '');
-    const base = (clean.length >= 3 ? clean : `${clean}user`).slice(0, 30) || 'user';
+    const base =
+      (clean.length >= 3 ? clean : `${clean}user`).slice(0, 30) || 'user';
     const suggestions: string[] = [];
 
     for (let suffix = 1; suggestions.length < 3 && suffix <= 999; suffix += 1) {
       const suffixText = String(suffix);
       const stem = base.slice(0, 30 - suffixText.length);
       const candidate = `${stem}${suffixText}`;
-      if (!USERNAME_PATTERN.test(candidate) || RESERVED_USERNAMES.has(candidate)) {
+      if (
+        !USERNAME_PATTERN.test(candidate) ||
+        RESERVED_USERNAMES.has(candidate)
+      ) {
         continue;
       }
       if (await this.isUsernameAvailable(candidate, excludeUserId)) {
@@ -265,11 +288,19 @@ export class UsersService {
     return suggestions;
   }
 
-  private async isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
+  private async isUsernameAvailable(
+    username: string,
+    excludeUserId?: string,
+  ): Promise<boolean> {
     const rows = await this.db
       .select({ id: schema.users.id })
       .from(schema.users)
-      .where(and(eq(schema.users.username, username), isNull(schema.users.deletedAt)))
+      .where(
+        and(
+          eq(schema.users.username, username),
+          isNull(schema.users.deletedAt),
+        ),
+      )
       .limit(1);
 
     const owner = rows[0] ?? null;

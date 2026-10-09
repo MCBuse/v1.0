@@ -13,6 +13,8 @@ export class StripeClient {
     this.stripe = new Stripe(secretKey, {
       apiVersion: '2026-04-22.dahlia',
       typescript: true,
+      // SDK default is 80s — longer than Cloud Run's 60s request timeout.
+      timeout: 15_000,
       appInfo: {
         name: 'mcbuse-api',
         version: '0.1.0',

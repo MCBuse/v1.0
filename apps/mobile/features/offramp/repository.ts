@@ -1,4 +1,5 @@
 import { http } from '@/lib/api';
+import { finishMoneyIntent, moneyIntent } from '@/lib/api/money-intent';
 
 import {
   createOfframpSessionResponseSchema,
@@ -24,7 +25,11 @@ import {
 
 export const offrampRepository = {
   async initiateOfframp(input: OfframpInput): Promise<OfframpResponse> {
-    const raw = await http.post<unknown>('/offramp', input);
+    const intent = await moneyIntent('offramp', input);
+    const raw = await http.post<unknown>('/offramp', input, {
+      headers: { 'Idempotency-Key': intent.key },
+    });
+    await finishMoneyIntent('offramp');
     return offrampResponse.parse(raw);
   },
 

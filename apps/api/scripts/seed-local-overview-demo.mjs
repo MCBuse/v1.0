@@ -400,7 +400,7 @@ async function fundPayer(db, euroCents) {
 // The customer pays from their routine wallet. A float covers the next few
 // payments; when it runs low the merchant sends what it has received back to
 // the customer, so a small amount of test USDC can carry a month of sales.
-const BASE_UNITS_PER_EURO_CENT = 11_500n; // EUR → USDC base units, with FX headroom
+const BASE_UNITS_PER_EURO_CENT = 13_000n; // EUR → USDC base units, with headroom for a strong euro
 let payerAvailable = 0n;
 
 async function routineAvailable(as) {
@@ -427,24 +427,58 @@ async function waitFor(check, label, timeoutMs = 15 * 60_000, everyMs = 5_000) {
  * Sandbox: funds the customer's holding account with a Stripe test checkout
  * (a person completes it in the browser), then moves it to routine.
  */
-async function fundPayerSandbox(floatBaseUnits) {
+// On the hosted platform the final step of a funding or an account transfer
+// (crediting the balance) is done by the scheduled financial-recovery job, so
+// a balance only moves when that job runs. See docs/demo-merchant-seeding.md.
+const RECOVERY_HINT =
+  'Balances are credited by the financial-recovery job. Run it now with\n' +
+  '    gcloud run jobs execute mcbuse-api-financial-recovery --project=$MCBUSE_GCP_PROJECT_ID --region=europe-west1 --wait\n' +
+  '  or set its schedule to every minute for the seeding window (see docs/demo-merchant-seeding.md).';
+
+async function fundPayerSandbox(floatBaseUnits, manifest) {
   payerAvailable = await routineAvailable(payerToken);
   if (payerAvailable >= floatBaseUnits / 2n) return;
-  if ((await holdingAvailable(payerToken)) < floatBaseUnits) {
-    const amountCents = String((floatBaseUnits + 9_999n) / 10_000n); // USDC base units → USD cents
-    const started = await call('POST', '/accounts/funding', { method: 'card', amountCents },
-      { 'idempotency-key': uuidFrom(`${KEY_PREFIX}:funding:${PAYER_EMAIL}:${amountCents}:${new Date().toISOString().slice(0, 13)}`) }, 0, payerToken);
-    if (!started?.checkoutUrl) throw new Error(`Funding did not return a checkout link: ${JSON.stringify(started).slice(0, 300)}`);
-    console.log('\n  ACTION NEEDED: open this Stripe test checkout and pay it with a Stripe test card:');
-    console.log(`  ${started.checkoutUrl}`);
-    console.log('  Waiting for the test USDC to arrive (up to 15 minutes)…');
-    await waitFor(async () => (await holdingAvailable(payerToken)) >= floatBaseUnits - 10_000n, 'the customer funding');
+  // On a re-run most of the float usually sits with the merchant, which
+  // received it; the paybacks in the sales loop hand it back. Only fund when
+  // the float itself is gone.
+  const merchantHas = await routineAvailable(token);
+  if (payerAvailable + merchantHas >= floatBaseUnits / 4n) {
+    console.log(`  reusing the float: customer ${(Number(payerAvailable) / 1e6).toFixed(2)} USDC, merchant ${(Number(merchantHas) / 1e6).toFixed(2)} USDC`);
+    return;
   }
-  const holding = await holdingAvailable(payerToken);
-  const cents = String(holding / 10_000n);
-  await call('POST', '/accounts/transfers', { from: 'holding', to: 'routine', amountCents: cents },
-    { 'idempotency-key': uuidFrom(`${KEY_PREFIX}:h2r:${PAYER_EMAIL}:${Date.now()}`) }, 0, payerToken);
-  await waitFor(async () => (payerAvailable = await routineAvailable(payerToken)) >= floatBaseUnits / 2n, 'the holding → routine transfer', 5 * 60_000);
+  // A transfer already under way means the funding is done; don't fund twice.
+  if (!manifest.transfer && (await holdingAvailable(payerToken)) < floatBaseUnits - 10_000n) {
+    const amountCents = String((floatBaseUnits + 9_999n) / 10_000n); // USDC base units → USD cents
+    // One funding per seed run: a re-run replays the same operation (and its
+    // checkout link) instead of starting a second payment.
+    manifest.fundingKey ??= uuidFrom(`${KEY_PREFIX}:funding:${PAYER_EMAIL}:${amountCents}:${Date.now()}`);
+    writeManifest(manifest);
+    const started = await call('POST', '/accounts/funding', { method: 'card', amountCents },
+      { 'idempotency-key': manifest.fundingKey }, 0, payerToken);
+    if (!['finalized', 'chain_confirmed', 'chain_submitted', 'collection_settled'].includes(started?.status)) {
+      if (!started?.checkoutUrl) throw new Error(`Funding did not return a checkout link: ${JSON.stringify(started).slice(0, 300)}`);
+      console.log('\n  ACTION NEEDED: open this Stripe test checkout and pay it with a Stripe test card:');
+      console.log(`  ${started.checkoutUrl}`);
+    }
+    console.log(`\n  Waiting for the ${Number(amountCents) / 100} test USDC to reach the customer's holding balance (up to 90 minutes).`);
+    console.log(`  ${RECOVERY_HINT}`);
+    await waitFor(async () => (await holdingAvailable(payerToken)) >= floatBaseUnits - 10_000n, 'the customer funding', 90 * 60_000, 15_000);
+    delete manifest.fundingKey;
+    writeManifest(manifest);
+  }
+  // Remembered, so a re-run replays the same transfer rather than starting another.
+  manifest.transfer ??= {
+    key: uuidFrom(`${KEY_PREFIX}:h2r:${PAYER_EMAIL}:${Date.now()}`),
+    cents: String((await holdingAvailable(payerToken)) / 10_000n),
+  };
+  writeManifest(manifest);
+  await call('POST', '/accounts/transfers', { from: 'holding', to: 'routine', amountCents: manifest.transfer.cents },
+    { 'idempotency-key': manifest.transfer.key }, 0, payerToken);
+  console.log('  Moving it from holding to routine…');
+  await waitFor(async () => (payerAvailable = await routineAvailable(payerToken)) >= floatBaseUnits / 2n,
+    `the holding → routine transfer. ${RECOVERY_HINT}`, 90 * 60_000, 15_000);
+  delete manifest.transfer;
+  writeManifest(manifest);
   console.log(`  customer float: ${(Number(payerAvailable) / 1e6).toFixed(2)} USDC`);
 }
 
@@ -477,34 +511,50 @@ async function recordDigitalSale(sale, lines, manifest, productIds) {
   const existing = manifest.digital[sale.key];
   if (existing?.status === 'completed') return existing;
   let invoice = existing?.requestId ? await call('GET', `/merchants/me/invoices/${existing.requestId}`) : null;
-  if (!invoice || ['expired', 'cancelled', 'failed'].includes(invoice.status)) {
-    const body = { lines, ...(sale.note ? { description: sale.note } : {}), expiresInSeconds: 3600 };
-    try {
-      invoice = await call('POST', '/merchants/me/invoices', body);
-    } catch (e) {
-      if (!(e.status === 409 && /stock/i.test(e.message))) throw e;
-      for (const l of sale.lines) if (l.sku)
-        await call('POST', `/merchants/me/products/${productIds[l.sku]}/stock-adjustments`, { reason: 'restock', change: 50 });
-      invoice = await call('POST', '/merchants/me/invoices', body);
+  // A few attempts: an invoice whose payment failed or expired is replaced.
+  for (let attempt = 0; attempt < 3 && invoice?.status !== 'completed'; attempt++) {
+    if (!invoice || ['expired', 'cancelled', 'failed'].includes(invoice.status)) {
+      const body = { lines, ...(sale.note ? { description: sale.note } : {}), expiresInSeconds: 3600 };
+      try {
+        invoice = await call('POST', '/merchants/me/invoices', body);
+      } catch (e) {
+        if (!(e.status === 409 && /stock/i.test(e.message))) throw e;
+        for (const l of sale.lines) if (l.sku)
+          await call('POST', `/merchants/me/products/${productIds[l.sku]}/stock-adjustments`, { reason: 'restock', change: 50 });
+        invoice = await call('POST', '/merchants/me/invoices', body);
+      }
+      manifest.digital[sale.key] = { requestId: invoice.id, occurredAt: sale.occurredAt.toISOString(), status: invoice.status, backdated: false };
+      writeManifest(manifest);
     }
-    manifest.digital[sale.key] = { requestId: invoice.id, occurredAt: sale.occurredAt.toISOString(), status: invoice.status, backdated: false };
-    writeManifest(manifest);
-  }
-  if (invoice.status !== 'completed') {
-    const nonce = new URL(invoice.qrPayload).searchParams.get('nonce');
-    const paid = await call('POST', '/payments', { nonce, idempotencyKey: uuidFrom(`${sale.key}:pay`) }, {}, 0, payerToken);
-    // A settled payment says so; otherwise wait for the invoice to settle.
-    // (The backdate step re-checks every one is completed in the database.)
-    if (paid?.status === 'completed') invoice = { ...invoice, status: 'completed' };
+    // Only an unpaid invoice is paid; one already processing is just awaited.
+    // The key is per invoice, so a retry reuses it and a replacement gets its own.
+    if (invoice.status === 'pending') {
+      const nonce = new URL(invoice.qrPayload).searchParams.get('nonce');
+      try {
+        const key = uuidFrom(`${sale.key}:pay:${invoice.id}${attempt ? `:${attempt}` : ''}`);
+        const paid = await call('POST', '/payments', { nonce, idempotencyKey: key }, {}, 0, payerToken);
+        if (paid?.status === 'completed') invoice = { ...invoice, status: 'completed' };
+      } catch (e) {
+        // The float estimate was short (exchange rate): pay back, then try again.
+        if (e.status === 400 && /insufficient balance/i.test(e.message)) {
+          await payBack(BigInt(invoice.amount?.minor ?? '0') * BASE_UNITS_PER_EURO_CENT);
+          continue;
+        }
+        // An earlier run may already have submitted this payment; the invoice says how it ended.
+        if (!(e.status === 400 && /idempotency|no longer pending|already/i.test(e.message))) throw e;
+        console.log(`\n  ${sale.key}: payment already submitted earlier (${e.message.slice(0, 80)}…); checking the invoice`);
+      }
+    }
     // Devnet settlement can take a while; mock settles at once.
-    const until = Date.now() + (MODE === 'sandbox' ? 120_000 : 15_000);
-    while (invoice.status !== 'completed' && invoice.status !== 'failed' && Date.now() < until) {
+    const until = Date.now() + (MODE === 'sandbox' ? 180_000 : 15_000);
+    while (!['completed', 'failed', 'expired', 'cancelled'].includes(invoice.status) && Date.now() < until) {
+      if (MODE === 'sandbox') await sleep(2_000);
       invoice = await call('GET', `/merchants/me/invoices/${invoice.id}`);
-      if (invoice.status !== 'completed' && MODE === 'sandbox') await sleep(1_500);
+      if (invoice.status === 'pending') break; // never paid: pay it on the next attempt
     }
   }
-  if (invoice.status !== 'completed')
-    throw new Error(`Digital sale ${sale.key} ended as "${invoice.status}". ${MODE === 'mock' ? ' Is the API running with TRANSFER_PROVIDER=mock?' : ''}`);
+  if (invoice?.status !== 'completed')
+    throw new Error(`Digital sale ${sale.key} ended as "${invoice?.status}".${MODE === 'mock' ? ' Is the API running with TRANSFER_PROVIDER=mock?' : ' Re-running continues from here.'}`);
   manifest.digital[sale.key] = { ...manifest.digital[sale.key], status: 'completed' };
   return manifest.digital[sale.key];
 }
@@ -704,7 +754,7 @@ async function main() {
       const largest = Math.max(...digitalToPay.map(saleCents));
       if (BigInt(largest) * BASE_UNITS_PER_EURO_CENT > floatBaseUnits)
         throw new Error(`The largest digital sale (€${(largest / 100).toFixed(2)}) is more than the --float-usdc of ${FLOAT_USDC}; raise it.`);
-      if (MODE === 'sandbox') await fundPayerSandbox(floatBaseUnits);
+      if (MODE === 'sandbox') await fundPayerSandbox(floatBaseUnits, manifest);
       else if (arg('float-usdc', null) !== null) {
         // A deliberately small float exercises the payback loop locally.
         await fundPayer(db, Number(floatBaseUnits / BASE_UNITS_PER_EURO_CENT));

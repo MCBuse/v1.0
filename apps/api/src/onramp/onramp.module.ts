@@ -27,7 +27,7 @@ import { AccountsModule } from '../accounts/accounts.module';
 @Module({
   imports: [
     forwardRef(() => AccountsModule),
-    HttpModule,
+    HttpModule.register({ timeout: 10_000 }),
     ConfigModule,
     LedgerModule,
     WalletsModule,

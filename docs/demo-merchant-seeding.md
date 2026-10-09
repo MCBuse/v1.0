@@ -39,6 +39,12 @@ export DATABASE_URL="$(gcloud secrets versions access latest --secret=DATABASE_U
 export DATABASE_SSL=no-verify
 DB_HOST="$(node -e 'console.log(new URL(process.argv[1]).hostname)' "$DATABASE_URL")"
 
+# 0. Let the financial-recovery job run every minute while seeding. It credits
+#    fundings and account transfers and settles slow payments; by default it
+#    runs hourly, which would stall the seed for up to an hour at each step.
+gcloud scheduler jobs update http mcbuse-api-financial-recovery-schedule \
+  --project=$MCBUSE_GCP_PROJECT_ID --location=europe-west1 --schedule='* * * * *'
+
 # 1. The demo login (skip if it already exists)
 curl -s -X POST https://api.mcbuse.com/api/v1/auth/signup \
   -H 'content-type: application/json' \
@@ -61,7 +67,16 @@ Early in step 3 the script prints a **Stripe test checkout link**. Open it and p
 Stripe test card (for example `4242 4242 4242 4242`, any future date, any CVC). The script
 waits until the 45 test USDC has arrived, then carries on.
 
-Then sign in at https://merchant.mcbuse.com as `e.aci@mcbuse.com`.
+Then sign in at https://merchant.mcbuse.com as `e.aci@mcbuse.com`, and put the recovery
+job back on its normal cadence:
+
+```bash
+gcloud scheduler jobs update http mcbuse-api-financial-recovery-schedule \
+  --project=$MCBUSE_GCP_PROJECT_ID --location=europe-west1 --schedule='0 * * * *'
+```
+
+If the script is waiting for a balance, you can also run the job once by hand:
+`gcloud run jobs execute mcbuse-api-financial-recovery --project=$MCBUSE_GCP_PROJECT_ID --region=europe-west1 --wait`.
 
 ## Notes
 

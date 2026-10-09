@@ -5,8 +5,11 @@ project_id="${MCBUSE_GCP_PROJECT_ID:?Set MCBUSE_GCP_PROJECT_ID}"
 region="${MCBUSE_GCP_REGION:-europe-west1}"
 service="${MCBUSE_RUN_SERVICE:-mcbuse-api}"
 job="${service}-financial-recovery"
-scheduler="${job}-every-minute"
-# Preserve the Scheduler ID; pre-user deployments default to the low-cost cadence.
+# Cadence-neutral Scheduler ID. Scheduler IDs cannot be renamed, so the legacy
+# "-every-minute" job (named when recovery ran every minute) is deleted below once
+# this one exists. Pre-user deployments default to the low-cost hourly cadence.
+scheduler="${job}-schedule"
+legacy_scheduler="${job}-every-minute"
 # Set MCBUSE_RECOVERY_SCHEDULE='* * * * *' for an active payment acceptance window.
 recovery_schedule="${MCBUSE_RECOVERY_SCHEDULE:-0 * * * *}"
 scheduler_account="${MCBUSE_ANALYTICS_SCHEDULER_ACCOUNT:-mcbuse-analytics-scheduler}@${project_id}.iam.gserviceaccount.com"
@@ -42,4 +45,9 @@ fi
 echo "recovery_schedule=$recovery_schedule"
 if [[ "$(gcloud scheduler jobs describe "$scheduler" --project="$project_id" --location="$region" --format='value(state)')" == "PAUSED" ]]; then
   gcloud scheduler jobs resume "$scheduler" --project="$project_id" --location="$region"
+fi
+# Remove the legacy Scheduler job only after its replacement is created and enabled.
+if gcloud scheduler jobs describe "$legacy_scheduler" --project="$project_id" --location="$region" >/dev/null 2>&1; then
+  gcloud scheduler jobs delete "$legacy_scheduler" --project="$project_id" --location="$region" --quiet
+  echo "deleted legacy scheduler $legacy_scheduler"
 fi

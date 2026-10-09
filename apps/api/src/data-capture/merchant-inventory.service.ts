@@ -34,6 +34,7 @@ import {
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
+import { isUniqueViolation } from '../common/pg-error';
 import { RatesService } from '../rates/rates.service';
 import {
   decimalRateToScaled,
@@ -813,12 +814,7 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
       error instanceof ConflictException
     )
       throw error;
-    if (
-      typeof error === 'object' &&
-      error &&
-      'code' in error &&
-      (error as { code?: string }).code === '23505'
-    ) {
+    if (isUniqueViolation(error)) {
       throw new ConflictException('A product with that SKU already exists');
     }
     throw error;

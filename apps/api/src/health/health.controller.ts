@@ -1,10 +1,12 @@
 import { Controller, Get, Inject } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import * as databaseProvider from '../database/database.provider';
 import { sql } from 'drizzle-orm';
 
 @ApiTags('health')
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
   constructor(
