@@ -32,7 +32,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => (
-            <Home2 size={24} color={color} variant="Linear" />
+            <Home2 size={24} color={color as string} variant="Linear" />
           ),
         }}
       />
@@ -41,7 +41,7 @@ export default function TabLayout() {
         options={{
           title: 'Activity',
           tabBarIcon: ({ color }) => (
-            <Clock size={24} color={color} variant="Linear" />
+            <Clock size={24} color={color as string} variant="Linear" />
           ),
         }}
       />
@@ -50,7 +50,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => (
-            <ProfileCircle size={24} color={color} variant="Linear" />
+            <ProfileCircle size={24} color={color as string} variant="Linear" />
           ),
         }}
       />
@@ -59,7 +59,7 @@ export default function TabLayout() {
         options={{
           title: 'Store',
           tabBarIcon: ({ color }) => (
-            <Shop size={24} color={color} variant="Linear" />
+            <Shop size={24} color={color as string} variant="Linear" />
           ),
         }}
       />

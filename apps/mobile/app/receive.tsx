@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   paddedText: { paddingHorizontal: 24, marginBottom: 8 },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems:      'center',
     justifyContent:  'center',

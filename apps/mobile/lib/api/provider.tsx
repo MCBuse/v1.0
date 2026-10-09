@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { useAppStore } from '@/store/app-store';
 import { setOnAuthExpired } from './client';
@@ -20,7 +20,7 @@ type Props = { children: React.ReactNode };
  */
 export function ApiProvider({ children }: Props) {
   const [ready, setReady] = useState(false);
-  const clientRef = useRef(createQueryClient());
+  const [queryClient] = useState(createQueryClient);
 
   const setIsAuthenticated = useAppStore((s) => s.setIsAuthenticated);
   const hydrateOnboarding  = useAppStore((s) => s.hydrateOnboarding);
@@ -30,7 +30,7 @@ export function ApiProvider({ children }: Props) {
     let cancelled = false;
 
     setOnAuthExpired(() => {
-      clientRef.current.clear();
+      queryClient.clear();
       signOut();
     });
 
@@ -44,12 +44,12 @@ export function ApiProvider({ children }: Props) {
       cancelled = true;
       setOnAuthExpired(null);
     };
-  }, [setIsAuthenticated, hydrateOnboarding, signOut]);
+  }, [queryClient, setIsAuthenticated, hydrateOnboarding, signOut]);
 
   if (!ready) return null;
 
   return (
-    <QueryClientProvider client={clientRef.current}>
+    <QueryClientProvider client={queryClient}>
       {children}
     </QueryClientProvider>
   );

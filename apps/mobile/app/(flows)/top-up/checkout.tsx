@@ -49,7 +49,7 @@ export default function TopUpCheckoutScreen() {
 
     if (!popup) {
       // Popup blocked - open in same tab
-      window.location.href = widgetUrl;
+      window.location.assign(widgetUrl);
       return;
     }
 
@@ -142,7 +142,7 @@ export default function TopUpCheckoutScreen() {
                 Complete your payment in the popup window
               </Text>
               <Text variant="caption" color="textTertiary" style={styles.centered}>
-                You'll be redirected back here when done
+                You&apos;ll be redirected back here when done
               </Text>
             </Box>
             <Button

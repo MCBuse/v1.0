@@ -77,7 +77,7 @@ describe('Issuers API', () => {
   });
 
   it('returns the issuer profile and submissions', async () => {
-    const response = await request(app.getHttpServer<Server>() as Server)
+    const response = await request(app.getHttpServer() as Server)
       .get('/issuer/me')
       .expect(200);
     const profile = response.body as {
@@ -98,7 +98,7 @@ describe('Issuers API', () => {
   });
 
   it('creates a draft submission and then submits it for review', async () => {
-    const createResponse = await request(app.getHttpServer<Server>() as Server)
+    const createResponse = await request(app.getHttpServer() as Server)
       .post('/issuer/submissions')
       .send({
         issuer: 'Northstar Labs',
@@ -125,7 +125,7 @@ describe('Issuers API', () => {
       expect.objectContaining({ ticker: 'HUD' }),
     );
 
-    const submitResponse = await request(app.getHttpServer<Server>() as Server)
+    const submitResponse = await request(app.getHttpServer() as Server)
       .post(`/issuer/submissions/${createdSubmission.id}/submit`)
       .expect(201);
     const submitted = submitResponse.body as { status: string };
@@ -138,7 +138,7 @@ describe('Issuers API', () => {
   });
 
   it('updates a returned submission before resubmission', async () => {
-    const response = await request(app.getHttpServer<Server>() as Server)
+    const response = await request(app.getHttpServer() as Server)
       .patch('/issuer/submissions/req-created')
       .send({ name: 'Harbor Dollar Revised' })
       .expect(200);
@@ -152,7 +152,7 @@ describe('Issuers API', () => {
   });
 
   it('records a reviewer request for changes with its reason', async () => {
-    const response = await request(app.getHttpServer<Server>() as Server)
+    const response = await request(app.getHttpServer() as Server)
       .post('/admin/issuer/submissions/req-test/decision')
       .send({
         decision: 'changes_requested',
