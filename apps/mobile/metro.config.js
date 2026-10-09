@@ -41,7 +41,7 @@ module.exports = (() => {
     };
     config.resolver = {
         ...resolver,
-        assetExts: [...resolver?.assetExts?.filter((ext) => ext !== "svg"), 'lottie'],
+        assetExts: [...resolver?.assetExts?.filter((ext) => ext !== "svg"), 'lottie', 'wasm'],
         blockList: blockList(config, [
             path.join(workspaceRoot, "apps", "api", "node_modules"),
             path.join(workspaceRoot, "apps", "web", "node_modules"),

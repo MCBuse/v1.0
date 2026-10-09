@@ -1,4 +1,3 @@
-import { useTheme } from '@shopify/restyle';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

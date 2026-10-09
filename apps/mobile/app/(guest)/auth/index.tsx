@@ -1,17 +1,14 @@
-import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
 import React from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoginWithOAuth } from '@privy-io/expo';
 
-import type { Theme } from '@/theme';
 import { SocialButton } from '@/components/auth/SocialButton';
 import { Box, Button, Text } from '@/components/ui';
 import { usePrivySession } from '@/features/auth';
 
 export default function AuthLandingScreen() {
-  const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
 
   // Mounting this hook here means the moment Privy reports a user

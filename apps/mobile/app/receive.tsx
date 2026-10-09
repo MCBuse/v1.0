@@ -59,13 +59,6 @@ export default function ReceiveScreen() {
     }
   }, [amount, currency, create]);
 
-  const handleCopy = useCallback(async () => {
-    if (!paymentReq) return;
-    await Share.share({ message: extractQrValue(paymentReq) });
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [paymentReq]);
-
   const handleShare = useCallback(async () => {
     if (!paymentReq) return;
     await Share.share({ message: extractQrValue(paymentReq) });
@@ -247,7 +240,7 @@ const styles = StyleSheet.create({
   },
   paddedText: { paddingHorizontal: 24, marginBottom: 8 },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems:      'center',
     justifyContent:  'center',

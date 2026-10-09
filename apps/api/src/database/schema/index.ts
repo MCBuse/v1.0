@@ -8,3 +8,4 @@ export * from './payment-requests';
 export * from './audit-logs';
 export * from './refresh-tokens';
 export * from './password-reset-codes';
+export * from './issuers';

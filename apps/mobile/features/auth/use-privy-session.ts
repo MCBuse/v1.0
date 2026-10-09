@@ -35,8 +35,6 @@ export function usePrivySession() {
   const autoExchangeStartedFor = useRef<string | null>(null);
   const exchangeInFlight = useRef(false);
 
-  const wallet = wallets?.[0];
-
   const exchange = useCallback(async () => {
     if (!user || !isReady) return;
     if (exchangedFor.current === user.id) return; // already done in this session
@@ -45,7 +43,7 @@ export function usePrivySession() {
     exchangeInFlight.current = true;
     try {
       // 1. Make sure we have a Solana wallet.
-      let pubkey = wallet?.publicKey;
+      let pubkey = wallets?.[0]?.publicKey;
       if (!pubkey) {
         if (!create) {
           throw new Error('Privy create() is unavailable; ensure Solana is enabled in the dashboard');
@@ -94,7 +92,7 @@ export function usePrivySession() {
     } finally {
       exchangeInFlight.current = false;
     }
-  }, [user, isReady, wallet?.publicKey, wallets, create, getAccessToken, setIsAuthenticated]);
+  }, [user, isReady, wallets, create, getAccessToken, setIsAuthenticated]);
 
   // Auto-exchange once when Privy reports a user. Manual retry handles failures.
   useEffect(() => {

@@ -2,13 +2,14 @@ import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
 import { CloseCircle, ProfileCircle, ScanBarcode, TickCircle } from 'iconsax-react-native';
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Box, Button, Input, NumPad, Text } from '@/components/ui';
 import { useExecuteUsernamePayment } from '@/features/payments';
 import { isUsernameFormatValid, normalizeUsernameInput, useResolveUsername } from '@/features/users';
 import { displayCurrencySymbol, formatCurrency, toBaseUnits } from '@/lib/currency';
+import { useWalletPreferences } from '@/store/wallet-preferences-store';
 import type { Theme } from '@/theme';
 
 type StableCurrency = 'USDC' | 'EURC';
@@ -17,6 +18,7 @@ type Step = 'recipient' | 'amount' | 'success';
 export default function SendScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
+  const { addedStablecoins } = useWalletPreferences();
 
   const [step, setStep] = useState<Step>('recipient');
   const [username, setUsername] = useState('');
@@ -26,6 +28,16 @@ export default function SendScreen() {
 
   const resolveUsername = useResolveUsername();
   const sendPayment = useExecuteUsernamePayment();
+
+  const availableCurrencies = [
+    { ticker: 'USDC', label: 'USD', symbol: '$' },
+    { ticker: 'EURC', label: 'EUR', symbol: '€' },
+    ...addedStablecoins.map((coin) => ({
+      ticker: coin.ticker,
+      label: coin.name,
+      symbol: coin.symbol,
+    })),
+  ];
 
   const handleResolve = useCallback(async () => {
     const clean = normalizeUsernameInput(username);
@@ -111,13 +123,18 @@ export default function SendScreen() {
           </Box>
         </Box>
 
-        <Box flexDirection="row" gap="s" paddingHorizontal="2xl" marginBottom="m">
-          {(['USDC', 'EURC'] as StableCurrency[]).map((item) => {
-            const active = currency === item;
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 24, gap: 8, paddingBottom: 4 }}
+          style={{ marginBottom: 12 }}
+        >
+          {availableCurrencies.map((item) => {
+            const active = currency === item.ticker;
             return (
               <Pressable
-                key={item}
-                onPress={() => setCurrency(item)}
+                key={item.ticker}
+                onPress={() => setCurrency(item.ticker as StableCurrency)}
                 style={[
                   styles.chip,
                   {
@@ -130,18 +147,21 @@ export default function SendScreen() {
                   variant="captionMedium"
                   style={{ color: active ? colors.textInverse : colors.textPrimary }}
                 >
-                  {item === 'EURC' ? 'EUR' : 'USD'}
+                  {item.label}
                 </Text>
               </Pressable>
             );
           })}
-        </Box>
+        </ScrollView>
 
         <Box flex={1}>
           <NumPad
             amount={amount}
             onAmountChange={setAmount}
-            currency={displayCurrencySymbol(currency)}
+            currency={
+              availableCurrencies.find((c) => c.ticker === currency)?.symbol ??
+              displayCurrencySymbol(currency)
+            }
             primaryAction={{
               label: sendPayment.isPending ? 'Sending...' : 'Send',
               onPress: handleSend,

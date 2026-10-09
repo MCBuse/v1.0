@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mcbuse",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.f-o-nyarko.mcbuse",
@@ -28,16 +27,14 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.f_o_nyarko.mcbuse",
       "permissions": [
         "android.permission.NFC"
-      ],
-      "usesCleartextTraffic": true
+      ]
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -63,7 +60,7 @@
             "deploymentTarget": "17.5"
           },
           "android": {
-            "compileSdkVersion": 35
+            "usesCleartextTraffic": true
           }
         }
       ]

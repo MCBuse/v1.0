@@ -1,5 +1,5 @@
 import { useTheme } from '@shopify/restyle';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { ArrowLeft } from 'iconsax-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ export default function CashOutCheckoutScreen() {
         alignItems="center"
         gap="m"
         paddingHorizontal="m"
-        style={{ paddingTop: insetsTop + 4, paddingBottom: 8 }}
+        style={{ paddingTop: insets.top + 4, paddingBottom: 8 }}
         borderBottomWidth={1}
         borderBottomColor="borderDefault"
       >

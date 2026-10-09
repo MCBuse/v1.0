@@ -1,16 +1,9 @@
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { create } from 'zustand';
 
-/**
- * App-level navigation state.
- *
- * hasSeenOnboarding — false on every cold boot (no persistence).
- *   The user always sees onboarding when the app starts fresh.
- *   Flip to true when they tap "Get Started" or "Skip".
- *
- * isAuthenticated — mirrors whether the session has valid tokens.
- *   Kept in sync by ApiProvider on boot and by the auth hooks on sign-in/out.
- *   Do not write directly from screens — always go through auth hooks.
- */
+const ONBOARDING_KEY = 'mcbuse.app.hasSeenOnboarding';
+
 type AppStore = {
   hasSeenOnboarding: boolean;
   isAuthenticated:   boolean;
@@ -18,13 +11,24 @@ type AppStore = {
   setHasSeenOnboarding: (value: boolean) => void;
   setIsAuthenticated:   (value: boolean) => void;
   signOut:              () => void;
+  hydrateOnboarding:    () => Promise<void>;
 };
 
 export const useAppStore = create<AppStore>((set) => ({
   hasSeenOnboarding: false,
   isAuthenticated:   false,
 
-  setHasSeenOnboarding: (value) => set({ hasSeenOnboarding: value }),
+  setHasSeenOnboarding: (value) => {
+    set({ hasSeenOnboarding: value });
+    if (Platform.OS !== 'web') {
+      SecureStore.setItemAsync(ONBOARDING_KEY, value ? '1' : '').catch(() => {});
+    }
+  },
   setIsAuthenticated:   (value) => set({ isAuthenticated: value }),
   signOut:              ()      => set({ isAuthenticated: false }),
+  hydrateOnboarding: async () => {
+    if (Platform.OS === 'web') return;
+    const stored = await SecureStore.getItemAsync(ONBOARDING_KEY);
+    if (stored === '1') set({ hasSeenOnboarding: true });
+  },
 }));

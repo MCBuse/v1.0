@@ -2,11 +2,10 @@ import { useTheme } from '@shopify/restyle';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'iconsax-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { WebView, type WebViewNavigation } from 'react-native-webview';
 
-import { Box, Text } from '@/components/ui';
+import { Box, Button, Text } from '@/components/ui';
 import { takeOnrampWidgetSession } from '@/lib/onramp-widget-cache';
 import type { Theme } from '@/theme';
 
@@ -18,6 +17,8 @@ export default function TopUpCheckoutScreen() {
   const params = useLocalSearchParams<{ transactionId: string }>();
   const transactionId = params.transactionId ?? '';
   const [widgetUrl, setWidgetUrl] = useState('');
+  const [checkoutWindow, setCheckoutWindow] = useState<Window | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
   useEffect(() => {
     if (!transactionId) return;
@@ -31,23 +32,71 @@ export default function TopUpCheckoutScreen() {
     );
   }, [transactionId]);
 
-  const onShouldStartLoadWithRequest = useCallback(
-    (req: { url: string }) => {
-      if (req.url.startsWith(REDIRECT_SCHEME)) {
-        goToStatus();
-        return false;
-      }
-      return true;
-    },
-    [goToStatus],
-  );
+  const openCheckout = useCallback(() => {
+    if (!widgetUrl) return;
 
-  const onNavChange = useCallback(
-    (nav: WebViewNavigation) => {
-      if (nav.url.startsWith(REDIRECT_SCHEME)) goToStatus();
-    },
-    [goToStatus],
-  );
+    // Open in new window
+    const width = 600;
+    const height = 800;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    const popup = window.open(
+      widgetUrl,
+      'StripeCheckout',
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+    );
+
+    if (!popup) {
+      // Popup blocked - open in same tab
+      window.location.assign(widgetUrl);
+      return;
+    }
+
+    setCheckoutWindow(popup);
+    setIsPolling(true);
+  }, [widgetUrl]);
+
+  // Poll the popup window to detect when it closes or redirects
+  useEffect(() => {
+    if (!isPolling || !checkoutWindow) return;
+
+    const interval = setInterval(() => {
+      try {
+        // Check if window is closed
+        if (checkoutWindow.closed) {
+          setIsPolling(false);
+          goToStatus();
+          return;
+        }
+
+        // Try to check URL (will fail due to CORS, but that's ok)
+        try {
+          const url = checkoutWindow.location.href;
+          if (url.startsWith(REDIRECT_SCHEME)) {
+            checkoutWindow.close();
+            setIsPolling(false);
+            goToStatus();
+          }
+        } catch (e) {
+          // CORS error expected - ignore
+        }
+      } catch (e) {
+        // Window closed or inaccessible
+        setIsPolling(false);
+        goToStatus();
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [isPolling, checkoutWindow, goToStatus]);
+
+  // Auto-open on mount
+  useEffect(() => {
+    if (widgetUrl && !checkoutWindow) {
+      openCheckout();
+    }
+  }, [widgetUrl, checkoutWindow, openCheckout]);
 
   if (!widgetUrl || !transactionId) {
     return (
@@ -84,24 +133,47 @@ export default function TopUpCheckoutScreen() {
         </Text>
       </Box>
 
-      <View style={styles.web}>
-        <WebView
-          source={{ uri: widgetUrl }}
-          onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
-          onNavigationStateChange={onNavChange}
-          startInLoadingState
-          renderLoading={() => (
-            <Box flex={1} alignItems="center" justifyContent="center">
-              <ActivityIndicator color={colors.textPrimary} />
+      <View style={styles.content}>
+        {isPolling ? (
+          <Box gap="l" alignItems="center">
+            <ActivityIndicator color={colors.textPrimary} size="large" />
+            <Box gap="s" alignItems="center">
+              <Text variant="bodyMedium" style={styles.centered}>
+                Complete your payment in the popup window
+              </Text>
+              <Text variant="caption" color="textTertiary" style={styles.centered}>
+                You&apos;ll be redirected back here when done
+              </Text>
             </Box>
-          )}
-          setSupportMultipleWindows={false}
-          javaScriptEnabled
-          domStorageEnabled
-          allowsInlineMediaPlayback
-          mediaPlaybackRequiresUserAction={false}
-          originWhitelist={['https://*', 'http://*', 'mcbuse://*']}
-        />
+            <Button
+              label="I've completed payment"
+              onPress={goToStatus}
+              variant="secondary"
+              size="sm"
+            />
+            {checkoutWindow && !checkoutWindow.closed && (
+              <Button
+                label="Reopen checkout"
+                onPress={() => checkoutWindow.focus()}
+                variant="ghost"
+                size="sm"
+              />
+            )}
+          </Box>
+        ) : (
+          <Box gap="l" alignItems="center">
+            <Text variant="body" color="textSecondary" style={styles.centered}>
+              Click below to open the secure payment window
+            </Text>
+            <Button label="Open Stripe checkout" onPress={openCheckout} />
+            <Button
+              label="Skip to status"
+              onPress={goToStatus}
+              variant="ghost"
+              size="sm"
+            />
+          </Box>
+        )}
       </View>
     </Box>
   );
@@ -115,5 +187,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  web: { flex: 1 },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  centered: {
+    textAlign: 'center',
+  },
 });

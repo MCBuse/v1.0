@@ -364,8 +364,11 @@ export default function HomeScreen() {
               const isCredit = dir === "credit";
               const prefix = dir === "credit" ? "+" : dir === "debit" ? "-" : "";
               return (
-                <Box
+                <Pressable
                   key={entry.id}
+                  onPress={() => router.push({ pathname: '/(flows)/receipt', params: { id: entry.id } })}
+                >
+                <Box
                   flexDirection="row"
                   alignItems="center"
                   gap="m"
@@ -436,6 +439,7 @@ export default function HomeScreen() {
                     </View>
                   </Box>
                 </Box>
+                </Pressable>
               );
             })}
           </Box>

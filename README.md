@@ -14,10 +14,14 @@ Turborepo monorepo with pnpm workspaces.
 | --- | --- | --- |
 | `apps/api` | NestJS, Drizzle ORM, PostgreSQL, Solana web3.js | Backend API — auth, wallets, ledger, payments, on/off-ramp |
 | `apps/web` | Next.js | Marketing site / web companion |
+| `apps/issuers-dashboard` | Next.js | Issuer-facing portal for submitting stablecoins and tracking decisions |
+| `apps/admin-dashboard` | Next.js | Internal MCBuse workspace for issuer due diligence and review decisions |
 | `apps/mobile` | Expo (React Native, new arch enabled) | Mobile app — primary consumer surface |
 | `packages/ui` | React | Shared UI primitives (web) |
 | `packages/shared` | TypeScript | Cross-app types/utils |
 | `packages/eslint-config`, `packages/typescript-config` | Tooling | Shared lint/TS config |
+
+The issuer portal and internal admin dashboard are separate frontend applications. Both call `apps/api` and use its shared PostgreSQL database; neither dashboard owns a separate database or backend. In production, configure `CORS_ORIGINS` with both dashboard origins.
 
 ## Prerequisites
 
@@ -89,6 +93,8 @@ To run a single app:
 pnpm --filter api dev
 pnpm --filter mobile start
 pnpm --filter web dev
+pnpm --filter issuers-dashboard dev # http://localhost:3001
+pnpm --filter admin-dashboard dev   # http://localhost:3002
 ```
 
 ### 5. Forward Stripe webhooks (for on-ramp + off-ramp)

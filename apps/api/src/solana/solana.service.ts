@@ -59,16 +59,27 @@ export class SolanaService implements OnModuleInit {
   /** Decrypt an encrypted keypair string back to a Solana Keypair. */
   decryptKeypair(encrypted: string): Keypair {
     const parts = encrypted.split(':');
-    if (parts.length !== 3) throw new Error('Invalid encrypted keypair format');
+    if (parts.length !== 3) {
+      this.logger.error(`Invalid encrypted keypair format. Expected 'iv:authTag:ciphertext' (3 parts), got ${parts.length} parts. First 50 chars: ${encrypted.substring(0, 50)}`);
+      throw new Error(
+        'Wallet encryption format is invalid. This wallet may need to be regenerated. ' +
+        'Please contact support or recreate the wallet.'
+      );
+    }
     const [ivHex, authTagHex, ciphertextHex] = parts;
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
     const ciphertext = Buffer.from(ciphertextHex, 'hex');
 
-    const decipher = createDecipheriv(ALGORITHM, this.encryptionKey, iv);
-    decipher.setAuthTag(authTag);
-    const secretKey = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-    return Keypair.fromSecretKey(secretKey);
+    try {
+      const decipher = createDecipheriv(ALGORITHM, this.encryptionKey, iv);
+      decipher.setAuthTag(authTag);
+      const secretKey = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      return Keypair.fromSecretKey(secretKey);
+    } catch (error) {
+      this.logger.error(`Failed to decrypt keypair: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error('Failed to decrypt wallet keypair. The encryption key may have changed or the wallet data is corrupted.');
+    }
   }
 
   /**
