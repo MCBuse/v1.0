@@ -299,6 +299,9 @@ importers:
       '@moonpay/react-native-moonpay-sdk':
         specifier: ^1.1.8
         version: 1.1.8(react-native-webview@13.16.1(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.0))(react@19.1.0)
+      '@react-native-async-storage/async-storage':
+        specifier: ^3.1.1
+        version: 3.1.1(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.0))(react@19.1.0)
       '@react-native-community/netinfo':
         specifier: 11.4.1
         version: 11.4.1(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.0))
@@ -2986,6 +2989,12 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  '@react-native-async-storage/async-storage@3.1.1':
+    resolution: {integrity: sha512-z+PnLz1n6ECKhgoHZHkfc+dijXZEyZnNFSajbtE0NEbsJhmX8x9GlOeiMQIKX2E4DUqPSgfIh4FYBv1M49KgPQ==}
+    peerDependencies:
+      react: 19.1.0
+      react-native: 0.81.5
 
   '@react-native-community/netinfo@11.4.1':
     resolution: {integrity: sha512-B0BYAkghz3Q2V09BF88RA601XursIEA111tnc2JOaN7axJWmNefmfjZqw/KdSxKZp7CZUuPpjBmz/WCR9uaHYg==}
@@ -5857,6 +5866,9 @@ packages:
   iconv-lite@0.7.2:
     resolution: {integrity: sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==}
     engines: {node: '>=0.10.0'}
+
+  idb@8.0.3:
+    resolution: {integrity: sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==}
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
@@ -11862,6 +11874,12 @@ snapshots:
       '@types/react': 19.2.2
     optional: true
 
+  '@react-native-async-storage/async-storage@3.1.1(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.0))(react@19.1.0)':
+    dependencies:
+      idb: 8.0.3
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.0)
+
   '@react-native-community/netinfo@11.4.1(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.0))':
     dependencies:
       react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.0)
@@ -11956,7 +11974,7 @@ snapshots:
       debug: 4.4.3
       invariant: 2.2.4
       metro: 0.83.6(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      metro-config: 0.83.6(bufferutil@4.1.0)
+      metro-config: 0.83.6(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-core: 0.83.6
       semver: 7.7.4
     transitivePeerDependencies:
@@ -15435,6 +15453,8 @@ snapshots:
     dependencies:
       safer-buffer: 2.1.2
 
+  idb@8.0.3: {}
+
   ieee754@1.2.1: {}
 
   ignore@5.3.2: {}
@@ -16611,6 +16631,22 @@ snapshots:
       - supports-color
       - utf-8-validate
 
+  metro-config@0.83.6(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+    dependencies:
+      connect: 3.7.0
+      flow-enums-runtime: 0.0.6
+      jest-validate: 29.7.0
+      metro: 0.83.6(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      metro-cache: 0.83.6
+      metro-core: 0.83.6
+      metro-runtime: 0.83.6
+      yaml: 2.8.3
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+    optional: true
+
   metro-core@0.83.3:
     dependencies:
       flow-enums-runtime: 0.0.6
@@ -17002,7 +17038,7 @@ snapshots:
       metro-babel-transformer: 0.83.6
       metro-cache: 0.83.6
       metro-cache-key: 0.83.6
-      metro-config: 0.83.6(bufferutil@4.1.0)
+      metro-config: 0.83.6(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       metro-core: 0.83.6
       metro-file-map: 0.83.6
       metro-resolver: 0.83.6

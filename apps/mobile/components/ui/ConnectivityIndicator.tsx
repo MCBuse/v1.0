@@ -1,4 +1,3 @@
-import { useTheme } from '@shopify/restyle';
 import { Wifi, WifiSquare } from 'iconsax-react-native';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -6,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useConnectivityMode } from '@/hooks/use-connectivity-mode';
 import { t } from '@/lib/i18n';
-import type { Theme } from '@/theme';
 
 import Text from './Text';
 
@@ -18,7 +16,6 @@ const MODE_CONFIG = {
 
 export function ConnectivityIndicator() {
   const mode = useConnectivityMode();
-  const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
 
   if (mode === 'online') return null;

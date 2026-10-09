@@ -1,7 +1,7 @@
 import { useTheme } from '@shopify/restyle';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, TickCircle } from 'iconsax-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

@@ -7,7 +7,7 @@ import {
   ExportSquare,
   TickCircle,
 } from 'iconsax-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   Alert,
   Linking,
@@ -25,13 +25,14 @@ import {
 } from '@/features/scoin-store';
 import { t } from '@/lib/i18n';
 import { truncateAddress } from '@/lib/currency';
+import { useWalletPreferences } from '@/store/wallet-preferences-store';
 import type { Theme } from '@/theme';
 
 export default function StablecoinDetailScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id: string; data: string }>();
-  const [added, setAdded] = useState(false);
+  const { addStablecoin, isAdded } = useWalletPreferences();
 
   const entry: RegistryEntry | null = useMemo(() => {
     try {
@@ -50,10 +51,16 @@ export default function StablecoinDetailScreen() {
   }
 
   function handleAddToWallet() {
-    setAdded(true);
+    if (!entry) return;
+    addStablecoin({
+      ticker: entry.ticker,
+      name: entry.name,
+      network: entry.network,
+      symbol: getCurrencySymbol(entry.ticker),
+    });
     Alert.alert(
       'Added',
-      `${entry!.ticker} has been added to your wallet. You can now use it for payments.`,
+      `${entry.ticker} has been added to your wallet. You can now use it for payments.`,
     );
   }
 
@@ -204,16 +211,16 @@ export default function StablecoinDetailScreen() {
         {/* Add to wallet */}
         <Button
           label={
-            added
+            isAdded(entry.ticker)
               ? t('scoinStore.detail.alreadyAdded')
               : t('scoinStore.detail.addToWallet')
           }
           onPress={handleAddToWallet}
-          disabled={added || entry.publicationStatus !== 'published'}
-          variant={added ? 'secondary' : 'primary'}
+          disabled={isAdded(entry.ticker) || entry.publicationStatus !== 'published'}
+          variant={isAdded(entry.ticker) ? 'secondary' : 'primary'}
           size="lg"
           leftIcon={
-            added ? (
+            isAdded(entry.ticker) ? (
               <TickCircle size={20} color={colors.textSecondary} variant="Bold" />
             ) : undefined
           }
