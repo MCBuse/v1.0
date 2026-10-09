@@ -1,6 +1,6 @@
 {
-  "id": "3dbfe820-e3d8-4f6f-b570-418355465805",
-  "prevId": "56393277-b2d1-42ea-9e42-a0c9343126e6",
+  "id": "56393277-b2d1-42ea-9e42-a0c9343126e6",
+  "prevId": "454f40f3-1423-4428-ad27-c811c345207b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -44,17 +44,23 @@
           "name": "first_name",
           "type": "varchar(100)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "last_name": {
           "name": "last_name",
           "type": "varchar(100)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "password_hash": {
           "name": "password_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "privy_user_id": {
+          "name": "privy_user_id",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": false
         },
@@ -149,6 +155,13 @@
           "columns": [
             "username"
           ]
+        },
+        "users_privy_user_id_unique": {
+          "name": "users_privy_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "privy_user_id"
+          ]
         }
       },
       "policies": {},
@@ -188,7 +201,13 @@
           "name": "encrypted_keypair",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "privy_wallet_id": {
+          "name": "privy_wallet_id",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
         },
         "is_active": {
           "name": "is_active",
@@ -2086,7 +2105,6 @@
       "values": [
         "draft",
         "in_review",
-        "needs_changes",
         "approved",
         "rejected",
         "withdrawn"
@@ -2097,7 +2115,6 @@
       "schema": "public",
       "values": [
         "submitted",
-        "changes_requested",
         "approved",
         "rejected",
         "published",

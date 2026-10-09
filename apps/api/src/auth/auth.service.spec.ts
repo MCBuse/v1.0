@@ -35,6 +35,7 @@ function createService(usernameAvailable = true) {
     {} as never,
     db as never,
     {} as never,
+    {} as never,
   );
   jest.spyOn(service as never, 'issueTokens' as never).mockResolvedValue({
     accessToken: 'access-token',

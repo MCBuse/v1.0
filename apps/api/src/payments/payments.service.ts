@@ -169,6 +169,12 @@ export class PaymentsService {
     this.logger.log(`[executeRoutineTransfer] Checking balance for wallet ${payerWallet.id}, currency ${currency}, amount ${amount}`);
     await this.assertAvailableBalance(payerWallet.id, currency, amount);
 
+    if (!payerWallet.encryptedKeypair) {
+      throw new BadRequestException(
+        'Server-side signing not available for Privy-managed wallets; transfers must be initiated client-side',
+      );
+    }
+
     this.logger.log(`[executeRoutineTransfer] Executing transfer via provider`);
     let transferResult;
     try {

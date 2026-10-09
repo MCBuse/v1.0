@@ -1,3 +1,4 @@
+import { usePrivy } from '@privy-io/expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
@@ -62,23 +63,26 @@ export function useCommitPendingAuth() {
  * cache, and flips the app store out of authenticated state.
  */
 export function useSignOut() {
-  const signOut      = useAppStore((s) => s.signOut);
-  const clearPending = usePendingAuthStore((s) => s.clear);
-  const queryClient  = useQueryClient();
+  const signOut       = useAppStore((s) => s.signOut);
+  const clearPending  = usePendingAuthStore((s) => s.clear);
+  const queryClient   = useQueryClient();
+  const { logout: privyLogout } = usePrivy();
+
+  const finish = async () => {
+    queryClient.clear();
+    clearPending();
+    signOut();
+    try {
+      await privyLogout();
+    } catch {
+      // Privy logout failure shouldn't trap the user in a half-signed-out state.
+    }
+  };
 
   return useOperation<void, void>({
     mutationFn: () => authRepository.logout(),
-    onSuccess:  () => {
-      queryClient.clear();
-      clearPending();
-      signOut();
-    },
-    // Even if the server call fails we still want the user signed out locally.
-    onError: () => {
-      queryClient.clear();
-      clearPending();
-      signOut();
-    },
+    onSuccess: finish,
+    onError:   finish,
   });
 }
 

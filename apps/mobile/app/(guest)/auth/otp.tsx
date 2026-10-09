@@ -1,12 +1,11 @@
 import { useTheme } from '@shopify/restyle';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLoginWithEmail } from '@privy-io/expo';
 
-import { useCommitPendingAuth, useSendPhoneOtp, useVerifyPhoneOtp } from '@/features/auth/hooks';
-import { usePendingAuthStore } from '@/features/auth/pending-store';
-import { authSession } from '@/lib/api';
+import { usePrivySession } from '@/features/auth';
 
 import type { Theme } from '@/theme';
 import { OtpInput } from '@/components/auth/OtpInput';
@@ -22,97 +21,95 @@ export default function OtpScreen() {
     flow: 'login' | 'register';
   }>();
 
-  const pending = usePendingAuthStore((s) => s.pending);
-  const clearPending = usePendingAuthStore((s) => s.clear);
-  const commitPending = useCommitPendingAuth();
-  const sendOtp = useSendPhoneOtp();
-  const verifyOtp = useVerifyPhoneOtp();
+  const { sendCode, loginWithCode, state } = useLoginWithEmail();
+  const {
+    status: sessionStatus,
+    error: sessionError,
+    retry: retryPrivySession,
+    hasPrivyUser,
+  } = usePrivySession();
 
   const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_SECONDS);
   const [canResend, setCanResend] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const otpSent = useRef(false);
+  const [submittingCode, setSubmittingCode] = useState(false);
 
-  const phone = pending?.identifier ?? identifier;
+  const verifying = state.status === 'submitting-code' || submittingCode;
+  const exchanging = sessionStatus === 'creating-wallet' || sessionStatus === 'exchanging';
+  const canSubmit = hasPrivyUser || code.length >= 6;
 
-  useEffect(() => {
-    if (!pending) {
-      router.replace('/(guest)/auth/login');
-      return;
-    }
-    if (otpSent.current) return;
-    otpSent.current = true;
-    sendOtp.mutateAsync({ phone }).catch(() => {
-      Alert.alert('Could not send code', 'Please try again or go back.');
-    });
-  }, [pending, phone, sendOtp]);
-
-  // Countdown timer
   useEffect(() => {
     if (countdown <= 0) { setCanResend(true); return; }
     const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(id);
   }, [countdown]);
 
+  useEffect(() => {
+    if (sessionStatus === 'success') {
+      router.replace('/(tabs)');
+    }
+  }, [sessionStatus]);
+
   const handleResend = async () => {
-    if (!canResend || sendOtp.isPending) return;
-    setCode('');
-    setError(null);
-    setCountdown(RESEND_SECONDS);
-    setCanResend(false);
+    if (!canResend || !identifier) return;
     try {
-      await sendOtp.mutateAsync({ phone });
+      if (hasPrivyUser) {
+        await retryPrivySession();
+        return;
+      }
+      await sendCode({ email: identifier });
+      setCode('');
+      setError(false);
+      setCountdown(RESEND_SECONDS);
+      setCanResend(false);
     } catch {
-      Alert.alert('Could not resend code', 'Please try again.');
+      // surface via state.status === 'error' below
     }
   };
 
   const handleVerify = useCallback(
     async (val?: string) => {
       const otp = val ?? code;
-      if (otp.length < 6 || verifying) return;
+      if (verifying || exchanging) return;
 
-      setVerifying(true);
-      setError(null);
-
+      setSubmittingCode(true);
+      setError(false);
       try {
-        await verifyOtp.mutateAsync({ phone, code: otp });
-      } catch {
-        setError('Invalid or expired code. Please try again.');
-        setVerifying(false);
-        return;
+        if (hasPrivyUser) {
+          await retryPrivySession();
+          return;
+        }
+        if (otp.length < 6) return;
+        await loginWithCode({ code: otp, email: identifier });
+        setCode('');
+        // Privy now has a user → usePrivySession exchanges → effect above navigates.
+      } catch (e) {
+        console.log(e)
+        setError(true);
+      } finally {
+        setSubmittingCode(false);
       }
-
-      const ok = await commitPending();
-      setVerifying(false);
-
-      if (!ok) {
-        router.replace('/(guest)/auth/login');
-        return;
-      }
-
-      router.replace('/(tabs)');
     },
-    [code, verifying, commitPending, phone, verifyOtp],
+    [
+      code,
+      verifying,
+      exchanging,
+      hasPrivyUser,
+      retryPrivySession,
+      loginWithCode,
+      identifier,
+    ],
   );
 
   const handleChange = (val: string) => {
     setCode(val);
-    if (error) setError(null);
+    if (error) setError(false);
   };
 
-  const handleBack = async () => {
-    await authSession.clear();
-    clearPending();
-    router.back();
-  };
-
-  const isEmail = identifier.includes('@');
-  const maskedIdentifier = isEmail
+  const maskedIdentifier = identifier.includes('@')
     ? identifier.replace(/(.{2}).+(@.+)/, '$1•••$2')
-    : identifier.replace(/(\+?\d{1,3})\d+(\d{4})/, '$1•••••$2');
+    : identifier;
 
   return (
     <KeyboardAvoidingView
@@ -125,42 +122,45 @@ export default function OtpScreen() {
         paddingHorizontal="2xl"
         style={{ paddingBottom: insets.bottom + 24 }}
       >
-        {/* Header */}
         <Box gap="xs" marginBottom="3xl">
-          <Text variant="h1">Check your {isEmail ? 'email' : 'messages'}</Text>
+          <Text variant="h1">Check your email</Text>
           <Text variant="body" color="textSecondary">
             We sent a 6-digit code to{'\n'}
             <Text variant="bodyMedium">{maskedIdentifier}</Text>
           </Text>
-          <Text variant="caption" color="textTertiary" marginTop="s">
-            Check your messages for the verification code.
-          </Text>
         </Box>
 
-        {/* OTP boxes */}
         <Box marginBottom="2xl">
           <OtpInput
             value={code}
             onChange={handleChange}
             onFilled={handleVerify}
-            error={Boolean(error)}
+            error={error}
           />
           {error && (
             <Text variant="caption" color="error" textAlign="center" marginTop="m">
-              {error}
+              Incorrect code. Please try again.
+            </Text>
+          )}
+          {sessionError && !error && (
+            <Text variant="caption" color="error" textAlign="center" marginTop="m">
+              {sessionError}
             </Text>
           )}
         </Box>
 
-        {/* Verify button */}
         <Button
-          label={verifying ? 'Verifying…' : 'Verify'}
+          label={
+            exchanging ? 'Setting up your wallet…' :
+              verifying ? 'Verifying…' :
+                hasPrivyUser ? 'Finish sign in' :
+                  'Verify'
+          }
           variant="primary"
-          disabled={code.length < 6 || verifying}
+          disabled={!canSubmit || verifying || exchanging}
           onPress={() => handleVerify()}
         />
 
-        {/* Resend */}
         <Box flexDirection="row" justifyContent="center" gap="xs" marginTop="2xl">
           <Text variant="caption" color="textSecondary">
             Didn&apos;t receive it?{' '}
@@ -180,15 +180,14 @@ export default function OtpScreen() {
           )}
         </Box>
 
-        {/* Change contact */}
         <Box alignItems="center" marginTop="m">
           <Text
             variant="caption"
             color="textSecondary"
             style={styles.changeLink}
-            onPress={handleBack}
+            onPress={() => router.back()}
           >
-            Change {isEmail ? 'email' : 'phone number'}
+            Change email
           </Text>
         </Box>
       </Box>

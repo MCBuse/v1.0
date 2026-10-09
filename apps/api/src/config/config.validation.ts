@@ -69,6 +69,9 @@ export class EnvironmentVariables {
   DATABASE_POOL_MAX?: number;
 
   @IsString()
+  PRIVY_APP_ID: string;
+
+  @IsString()
   @MinLength(32)
   JWT_ACCESS_SECRET: string;
 

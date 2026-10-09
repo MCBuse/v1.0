@@ -61,15 +61,22 @@
     {
       "idx": 8,
       "version": "7",
-      "when": 1790903871787,
-      "tag": "0008_breezy_tag",
+      "when": 1778485543831,
+      "tag": "0008_privy_auth",
       "breakpoints": true
     },
     {
       "idx": 9,
       "version": "7",
+      "when": 1790903871787,
+      "tag": "0009_breezy_tag",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
       "when": 1791165584633,
-      "tag": "0009_request_changes_workflow",
+      "tag": "0010_request_changes_workflow",
       "breakpoints": true
     }
   ]

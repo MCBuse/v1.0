@@ -21,6 +21,7 @@ import { OTP_PROVIDER } from '../otp/otp-provider.interface';
 import { WalletsService } from '../wallets/wallets.service';
 import { SignupDto } from './dto/signup.dto';
 import { IssuerSignupDto } from './dto/issuer-signup.dto';
+import { PrivyJwtService } from './privy/privy-jwt.service';
 
 const BCRYPT_ROUNDS = 12;
 const RESET_CODE_TTL_MINUTES = 15;
@@ -41,6 +42,7 @@ export class AuthService {
     private readonly config: ConfigService,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     @Inject(OTP_PROVIDER) private readonly otpProvider: OtpProvider,
+    private readonly privyJwt: PrivyJwtService,
   ) {}
 
   async signup(dto: SignupDto): Promise<AuthTokens> {
@@ -150,6 +152,82 @@ export class AuthService {
     this.logger.log('User logged in: ' + user.id);
     return this.issueTokens(user.id, user.email);
   }
+
+  /**
+   * Sign in via Privy. The mobile client has already completed Privy auth and
+   * holds an embedded Solana wallet; we verify their access token, upsert the
+   * local user + wallet rows, and return our own session tokens.
+   */
+  async privyLogin(input: {
+    privyAccessToken: string;
+    solanaPubkey: string;
+    email?: string;
+    phone?: string;
+  }): Promise<AuthTokens> {
+    const claims = await this.privyJwt.verify(input.privyAccessToken);
+    const privyUserId = claims.sub;
+
+    // Upsert by privyUserId. Username is auto-generated on first login; users
+    // can change it via the profile screen later.
+    const userId = await this.db.transaction(async (tx) => {
+      const existing = await tx
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.privyUserId, privyUserId))
+        .limit(1);
+
+      if (existing[0]) {
+        // Refresh the email/phone if Privy now has values we didn't have before.
+        const patch: Partial<typeof schema.users.$inferInsert> = { updatedAt: new Date() };
+        if (input.email) patch.email = input.email;
+        if (input.phone) patch.phone = input.phone;
+        await tx.update(schema.users).set(patch).where(eq(schema.users.id, existing[0].id));
+        return existing[0].id;
+      }
+
+      // Auto-generate `user_<8-hex>`; retry on the (vanishingly rare) collision.
+      let username = '';
+      for (let i = 0; i < 5; i++) {
+        const candidate = 'user_' + randomUUID().replace(/-/g, '').slice(0, 8);
+        const clash = await tx
+          .select({ id: schema.users.id })
+          .from(schema.users)
+          .where(eq(schema.users.username, candidate))
+          .limit(1);
+        if (!clash[0]) {
+          username = candidate;
+          break;
+        }
+      }
+      if (!username) throw new Error('Failed to generate a unique username');
+
+      const inserted = await tx
+        .insert(schema.users)
+        .values({
+          privyUserId,
+          username,
+          email: input.email ?? null,
+          phone: input.phone ?? null,
+        })
+        .returning({ id: schema.users.id });
+      return inserted[0].id;
+    });
+
+    // Upsert wallet row keyed by Solana pubkey. No keypair stored — Privy holds it.
+    await this.db
+      .insert(schema.wallets)
+      .values({
+        userId,
+        type: 'routine',
+        solanaPubkey: input.solanaPubkey,
+        privyWalletId: privyUserId,
+      })
+      .onConflictDoNothing({ target: schema.wallets.solanaPubkey });
+
+    this.logger.log('Privy login resolved user: ' + userId);
+    return this.issueTokens(userId, input.email ?? null);
+  }
+
 
   async refresh(rawRefreshToken: string): Promise<AuthTokens> {
     let payload: { sub: string; email: string; jti: string };

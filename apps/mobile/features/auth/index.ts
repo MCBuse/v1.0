@@ -7,6 +7,7 @@ export {
   useForgotPassword,
   useResetPassword,
 } from './hooks';
+export { usePrivySession }      from './use-privy-session';
 export { authRepository }       from './repository';
 export type {
   LoginRequest,

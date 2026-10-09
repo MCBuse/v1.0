@@ -1,79 +1,63 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLoginWithEmail } from '@privy-io/expo';
 
-import { ApiError, authSession } from '@/lib/api';
-import type { LoginFormValues } from '@/lib/validation/auth';
-import { loginSchema } from '@/lib/validation/auth';
-import { Eye, EyeSlash } from 'iconsax-react-native';
+import { usePrivySession } from '@/features/auth';
+import { Box, Button, Input, Text } from '@/components/ui';
 
-import { useCompleteAuth, useLogin, useLoginPhone } from '@/features/auth/hooks';
-import { usePendingAuthStore } from '@/features/auth/pending-store';
-
-import type { Theme } from '@/theme';
-import { Box, Button, Input, PhoneInput, Text } from '@/components/ui';
-
-type Mode = 'email' | 'phone';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
-  const { colors } = useTheme<Theme>();
-  const insets     = useSafeAreaInsets();
-  const [showPassword, setShowPassword] = useState(false);
+  const insets = useSafeAreaInsets();
 
-  const completeAuth = useCompleteAuth();
-  const login        = useLogin();
-  const loginPhone   = useLoginPhone();
-  const setPending   = usePendingAuthStore((s) => s.set);
-
+  const { sendCode, state } = useLoginWithEmail();
   const {
-    control,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { mode: 'email', identifier: '', password: '' },
-    mode: 'onBlur',
-  });
+    status: sessionStatus,
+    error: sessionError,
+    retry: retryPrivySession,
+    hasPrivyUser,
+  } = usePrivySession();
+  const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | undefined>();
 
-  const mode      = watch('mode');
-  const submitting = login.isPending || loginPhone.isPending;
+  const sending = state.status === 'sending-code';
+  const finishingSession =
+    sessionStatus === 'creating-wallet' || sessionStatus === 'exchanging';
+  const validEmail = EMAIL_RE.test(email.trim());
 
-  const switchMode = (m: Mode) => {
-    setValue('mode', m,    { shouldValidate: false });
-    setValue('identifier', '', { shouldValidate: false });
-  };
+  useEffect(() => {
+    if (sessionStatus === 'success') {
+      router.replace('/(tabs)');
+    }
+  }, [sessionStatus]);
 
-  const onSubmit = async (data: LoginFormValues) => {
+  const handleSend = async () => {
+    if (hasPrivyUser) {
+      await retryPrivySession();
+      return;
+    }
+
+    if (!validEmail) {
+      setEmailError('Enter a valid email address');
+      return;
+    }
+    setEmailError(undefined);
     try {
-      const tokens = data.mode === 'email'
-        ? await login.mutateAsync({ email: data.identifier, password: data.password })
-        : await loginPhone.mutateAsync({ phone: data.identifier, password: data.password });
-
-      if (data.mode === 'phone') {
-        await authSession.set(tokens);
-        setPending({ tokens, identifier: data.identifier, channel: 'phone', flow: 'login' });
-        router.push({ pathname: '/(guest)/auth/otp', params: { identifier: data.identifier, flow: 'login' } });
-      } else {
-        await completeAuth(tokens);
-        router.replace('/(tabs)');
-      }
-    } catch (err) {
-      const message =
-        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
-      Alert.alert('Sign in failed', message);
+      await sendCode({ email: email.trim() });
+      router.push({
+        pathname: '/(guest)/auth/otp',
+        params: { identifier: email.trim(), flow: 'login' },
+      });
+    } catch (e) {
+      Alert.alert('Could not send code', e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -87,131 +71,48 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <Box gap="xs" marginBottom="3xl">
-          <Text variant="h1">Welcome back</Text>
+          <Text variant="h1">Welcome to MCBuse</Text>
           <Text variant="body" color="textSecondary">
-            Sign in to your MCBuse account.
+            We&apos;ll send a 6-digit code to your email.
           </Text>
         </Box>
 
-        {/* Mode toggle */}
-        <Box
-          flexDirection="row"
-          backgroundColor="bgSecondary"
-          borderRadius="full"
-          padding="xs"
-          marginBottom="2xl"
-        >
-          {(['email', 'phone'] as Mode[]).map((m) => (
-            <Pressable
-              key={m}
-              onPress={() => switchMode(m)}
-              style={[
-                styles.toggle,
-                { backgroundColor: mode === m ? colors.bgPrimary : colors.transparent },
-              ]}
-            >
-              <Text
-                variant="captionMedium"
-                style={{
-                  color:      mode === m ? colors.textPrimary : colors.textSecondary,
-                  fontWeight: mode === m ? '600' : '400',
-                }}
-              >
-                {m === 'email' ? 'Email' : 'Phone'}
-              </Text>
-            </Pressable>
-          ))}
-        </Box>
-
-        {/* Fields */}
         <Box gap="m">
-          <Controller
-            control={control}
-            name="identifier"
-            render={({ field }) =>
-              mode === 'email' ? (
-                <Input
-                  label="Email address"
-                  placeholder="you@example.com"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  onBlur={field.onBlur}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="next"
-                  error={errors.identifier?.message}
-                />
-              ) : (
-                <PhoneInput
-                  label="Phone number"
-                  onChange={(meta) => field.onChange(meta.e164)}
-                  error={errors.identifier?.message}
-                />
-              )
+          <Input
+            label="Email address"
+            placeholder="you@example.com"
+            value={email}
+            onChangeText={(v) => {
+              setEmail(v);
+              if (emailError) setEmailError(undefined);
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+            error={emailError}
+          />
+        </Box>
+
+        <Box marginTop="3xl">
+          <Button
+            label={
+              finishingSession ? 'Finishing sign in…' :
+                sending ? 'Sending code…' :
+                  hasPrivyUser ? 'Finish sign in' :
+                    'Continue'
             }
+            variant="primary"
+            disabled={finishingSession || sending || (!hasPrivyUser && !validEmail)}
+            onPress={handleSend}
           />
-
-          <Controller
-            control={control}
-            name="password"
-            render={({ field }) => (
-              <Input
-                label="Password"
-                placeholder="Min. 6 characters"
-                value={field.value}
-                onChangeText={field.onChange}
-                onBlur={field.onBlur}
-                secureTextEntry={!showPassword}
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit(onSubmit)}
-                error={errors.password?.message}
-                suffix={
-                  <Pressable onPress={() => setShowPassword((v) => !v)}>
-                    {showPassword
-                      ? <EyeSlash size={20} color={colors.textTertiary} variant="Linear" />
-                      : <Eye     size={20} color={colors.textTertiary} variant="Linear" />
-                    }
-                  </Pressable>
-                }
-              />
-            )}
-          />
-        </Box>
-
-        {/* Forgot password */}
-        <Box alignItems="flex-end" marginTop="m" marginBottom="3xl">
-          <Text
-            variant="caption"
-            color="textSecondary"
-            style={styles.forgotLink}
-            onPress={() => router.push('/(guest)/auth/forgot-password')}
-          >
-            Forgot password?
-          </Text>
-        </Box>
-
-        <Button
-          label={submitting ? 'Signing in…' : 'Sign in'}
-          variant="primary"
-          disabled={submitting}
-          onPress={handleSubmit(onSubmit)}
-        />
-
-        {/* Switch to register */}
-        <Box flexDirection="row" justifyContent="center" gap="xs" marginTop="2xl">
-          <Text variant="caption" color="textSecondary">
-            Don&apos;t have an account?
-          </Text>
-          <Text
-            variant="caption"
-            style={[styles.switchLink, { color: colors.textPrimary }]}
-            onPress={() => router.replace('/(guest)/auth/register')}
-          >
-            Create one
-          </Text>
+          {hasPrivyUser && sessionError && (
+            <Text variant="caption" color="error" textAlign="center" marginTop="m">
+              {sessionError}
+            </Text>
+          )}
         </Box>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -221,19 +122,4 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   flex:   { flex: 1, backgroundColor: 'transparent' },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 8 },
-  toggle: {
-    flex:           1,
-    height:         34,
-    borderRadius:   9999,
-    alignItems:     'center',
-    justifyContent: 'center',
-  },
-  forgotLink: {
-    fontWeight:         '500',
-    textDecorationLine: 'underline',
-  },
-  switchLink: {
-    fontWeight:         '600',
-    textDecorationLine: 'underline',
-  },
 });
