@@ -13,3 +13,5 @@ export { Divider } from './Divider';
 export { AmountInput } from './AmountInput';
 export { QRDisplay } from './QRDisplay';
 export { TransactionStatus } from './TransactionStatus';
+export { ComplianceBadge } from './ComplianceBadge';
+export { ConnectivityIndicator } from './ConnectivityIndicator';

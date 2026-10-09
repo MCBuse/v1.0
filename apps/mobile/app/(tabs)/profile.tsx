@@ -1,19 +1,23 @@
 import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
-import { Copy, Edit2, ProfileCircle } from 'iconsax-react-native';
+import { Copy, Edit2, ProfileCircle, Wallet } from 'iconsax-react-native';
 import React from 'react';
-import { Pressable, Share, StyleSheet } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { Box, Button, Text } from '@/components/ui';
+import { DemoPanel } from '@/components/ui/DemoPanel';
+import { useSignOut } from '@/features/auth';
 import { useProfile } from '@/features/users';
-import { displayCurrencyLabel } from '@/lib/currency';
+import { useWallets } from '@/features/wallets';
+import { displayCurrencyLabel, truncateAddress } from '@/lib/currency';
 import type { Theme } from '@/theme';
 
 export default function ProfileScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
   const profile = useProfile();
+  const wallets = useWallets();
+  const signOut = useSignOut();
   const user = profile.data;
 
   const handleShare = async () => {
@@ -24,11 +28,22 @@ export default function ProfileScreen() {
     });
   };
 
+  const handleCopyAddress = async (address: string) => {
+    await Share.share({ message: address });
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: () => signOut.mutate() },
+    ]);
+  };
+
   return (
     <Box
       flex={1}
       backgroundColor="bgPrimary"
-      style={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }}
+      style={{ paddingTop: insets.top + 8 }}
     >
       <Box paddingHorizontal="2xl" marginBottom="2xl">
         <Text variant="h2">Profile</Text>
@@ -46,7 +61,10 @@ export default function ProfileScreen() {
           <Button label="Try again" variant="secondary" onPress={() => profile.reload()} />
         </Box>
       ) : (
-        <Box paddingHorizontal="2xl" gap="l">
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 24, gap: 16 }}
+          showsVerticalScrollIndicator={false}
+        >
           <Box backgroundColor="bgSecondary" borderRadius="xl" padding="l" gap="m">
             <Box flexDirection="row" alignItems="center" gap="m">
               <Box
@@ -104,19 +122,67 @@ export default function ProfileScreen() {
             </Box>
           </Box>
 
+          <Box backgroundColor="bgSecondary" borderRadius="xl" padding="l" gap="m">
+            <Box flexDirection="row" alignItems="center" gap="s">
+              <Wallet size={18} color={colors.textTertiary} variant="Linear" />
+              <Text variant="captionMedium" color="textTertiary">Wallets · Solana Devnet</Text>
+            </Box>
+
+            {wallets.data?.routine?.solanaPubkey && (
+              <>
+                <Box style={[styles.divider, { backgroundColor: colors.borderSubtle }]} />
+                <Pressable onPress={() => handleCopyAddress(wallets.data!.routine!.solanaPubkey)}>
+                  <Text variant="caption" color="textTertiary">Routine Account</Text>
+                  <Text variant="bodyMedium" style={styles.monoText}>
+                    {truncateAddress(wallets.data.routine.solanaPubkey, 8)}
+                  </Text>
+                </Pressable>
+              </>
+            )}
+
+            {wallets.data?.savings?.solanaPubkey && (
+              <>
+                <Box style={[styles.divider, { backgroundColor: colors.borderSubtle }]} />
+                <Pressable onPress={() => handleCopyAddress(wallets.data!.savings!.solanaPubkey)}>
+                  <Text variant="caption" color="textTertiary">Holding Account</Text>
+                  <Text variant="bodyMedium" style={styles.monoText}>
+                    {truncateAddress(wallets.data.savings.solanaPubkey, 8)}
+                  </Text>
+                </Pressable>
+              </>
+            )}
+
+            {!wallets.data?.routine && !wallets.data?.savings && !wallets.isLoading && (
+              <Text variant="caption" color="textTertiary">No wallets found</Text>
+            )}
+          </Box>
+
+          <DemoPanel />
+
           <Box gap="m">
             <Button
-              label="Share Username"
+              label="Issuer Portal"
               variant="secondary"
-              onPress={handleShare}
+              onPress={() => router.push('/(flows)/scoin-store/issuer-profile' as never)}
             />
             <Button
               label="Edit Profile"
               variant="secondary"
               onPress={() => router.push('/(flows)/profile-edit')}
             />
+            <Button
+              label="Share Username"
+              variant="secondary"
+              onPress={handleShare}
+            />
+            <Button
+              label={signOut.isPending ? 'Signing out…' : 'Sign Out'}
+              variant="ghost"
+              onPress={handleSignOut}
+              disabled={signOut.isPending}
+            />
           </Box>
-        </Box>
+        </ScrollView>
       )}
     </Box>
   );
@@ -132,5 +198,9 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: StyleSheet.hairlineWidth,
+  },
+  monoText: {
+    fontFamily: 'IBMPlexSans-Regular',
+    letterSpacing: 0.5,
   },
 });

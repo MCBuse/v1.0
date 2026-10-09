@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import 'react-native-url-polyfill/auto';
 
+import { ConnectivityIndicator } from '@/components/ui/ConnectivityIndicator';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ApiProvider } from '@/lib/api';
 import { theme, darkTheme } from '@/theme';
@@ -43,6 +44,7 @@ export default function RootLayout() {
     <RestyleProvider theme={isDark ? darkTheme : theme}>
       <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
         <ApiProvider>
+          <ConnectivityIndicator />
           <Stack>
             {/* index.tsx handles the boot redirect */}
             <Stack.Screen name="index"   options={{ headerShown: false }} />
