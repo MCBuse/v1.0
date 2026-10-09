@@ -18,7 +18,7 @@ export const signupRequest = z.object({
   email:     z.string().email().optional(),
   phone:     z.string().optional(),
   username:  z.string().min(3).max(30),
-  password:  z.string().min(8),
+  password:  z.string().min(8).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/),
   firstName: z.string().min(1),
   lastName:  z.string().min(1),
 });

@@ -17,6 +17,7 @@ import { WalletsService } from '../wallets/wallets.service';
 import { CreatePaymentRequestDto } from './dto/create-payment-request.dto';
 
 const DEFAULT_EXPIRY_SECONDS = 300; // 5 minutes for dynamic QR
+const BASE_UNITS_PER_CENT = 10_000n; // USDC/EURC use 6 decimals: 0.01 = 10_000
 const QR_VERSION = '1';
 const QR_SCHEME = 'mcbuse://pay';
 
@@ -49,22 +50,21 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
     // When line items are provided, the server computes the total — client `amount` is ignored.
     let computedAmount: bigint | null = null;
     if (hasLineItems) {
+      dto.lineItems!.forEach((it, index) => {
+        this.parseCentAmount(it.unitAmount, `lineItems[${index}].unitAmount`);
+      });
+
       computedAmount = dto.lineItems!.reduce(
         (sum, it) => sum + BigInt(it.unitAmount) * BigInt(it.quantity),
         0n,
       );
-      if (computedAmount <= 0n) {
-        throw new BadRequestException('Line items total must be positive');
-      }
       if (!dto.currency) {
         throw new BadRequestException('currency is required when lineItems are provided');
       }
     } else if (dto.type === 'dynamic') {
       if (!dto.amount) throw new BadRequestException('amount is required for dynamic payment requests');
       if (!dto.currency) throw new BadRequestException('currency is required for dynamic payment requests');
-      const amount = BigInt(dto.amount);
-      if (amount <= 0n) throw new BadRequestException('amount must be positive');
-      computedAmount = amount;
+      computedAmount = this.parseCentAmount(dto.amount, 'amount');
     }
 
     // P2P payments land in the routine wallet
@@ -271,6 +271,22 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
     if (pr.amount) params.set('amount', pr.amount.toString());
     if (pr.currency) params.set('currency', pr.currency);
     return `${QR_SCHEME}?${params.toString()}`;
+  }
+
+  private parseCentAmount(value: string, fieldName: string) {
+    if (!/^\d+$/.test(value)) {
+      throw new BadRequestException(`${fieldName} must be a non-negative integer string`);
+    }
+
+    const amount = BigInt(value);
+    if (amount < BASE_UNITS_PER_CENT) {
+      throw new BadRequestException(`${fieldName} must be at least 0.01 USDC/EURC`);
+    }
+    if (amount % BASE_UNITS_PER_CENT !== 0n) {
+      throw new BadRequestException(`${fieldName} must be cent-denominated`);
+    }
+
+    return amount;
   }
 
   private sanitize(pr: typeof schema.paymentRequests.$inferSelect) {

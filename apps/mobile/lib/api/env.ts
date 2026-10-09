@@ -4,9 +4,14 @@ import { Platform } from 'react-native';
 const API_PORT = 4000;
 const API_PREFIX = 'api/v1';
 
+const WEB_HOST =
+  Platform.OS === 'web' && typeof window !== 'undefined'
+    ? window.location.hostname
+    : 'localhost';
+
 const EMULATOR_HOST = Platform.select({
   android: '10.0.2.2',
-  default: '192.168.0.166',
+  default: WEB_HOST,
 });
 
 const FALLBACK_BASE_URL = `http://${EMULATOR_HOST}:${API_PORT}/${API_PREFIX}`;
@@ -39,10 +44,12 @@ function devServerApiBaseUrl(): string | undefined {
   return host ? `http://${host}:${API_PORT}/${API_PREFIX}` : undefined;
 }
 
+const inferredDevBaseUrl = __DEV__ ? devServerApiBaseUrl() : undefined;
+
 const apiBaseUrl =
+  inferredDevBaseUrl ??
   normalizeBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL) ??
   normalizeBaseUrl(extra.apiBaseUrl) ??
-  devServerApiBaseUrl() ??
   FALLBACK_BASE_URL;
 
 export const env = {

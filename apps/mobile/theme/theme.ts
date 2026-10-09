@@ -18,6 +18,12 @@ const theme = createTheme({
     bgBrand: palette.black,
     bgOverlay: palette.overlay,
 
+    // Account cards stay dark in both themes for brand consistency
+    accountCardBg: palette.black,
+    accountCardText: palette.white,
+    accountCardMutedText: 'rgba(255,255,255,0.52)',
+    accountCardDivider: 'rgba(255,255,255,0.12)',
+
     // Text
     textPrimary: palette.black,
     textSecondary: palette.gray700,

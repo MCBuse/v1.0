@@ -1,6 +1,7 @@
-import { useOperation } from '@/lib/api';
+import { useDataScreen, useOperation } from '@/lib/api';
 
 import {
+  type CancelPaymentRequestResponse,
   type CreatePaymentRequestInput,
   type ExecutePaymentInput,
   type ExecutePaymentResponse,
@@ -12,9 +13,31 @@ import {
 } from './models';
 import { paymentRepository } from './repository';
 
+const TERMINAL_PAYMENT_REQUEST_STATUSES = new Set(['completed', 'expired', 'cancelled']);
+
 export function useCreatePaymentRequest() {
   return useOperation<CreatePaymentRequestInput, PaymentRequest>({
     mutationFn: (input) => paymentRepository.createPaymentRequest(input),
+  });
+}
+
+export function usePaymentRequest(id: string | undefined, enabled = true) {
+  return useDataScreen<PaymentRequest>({
+    queryKey: ['payment-request', id],
+    queryFn:  () => paymentRepository.getPaymentRequest(id!),
+    enabled:  Boolean(id) && enabled,
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
+      if (!status || TERMINAL_PAYMENT_REQUEST_STATUSES.has(status)) return false;
+      return 2000;
+    },
+  });
+}
+
+export function useCancelPaymentRequest() {
+  return useOperation<string, CancelPaymentRequestResponse>({
+    mutationFn:     (id) => paymentRepository.cancelPaymentRequest(id),
+    invalidateKeys: [['payment-request']],
   });
 }
 

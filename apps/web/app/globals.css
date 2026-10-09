@@ -1,50 +1,90 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-text: #0a0a0a;
+  --color-muted: #666666;
+  --color-subtle: #aaaaaa;
+  --color-border: #e0e0e0;
+  --color-border-strong: #c8c8c8;
+  --color-accent: #0a0a0a;
+  --color-accent-hover: #333333;
+  --color-accent-soft: #f0f0f0;
+  --color-success: #505050;
+  --color-success-soft: #f0f0f0;
+  --color-warning: #888888;
+  --color-warning-soft: #f5f5f5;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-card: 14px;
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.04),
+    0 24px 48px -16px rgba(0, 0, 0, 0.12);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    text-rendering: optimizeLegibility;
+    background-image: linear-gradient(
+        rgba(0, 0, 0, 0.05) 1px,
+        transparent 1px
+      ),
+      linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  ::selection {
+    background: rgba(0, 0, 0, 0.08);
+    color: #0a0a0a;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.03em;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
   }
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.imgDark {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+@keyframes blob-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.55;
   }
-
-  .imgLight {
-    display: none;
+  33% {
+    transform: translate(48px, -36px) scale(1.06);
+    opacity: 0.75;
   }
-  .imgDark {
-    display: unset;
+  66% {
+    transform: translate(-32px, 24px) scale(0.94);
+    opacity: 0.45;
+  }
+}
+
+@keyframes blob-drift-alt {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate(-56px, 44px) scale(1.1);
+    opacity: 0.55;
   }
 }

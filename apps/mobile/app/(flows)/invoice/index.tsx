@@ -1,6 +1,6 @@
 import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
-import { Add, CloseCircle, Copy, Minus, Trash } from 'iconsax-react-native';
+import { Add, CloseCircle, Copy, Minus, TickCircle, Trash } from 'iconsax-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
@@ -16,15 +16,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 
 import { Box, Button, Input, Text } from '@/components/ui';
-import { useCreatePaymentRequest } from '@/features/payments';
+import { useCancelPaymentRequest, useCreatePaymentRequest, usePaymentRequest } from '@/features/payments';
 import type { LineItem, PaymentRequest } from '@/features/payments';
 import { formatAmount, toBaseUnits } from '@/lib/format';
 import type { Theme } from '@/theme';
 
 type Currency = 'USDC' | 'EURC';
 type Step = 'edit' | 'qr';
+type InvoiceMode = 'total' | 'items';
 
 const QR_EXPIRY = 300; // 5 minutes
+const CENT_BASE_UNITS = 10_000n;
+const TERMINAL_STATUSES = new Set(['completed', 'expired', 'cancelled']);
 
 type DraftItem = {
   id:          string;
@@ -46,7 +49,31 @@ function parseUnit(decimal: string): bigint {
 }
 
 function buildQrValue(req: PaymentRequest): string {
-  return `mcbuse://pay?nonce=${req.nonce}`;
+  return req.qrString ?? `mcbuse://pay?nonce=${req.nonce}`;
+}
+
+function normalizeMoneyInput(value: string): string {
+  const cleaned = value.replace(/[^0-9.]/g, '');
+  const [wholeRaw = '', ...fractionParts] = cleaned.split('.');
+  const whole = wholeRaw.replace(/^0+(?=\d)/, '');
+  const fraction = fractionParts.join('').slice(0, 2);
+  if (cleaned.includes('.')) return `${whole || '0'}.${fraction}`;
+  return whole;
+}
+
+function isCentAmount(amount: bigint): boolean {
+  return amount >= CENT_BASE_UNITS && amount % CENT_BASE_UNITS === 0n;
+}
+
+function isTerminalStatus(status: string): boolean {
+  return TERMINAL_STATUSES.has(status);
+}
+
+function statusTone(status: string) {
+  if (status === 'completed') return { label: 'Paid', color: '#16A34A', backgroundColor: 'rgba(22,163,74,0.1)' };
+  if (status === 'expired') return { label: 'Expired', color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.1)' };
+  if (status === 'cancelled') return { label: 'Cancelled', color: '#6B7280', backgroundColor: 'rgba(107,114,128,0.12)' };
+  return { label: 'Awaiting payment', color: '#B45309', backgroundColor: 'rgba(245,158,11,0.12)' };
 }
 
 export default function InvoiceScreen() {
@@ -54,26 +81,46 @@ export default function InvoiceScreen() {
   const insets = useSafeAreaInsets();
 
   const [step, setStep]               = useState<Step>('edit');
+  const [mode, setMode]               = useState<InvoiceMode>('total');
   const [currency, setCurrency]       = useState<Currency>('USDC');
   const [description, setDescription] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
   const [items, setItems]             = useState<DraftItem[]>(() => [newDraft()]);
   const [paymentReq, setPaymentReq]   = useState<PaymentRequest | null>(null);
 
   const create = useCreatePaymentRequest();
+  const cancelInvoice = useCancelPaymentRequest();
+  const statusQuery = usePaymentRequest(paymentReq?.id, step === 'qr' && Boolean(paymentReq));
+  const currentPaymentReq = useMemo(
+    () => {
+      if (!statusQuery.data) return paymentReq;
+      if (paymentReq && isTerminalStatus(paymentReq.status) && statusQuery.data.status === 'pending') {
+        return { ...paymentReq, qrString: paymentReq.qrString ?? statusQuery.data.qrString };
+      }
+      return { ...statusQuery.data, qrString: statusQuery.data.qrString ?? paymentReq?.qrString };
+    },
+    [paymentReq, statusQuery.data],
+  );
+  const currentStatus = currentPaymentReq?.status ?? 'pending';
+  const currentStatusTone = statusTone(currentStatus);
   const symbol = currency === 'EURC' ? '€' : '$';
 
   // ── Live subtotal ─────────────────────────────────────────────────────────
 
+  const totalBase = useMemo(() => parseUnit(totalAmount), [totalAmount]);
+
   const subtotalBase = useMemo(() => {
+    if (mode === 'total') return totalBase;
     return items.reduce((sum, it) => sum + parseUnit(it.unitDecimal) * BigInt(it.quantity), 0n);
-  }, [items]);
+  }, [items, mode, totalBase]);
 
   const canGenerate = useMemo(() => {
+    if (mode === 'total') return isCentAmount(totalBase);
     if (items.length === 0) return false;
     return items.every(
-      (it) => it.name.trim().length > 0 && it.quantity >= 1 && parseUnit(it.unitDecimal) > 0n,
+      (it) => it.name.trim().length > 0 && it.quantity >= 1 && isCentAmount(parseUnit(it.unitDecimal)),
     );
-  }, [items]);
+  }, [items, mode, totalBase]);
 
   // ── Item mutators ─────────────────────────────────────────────────────────
 
@@ -102,9 +149,10 @@ export default function InvoiceScreen() {
     try {
       const req = await create.mutateAsync({
         type:             'dynamic',
+        amount:           mode === 'total' ? subtotalBase.toString() : undefined,
         currency,
         description:      description.trim() || undefined,
-        lineItems,
+        lineItems:        mode === 'items' ? lineItems : undefined,
         expiresInSeconds: QR_EXPIRY,
       });
       setPaymentReq(req);
@@ -113,26 +161,41 @@ export default function InvoiceScreen() {
       const msg = err instanceof Error ? err.message : 'Could not create invoice. Please try again.';
       Alert.alert('Error', msg);
     }
-  }, [canGenerate, items, currency, description, create]);
+  }, [canGenerate, create, currency, description, items, mode, subtotalBase]);
 
   const handleShare = useCallback(async () => {
-    if (!paymentReq) return;
-    await Share.share({ message: buildQrValue(paymentReq) });
-  }, [paymentReq]);
+    if (!currentPaymentReq) return;
+    await Share.share({ message: buildQrValue(currentPaymentReq) });
+  }, [currentPaymentReq]);
 
   const reset = useCallback(() => {
     setStep('edit');
+    setTotalAmount('');
     setItems([newDraft()]);
     setDescription('');
     setPaymentReq(null);
   }, []);
 
+  const handleCancelInvoice = useCallback(async () => {
+    if (!currentPaymentReq || currentPaymentReq.status !== 'pending') return;
+    try {
+      await cancelInvoice.mutateAsync(currentPaymentReq.id);
+      setPaymentReq((prev) => (prev ? { ...prev, status: 'cancelled' } : prev));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not cancel this invoice.';
+      Alert.alert('Error', msg);
+    }
+  }, [cancelInvoice, currentPaymentReq]);
+
   // ── QR step ───────────────────────────────────────────────────────────────
 
-  if (step === 'qr' && paymentReq) {
-    const displayAmt = paymentReq.amount
-      ? formatAmount(paymentReq.amount, paymentReq.currency ?? undefined)
+  if (step === 'qr' && currentPaymentReq) {
+    const displayAmt = currentPaymentReq.amount
+      ? formatAmount(currentPaymentReq.amount, currentPaymentReq.currency ?? undefined)
       : '—';
+    const isTerminal = isTerminalStatus(currentStatus);
+    const isPaid = currentStatus === 'completed';
+    const canCancel = currentStatus === 'pending';
 
     return (
       <View style={[styles.screen, { backgroundColor: colors.bgPrimary, paddingTop: insets.top + 8 }]}>
@@ -156,6 +219,22 @@ export default function InvoiceScreen() {
           </Box>
 
           <Box
+            flexDirection="row"
+            alignItems="center"
+            gap="s"
+            marginBottom="l"
+            paddingHorizontal="m"
+            paddingVertical="s"
+            borderRadius="full"
+            style={{ backgroundColor: currentStatusTone.backgroundColor }}
+          >
+            {isPaid && <TickCircle size={16} color={currentStatusTone.color} variant="Bold" />}
+            <Text variant="captionMedium" style={{ color: currentStatusTone.color }}>
+              {currentStatusTone.label}
+            </Text>
+          </Box>
+
+          <Box
             backgroundColor="white"
             borderRadius="2xl"
             padding="2xl"
@@ -165,7 +244,7 @@ export default function InvoiceScreen() {
             marginBottom="2xl"
           >
             <QRCode
-              value={buildQrValue(paymentReq)}
+              value={buildQrValue(currentPaymentReq)}
               size={220}
               color="#000000"
               backgroundColor="#FFFFFF"
@@ -173,10 +252,16 @@ export default function InvoiceScreen() {
           </Box>
 
           <Text variant="caption" color="textTertiary" style={styles.centeredText}>
-            Expires in 5 minutes
+            {isPaid
+              ? 'Payment received.'
+              : currentStatus === 'expired'
+                ? 'This QR can no longer be paid.'
+                : currentStatus === 'cancelled'
+                  ? 'This invoice was cancelled.'
+                  : 'Expires in 5 minutes'}
           </Text>
 
-          {paymentReq.lineItems && paymentReq.lineItems.length > 0 && (
+          {currentPaymentReq.lineItems && currentPaymentReq.lineItems.length > 0 && (
             <Box
               alignSelf="stretch"
               marginTop="2xl"
@@ -185,7 +270,7 @@ export default function InvoiceScreen() {
               borderRadius="l"
               gap="s"
             >
-              {paymentReq.lineItems.map((it, idx) => {
+              {currentPaymentReq.lineItems.map((it, idx) => {
                 const lineBase = (BigInt(it.unitAmount) * BigInt(it.quantity)).toString();
                 return (
                   <Box key={`${it.name}_${idx}`} flexDirection="row" justifyContent="space-between" gap="m">
@@ -193,7 +278,7 @@ export default function InvoiceScreen() {
                       {it.quantity} × {it.name}
                     </Text>
                     <Text variant="bodyMedium">
-                      {formatAmount(lineBase, paymentReq.currency ?? undefined)}
+                      {formatAmount(lineBase, currentPaymentReq.currency ?? undefined)}
                     </Text>
                   </Box>
                 );
@@ -207,7 +292,16 @@ export default function InvoiceScreen() {
               variant="primary"
               leftIcon={<Copy size={18} color={colors.textInverse} variant="Linear" />}
               onPress={handleShare}
+              disabled={isTerminal}
             />
+            {canCancel && (
+              <Button
+                label={cancelInvoice.isPending ? 'Cancelling…' : 'Cancel Invoice'}
+                variant="secondary"
+                loading={cancelInvoice.isPending}
+                onPress={handleCancelInvoice}
+              />
+            )}
             <Button label="New Invoice" variant="ghost" onPress={reset} />
           </Box>
         </ScrollView>
@@ -262,6 +356,35 @@ export default function InvoiceScreen() {
             ))}
           </Box>
 
+          <Box
+            flexDirection="row"
+            backgroundColor="bgSecondary"
+            borderRadius="full"
+            padding="xs"
+            marginBottom="l"
+          >
+            {([
+              ['total', 'Total only'],
+              ['items', 'Line items'],
+            ] as const).map(([value, label]) => (
+              <Pressable
+                key={value}
+                onPress={() => setMode(value)}
+                style={[
+                  styles.modeTab,
+                  mode === value && { backgroundColor: colors.bgPrimary },
+                ]}
+              >
+                <Text
+                  variant="captionMedium"
+                  style={{ color: mode === value ? colors.textPrimary : colors.textSecondary }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </Box>
+
           {/* Description */}
           <Box marginBottom="l">
             <Input
@@ -273,30 +396,48 @@ export default function InvoiceScreen() {
             />
           </Box>
 
-          {/* Items */}
-          <Text variant="captionMedium" color="textSecondary" marginBottom="s">
-            Items
-          </Text>
+          {mode === 'total' ? (
+            <Box marginBottom="l">
+              <Input
+                label="Total"
+                prefix={symbol}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+                value={totalAmount}
+                onChangeText={(value) => setTotalAmount(normalizeMoneyInput(value))}
+              />
+              <Text variant="caption" color="textTertiary" style={styles.fieldHint}>
+                Minimum {symbol}0.01
+              </Text>
+            </Box>
+          ) : (
+            <>
+              {/* Items */}
+              <Text variant="captionMedium" color="textSecondary" marginBottom="s">
+                Items
+              </Text>
 
-          {items.map((it) => (
-            <ItemRow
-              key={it.id}
-              item={it}
-              symbol={symbol}
-              canRemove={items.length > 1}
-              colors={colors}
-              onChangeName={(name) => updateItem(it.id, { name })}
-              onChangeUnit={(unitDecimal) => updateItem(it.id, { unitDecimal })}
-              onIncQty={() => updateItem(it.id, { quantity: Math.min(999, it.quantity + 1) })}
-              onDecQty={() => updateItem(it.id, { quantity: Math.max(1, it.quantity - 1) })}
-              onRemove={() => removeItem(it.id)}
-            />
-          ))}
+              {items.map((it) => (
+                <ItemRow
+                  key={it.id}
+                  item={it}
+                  symbol={symbol}
+                  canRemove={items.length > 1}
+                  colors={colors}
+                  onChangeName={(name) => updateItem(it.id, { name })}
+                  onChangeUnit={(unitDecimal) => updateItem(it.id, { unitDecimal: normalizeMoneyInput(unitDecimal) })}
+                  onIncQty={() => updateItem(it.id, { quantity: Math.min(999, it.quantity + 1) })}
+                  onDecQty={() => updateItem(it.id, { quantity: Math.max(1, it.quantity - 1) })}
+                  onRemove={() => removeItem(it.id)}
+                />
+              ))}
 
-          <Pressable onPress={addItem} style={[styles.addBtn, { borderColor: colors.borderDefault }]}>
-            <Add size={18} color={colors.textPrimary} variant="Linear" />
-            <Text variant="bodyMedium">Add item</Text>
-          </Pressable>
+              <Pressable onPress={addItem} style={[styles.addBtn, { borderColor: colors.borderDefault }]}>
+                <Add size={18} color={colors.textPrimary} variant="Linear" />
+                <Text variant="bodyMedium">Add item</Text>
+              </Pressable>
+            </>
+          )}
 
           {/* Subtotal */}
           <Box
@@ -439,6 +580,16 @@ const styles = StyleSheet.create({
     paddingVertical:    8,
     borderRadius:       99,
     borderWidth:        1,
+  },
+  modeTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  fieldHint: {
+    marginTop: 6,
   },
   addBtn: {
     flexDirection:     'row',

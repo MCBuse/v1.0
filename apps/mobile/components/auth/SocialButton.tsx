@@ -1,10 +1,11 @@
 import { useTheme } from "@shopify/restyle";
 import * as Haptics from "expo-haptics";
 import React from "react";
-import { Pressable, StyleSheet, type PressableProps } from "react-native";
+import { Pressable, StyleSheet, type PressableProps, View } from "react-native";
 
 import type { Theme } from "@/theme";
-import { Box, Text } from "@/components/ui";
+import { Text } from "@/components/ui";
+import { AppleLogo, FacebookLogo, GoogleLogo } from "./brand-icons";
 
 export type SocialProvider = "apple" | "google" | "facebook";
 
@@ -14,11 +15,27 @@ interface SocialButtonProps extends Omit<PressableProps, "style"> {
 
 const PROVIDER_CONFIG: Record<
   SocialProvider,
-  { label: string; initial: string; dark: boolean }
+  {
+    label: string;
+    Icon: React.ComponentType<{ size?: number }>;
+    dark: boolean;
+  }
 > = {
-  apple: { label: "Continue with Apple", initial: "", dark: true },
-  google: { label: "Continue with Google", initial: "G", dark: false },
-  facebook: { label: "Continue with Facebook", initial: "f", dark: false },
+  apple: {
+    label: "Continue with Apple",
+    Icon: AppleLogo,
+    dark: true,
+  },
+  google: {
+    label: "Continue with Google",
+    Icon: GoogleLogo,
+    dark: false,
+  },
+  facebook: {
+    label: "Continue with Facebook",
+    Icon: FacebookLogo,
+    dark: false,
+  },
 };
 
 export function SocialButton({
@@ -55,20 +72,9 @@ export function SocialButton({
       accessibilityLabel={config.label}
       {...rest}
     >
-      {/* Logo placeholder — replace with real SVG logo per provider */}
-      <Box
-        style={[
-          styles.logo,
-          { backgroundColor: isDark ? colors.white : colors.bgSecondary },
-        ]}
-      >
-        <Text
-          variant="captionMedium"
-          style={{ color: isDark ? colors.textPrimary : colors.textSecondary }}
-        >
-          {config.initial}
-        </Text>
-      </Box>
+      <View style={styles.icon}>
+        <config.Icon size={22} />
+      </View>
 
       <Text variant="bodySemibold" style={[styles.label, { color: text }]}>
         {config.label}
@@ -87,12 +93,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 10,
   },
-  logo: {
+  icon: {
     width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
+    textAlign: "center",
   },
   label: {
     flex: 1,

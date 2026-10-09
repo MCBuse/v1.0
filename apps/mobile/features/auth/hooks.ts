@@ -18,12 +18,6 @@ import type {
 import { usePendingAuthStore } from './pending-store';
 import { authRepository } from './repository';
 
-/**
- * Submits email + password to /auth/login. Tokens are returned but NOT yet
- * written to the session — the caller (login screen) stashes them via the
- * pending-auth store and navigates to OTP. Only after OTP verification does
- * `commitPendingAuth` activate them.
- */
 export function useLogin() {
   return useOperation<LoginRequest, TokenPairResponse>({
     mutationFn: (input) => authRepository.login(input),
@@ -42,22 +36,26 @@ export function useSignup() {
   });
 }
 
-/**
- * Moves tokens from the pending-auth store into the session cache and flips
- * `isAuthenticated` — the root layout will swap route groups on the next render.
- */
-export function useCommitPendingAuth() {
-  const pending            = usePendingAuthStore((s) => s.pending);
+export function useCompleteAuth() {
   const clearPending       = usePendingAuthStore((s) => s.clear);
   const setIsAuthenticated = useAppStore((s) => s.setIsAuthenticated);
 
-  return useCallback(async () => {
-    if (!pending) return false;
-    await authSession.set(pending.tokens);
+  return useCallback(async (tokens: TokenPairResponse) => {
+    await authSession.set(tokens);
     clearPending();
     setIsAuthenticated(true);
+  }, [clearPending, setIsAuthenticated]);
+}
+
+export function useCommitPendingAuth() {
+  const pending = usePendingAuthStore((s) => s.pending);
+  const completeAuth = useCompleteAuth();
+
+  return useCallback(async () => {
+    if (!pending) return false;
+    await completeAuth(pending.tokens);
     return true;
-  }, [pending, clearPending, setIsAuthenticated]);
+  }, [pending, completeAuth]);
 }
 
 /**
