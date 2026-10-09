@@ -160,6 +160,12 @@ export class PaymentsService {
 
     await this.assertAvailableBalance(payerWallet.id, currency, amount);
 
+    if (!payerWallet.encryptedKeypair) {
+      throw new BadRequestException(
+        'Server-side signing not available for Privy-managed wallets; transfers must be initiated client-side',
+      );
+    }
+
     const transferResult = await this.transferProvider.execute({
       payerWalletId: payerWallet.id,
       payerPubkey: payerWallet.solanaPubkey,

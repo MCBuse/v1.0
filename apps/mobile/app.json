@@ -54,7 +54,19 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.5"
+          },
+          "android": {
+            "compileSdkVersion": 35
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -63,7 +75,9 @@
       "router": {},
       "eas": {
         "projectId": "24d4d4c3-a3fa-4088-b6f1-db39e8b0e82f"
-      }
+      },
+      "privyAppId": "cmp0fngli001a0bl5sxo0mo40",
+      "privyClientId": "client-WY6ZMQ6YJUWqv2xrSDekGJiGqpBiRpmd28sRg3kcPPCn4"
     }
   }
 }

@@ -6,6 +6,8 @@ import {
   IBMPlexSans_600SemiBold,
   IBMPlexSans_700Bold,
 } from '@expo-google-fonts/ibm-plex-sans';
+import { PrivyProvider } from '@privy-io/expo';
+import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -20,6 +22,9 @@ import { theme, darkTheme } from '@/theme';
 
 // Hold the splash until fonts are ready
 SplashScreen.preventAutoHideAsync();
+
+const privyAppId = Constants.expoConfig?.extra?.privyAppId as string;
+const privyClientId = Constants.expoConfig?.extra?.privyClientId as string;
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -40,21 +45,23 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <RestyleProvider theme={isDark ? darkTheme : theme}>
-      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-        <ApiProvider>
-          <Stack>
-            {/* index.tsx handles the boot redirect */}
-            <Stack.Screen name="index"   options={{ headerShown: false }} />
-            <Stack.Screen name="(guest)" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)"  options={{ headerShown: false }} />
-            {/* Transaction flows — presented as modals over the tab bar */}
-            <Stack.Screen name="(flows)" options={{ headerShown: false, presentation: 'modal' }} />
-            <Stack.Screen name="modal"   options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
-        </ApiProvider>
-      </ThemeProvider>
-    </RestyleProvider>
+    <PrivyProvider appId={privyAppId} clientId={privyClientId}>
+      <RestyleProvider theme={isDark ? darkTheme : theme}>
+        <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+          <ApiProvider>
+            <Stack>
+              {/* index.tsx handles the boot redirect */}
+              <Stack.Screen name="index"   options={{ headerShown: false }} />
+              <Stack.Screen name="(guest)" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)"  options={{ headerShown: false }} />
+              {/* Transaction flows — presented as modals over the tab bar */}
+              <Stack.Screen name="(flows)" options={{ headerShown: false, presentation: 'modal' }} />
+              <Stack.Screen name="modal"   options={{ presentation: 'modal', title: 'Modal' }} />
+            </Stack>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+          </ApiProvider>
+        </ThemeProvider>
+      </RestyleProvider>
+    </PrivyProvider>
   );
 }

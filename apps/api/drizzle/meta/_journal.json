@@ -57,6 +57,13 @@
       "when": 1778976000001,
       "tag": "0007_stripe_provider_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778485543831,
+      "tag": "0008_privy_auth",
+      "breakpoints": true
     }
   ]
 }
