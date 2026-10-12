@@ -41,7 +41,8 @@
     "test:clean": "node scripts/clean-test-data.mjs",
     "analytics:load": "ts-node -T src/data-capture/analytics/general-analytics.load.ts",
     "perf:payment": "ts-node -T src/data-capture/payment-api.perf.ts",
-    "credit:provision": "ts-node src/credit-assessment/provision-credit.ts"
+    "credit:provision": "ts-node src/credit-assessment/provision-credit.ts",
+    "db:seed:dev": "ts-node --transpile-only src/database/seed-issuers.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.1.0",
@@ -68,6 +69,7 @@
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
     "helmet": "^8.1.0",
+    "jose": "^5.9.6",
     "nestjs-pino": "^4.6.1",
     "nodemailer": "^10.0.10",
     "passport": "^0.7.0",

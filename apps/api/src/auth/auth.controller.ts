@@ -20,8 +20,10 @@ import { PhoneAuthGuard } from './guards/phone-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { SignupDto } from './dto/signup.dto';
+import { IssuerSignupDto } from './dto/issuer-signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginPhoneDto } from './dto/login-phone.dto';
+import { PrivyLoginDto } from './dto/privy-login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -44,6 +46,14 @@ export class AuthController {
   @ApiCreatedResponse({ description: 'Returns access and refresh tokens' })
   signup(@Body() dto: SignupDto) {
     return this.authService.signup(dto);
+  }
+
+  @Public()
+  @Post('issuer-signup')
+  @ApiOperation({ summary: 'Register an issuer account and organization' })
+  @ApiCreatedResponse({ description: 'Returns access and refresh tokens' })
+  signupIssuer(@Body() dto: IssuerSignupDto) {
+    return this.authService.signupIssuer(dto);
   }
 
   @Public()
@@ -72,6 +82,22 @@ export class AuthController {
     @CurrentUser() user: { id: string; email: string | null },
   ) {
     return this.authService.login(user);
+  }
+
+  @Public()
+  @Post('privy-login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Sign in via Privy (verifies Privy access token, upserts user + wallet)',
+  })
+  @ApiOkResponse({ description: 'Returns access and refresh tokens' })
+  privyLogin(@Body() dto: PrivyLoginDto) {
+    return this.authService.privyLogin({
+      privyAccessToken: dto.privyAccessToken,
+      solanaPubkey: dto.solanaPubkey,
+      email: dto.email,
+      phone: dto.phone,
+    });
   }
 
   @Public()

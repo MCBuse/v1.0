@@ -18,7 +18,7 @@ export const signupRequest = z.object({
   email:     z.string().email().optional(),
   phone:     z.string().optional(),
   username:  z.string().min(3).max(30),
-  password:  z.string().min(8),
+  password:  z.string().min(8).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/),
   firstName: z.string().min(1),
   lastName:  z.string().min(1),
 });
@@ -56,6 +56,14 @@ export const resetPasswordRequest = z
     message: 'email or phone is required',
   });
 export type ResetPasswordRequest = z.infer<typeof resetPasswordRequest>;
+
+export const privyLoginRequest = z.object({
+  privyAccessToken: z.string().min(20),
+  solanaPubkey:     z.string().min(32),
+  email:            z.string().email().optional(),
+  phone:            z.string().min(1).optional(),
+});
+export type PrivyLoginRequest = z.infer<typeof privyLoginRequest>;
 
 // ── Responses ───────────────────────────────────────────────────────────────
 

@@ -172,6 +172,11 @@ export class OfframpSessionsService {
 
     let depositTxHash: string;
     try {
+      if (!savings.encryptedKeypair) {
+        throw new BadRequestException(
+          'Server-side signing not available for Privy-managed wallets; sweep must be initiated client-side',
+        );
+      }
       depositTxHash = await this.solanaDeposits.sendUsdcDeposit({
         payerPubkey: savings.solanaPubkey,
         payerEncryptedKeypair: savings.encryptedKeypair,
@@ -484,6 +489,11 @@ export class OfframpSessionsService {
       .where(eq(schema.wallets.id, walletId))
       .limit(1);
     if (!wallet) throw new BadRequestException('Holding wallet not found');
+    if (!wallet.encryptedKeypair) {
+      throw new BadRequestException(
+        'Server-side signing not available for Privy-managed wallets',
+      );
+    }
     return wallet.encryptedKeypair;
   }
 

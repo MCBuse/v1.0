@@ -1,0 +1,52 @@
+# syntax=docker/dockerfile:1
+
+FROM node:22-slim AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV NEXT_TELEMETRY_DISABLED=1
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+
+FROM base AS deps
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/admin-dashboard/package.json apps/admin-dashboard/package.json
+COPY packages/eslint-config/package.json packages/eslint-config/package.json
+COPY packages/typescript-config/package.json packages/typescript-config/package.json
+
+RUN pnpm install --filter admin-dashboard... --frozen-lockfile
+
+FROM deps AS build
+
+# Inlined into the client bundle at build time.
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+COPY apps/admin-dashboard apps/admin-dashboard
+COPY apps/web/app/fonts apps/web/app/fonts
+COPY packages/eslint-config packages/eslint-config
+COPY packages/typescript-config packages/typescript-config
+
+RUN pnpm --filter admin-dashboard build
+
+FROM node:22-slim AS runner
+
+ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+ENV PORT=8080
+
+WORKDIR /app
+
+COPY --from=build /app/apps/admin-dashboard/.next/standalone ./
+COPY --from=build /app/apps/admin-dashboard/.next/static ./apps/admin-dashboard/.next/static
+
+WORKDIR /app/apps/admin-dashboard
+
+USER node
+
+EXPOSE 8080
+
+CMD ["node", "server.js"]

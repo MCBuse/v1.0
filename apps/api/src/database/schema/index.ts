@@ -17,3 +17,4 @@ export * from './merchant-events';
 export * from './merchant-analytics-work';
 export * from './merchant-assessments';
 export * from './credit-assessment';
+export * from './issuers';

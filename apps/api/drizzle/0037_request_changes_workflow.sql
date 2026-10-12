@@ -1,0 +1,2 @@
+ALTER TYPE "public"."stablecoin_submission_status" ADD VALUE 'needs_changes' BEFORE 'approved';--> statement-breakpoint
+ALTER TYPE "public"."submission_review_action" ADD VALUE 'changes_requested' BEFORE 'approved';

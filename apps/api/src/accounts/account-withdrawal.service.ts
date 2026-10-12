@@ -166,6 +166,10 @@ export class AccountWithdrawalService {
       throw new Error('Source account does not belong to the operation owner');
     }
 
+    if (!source.encryptedKeypair) {
+      await this.refuseSigning(operation, source.id, 'no_custodial_key');
+      throw new Error('Server-side signing not available for Privy-managed wallets');
+    }
     const keypair = this.solana.decryptKeypair(source.encryptedKeypair);
     if (keypair.publicKey.toBase58() !== source.solanaPubkey) {
       await this.refuseSigning(operation, source.id, 'address_mismatch');

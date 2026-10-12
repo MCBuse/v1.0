@@ -5,6 +5,7 @@ import {
   ArrowSwapHorizontal,
   Send2,
 } from 'iconsax-react-native';
+import { router } from 'expo-router';
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -15,7 +16,6 @@ import {
   type ListRenderItem,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 
 import { Box, Text } from '@/components/ui';
 import { useTransactions } from '@/features/transactions';
@@ -318,7 +318,11 @@ export default function ActivityScreen() {
   const renderEntry = useCallback<ListRenderItem<LedgerEntry | null>>(
     ({ item }) => {
       if (!item) return <TxSkeleton colors={skeletonColors} />;
-      return <TxRow entry={item} colors={rowColors} walletIds={ownWalletIds} />;
+      return (
+        <Pressable onPress={() => router.push({ pathname: '/(flows)/receipt', params: { id: item.id } })}>
+          <TxRow entry={item} colors={rowColors} walletIds={ownWalletIds} />
+        </Pressable>
+      );
     },
     [ownWalletIds, rowColors, skeletonColors],
   );

@@ -173,6 +173,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async executeByUsername(payerUserId: string, dto: ExecuteUsernamePaymentDto) {
+    this.logger.log(`[executeByUsername] Starting payment from ${payerUserId} to @${dto.username}`);
+
     const recipient = await this.usersService.findByUsername(dto.username);
     if (!recipient || !recipient.isActive)
       throw new NotFoundException('Recipient not found');
@@ -335,6 +337,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (!merchantPaymentRequest)
       await this.assertAvailableBalance(payerWallet.id, currency, amount);
     if (process.env.MONEY_INITIATION_ENABLED === 'false') throw new BadRequestException('New money movements are temporarily disabled');
+    if (!payerWallet.encryptedKeypair) {
+      throw new BadRequestException(
+        'Server-side signing not available for Privy-managed wallets; transfers must be initiated client-side',
+      );
+    }
     const transferResult = await this.transferProvider.execute({
       payerWalletId: payerWallet.id,
       payerPubkey: payerWallet.solanaPubkey,

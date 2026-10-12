@@ -1,3 +1,4 @@
+import { usePrivy } from '@privy-io/expo';
 import { Stack } from 'expo-router';
 
 export default function GuestLayout() {

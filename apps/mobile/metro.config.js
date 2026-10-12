@@ -8,6 +8,19 @@ const { getDefaultConfig } = require("expo/metro-config");
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, "../..");
 
+const escapePathForRegex = (filePath) =>
+    filePath.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
+
+const blockList = (config, paths) => [
+    ...(Array.isArray(config.resolver.blockList)
+        ? config.resolver.blockList
+        : [config.resolver.blockList].filter(Boolean)),
+    ...paths.map(
+        (filePath) =>
+            new RegExp(`${escapePathForRegex(filePath)}(?:[/\\\\].*)?$`),
+    ),
+];
+
 module.exports = (() => {
     const config = getDefaultConfig(projectRoot);
 
@@ -40,8 +53,31 @@ module.exports = (() => {
             path.resolve(workspaceRoot, "node_modules"),
         ],
         unstable_enableSymlinks: true,
-        assetExts: [...resolver?.assetExts?.filter((ext) => ext !== "svg"), 'lottie'],
+        assetExts: [...resolver?.assetExts?.filter((ext) => ext !== "svg"), 'lottie', 'wasm'],
+        blockList: blockList(config, [
+            path.join(workspaceRoot, "apps", "api", "node_modules"),
+            path.join(workspaceRoot, "apps", "portal", "node_modules"),
+            path.join(workspaceRoot, "apps", "issuers-dashboard", "node_modules"),
+            path.join(workspaceRoot, "apps", "admin-dashboard", "node_modules"),
+            path.join(workspaceRoot, "packages", "eslint-config", "node_modules"),
+            path.join(workspaceRoot, "packages", "shared", "node_modules"),
+            path.join(workspaceRoot, "packages", "typescript-config", "node_modules"),
+            path.join(workspaceRoot, "packages", "ui", "node_modules"),
+        ]),
         sourceExts: [...resolver.sourceExts, "svg"],
+    };
+
+    // Privy ships `jose` with broken package.exports; force the browser build.
+    const upstreamResolveRequest = config.resolver.resolveRequest;
+    config.resolver.resolveRequest = (context, moduleName, platform) => {
+        if (moduleName === 'jose') {
+            return context.resolveRequest(
+                { ...context, unstable_conditionNames: ['browser'] },
+                moduleName,
+                platform,
+            );
+        }
+        return (upstreamResolveRequest || context.resolveRequest)(context, moduleName, platform);
     };
 
     return config;

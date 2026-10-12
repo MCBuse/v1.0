@@ -8,6 +8,7 @@ import {
 } from '../database/testing/test-database';
 import * as schema from '../database/schema';
 import { AuthService } from './auth.service';
+import { PrivyJwtService } from './privy/privy-jwt.service';
 import type { UsersService } from '../users/users.service';
 import type { WalletsService } from '../wallets/wallets.service';
 import type { JwtService } from '@nestjs/jwt';
@@ -51,6 +52,7 @@ describe('AuthService password reset (integration)', () => {
       {} as ConfigService,
       db,
       { sendOtp: () => Promise.resolve() } as unknown as OtpProvider,
+      {} as PrivyJwtService,
     );
   });
 

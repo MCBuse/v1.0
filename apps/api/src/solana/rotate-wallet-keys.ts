@@ -18,6 +18,16 @@ export interface WalletRotationReport {
   mismatched: Array<{ walletId: string; expected: string; derived: string }>;
 }
 
+// Privy-managed wallets have no server-held key, so rotation and recovery skip them.
+function custodialOnly<T extends { encryptedKeypair: string | null }>(
+  rows: T[],
+): Array<T & { encryptedKeypair: string }> {
+  return rows.filter(
+    (row): row is T & { encryptedKeypair: string } =>
+      row.encryptedKeypair !== null,
+  );
+}
+
 export interface RotationOptions {
   /** When false the database is not written to; the checks still run. */
   apply: boolean;
@@ -51,7 +61,9 @@ export async function rotateWalletEncryption(
     options.walletIds
       ? selection.where(inArray(schema.wallets.id, options.walletIds))
       : selection
-  ).limit(options.limit ?? 10_000);
+  )
+    .limit(options.limit ?? 10_000)
+    .then(custodialOnly);
 
   const report: WalletRotationReport = {
     total: wallets.length,
@@ -145,9 +157,11 @@ export async function verifyWalletRecovery(
       encryptedKeypair: schema.wallets.encryptedKeypair,
     })
     .from(schema.wallets);
-  const wallets = await (walletIds
-    ? selection.where(inArray(schema.wallets.id, walletIds))
-    : selection);
+  const wallets = custodialOnly(
+    await (walletIds
+      ? selection.where(inArray(schema.wallets.id, walletIds))
+      : selection),
+  );
 
   const failures: Array<{ walletId: string; reason: string }> = [];
   for (const wallet of wallets) {

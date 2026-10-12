@@ -2,10 +2,12 @@ packages:
   - "apps/*"
   - "packages/*"
 overrides:
-  react: 19.1.0
-  react-dom: 19.1.0
-  react-native: 0.81.5
-  react-native-svg: 15.12.1
+  react: 19.2.3
+  react-dom: 19.2.3
+  react-native: 0.86.3
+  react-native-svg: 15.15.4
+  eslint-plugin-react-hooks>zod-validation-error: ^4.0.0
+  drizzle-orm>expo-sqlite: '-'
 allowBuilds:
   '@nestjs/core': true
   '@scarf/scarf': true

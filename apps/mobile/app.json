@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mcbuse",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.f-o-nyarko.mcbuse",
@@ -28,7 +27,6 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.f_o_nyarko.mcbuse",
       "permissions": [
@@ -36,7 +34,7 @@
       ]
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -54,7 +52,19 @@
         }
       ],
       "expo-secure-store",
-      "./plugins/with-ios-build-compatibility"
+      "./plugins/with-ios-build-compatibility",
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.5"
+          },
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -63,7 +73,9 @@
       "router": {},
       "eas": {
         "projectId": "24d4d4c3-a3fa-4088-b6f1-db39e8b0e82f"
-      }
+      },
+      "privyAppId": "cmp0fngli001a0bl5sxo0mo40",
+      "privyClientId": "client-WY6ZMQ6YJUWqv2xrSDekGJiGqpBiRpmd28sRg3kcPPCn4"
     }
   }
 }

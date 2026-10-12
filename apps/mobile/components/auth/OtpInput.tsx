@@ -22,6 +22,7 @@ export function OtpInput({
 }: OtpInputProps) {
   const { colors } = useTheme<Theme>();
   const inputRef = useRef<TextInput>(null);
+  const filledValueRef = useRef<string | null>(null);
   // Start as true — autoFocus fires before first paint on most devices;
   // onBlur will set it back to false if the user dismisses.
   const [focused, setFocused] = useState(true);
@@ -32,7 +33,14 @@ export function OtpInput({
 
   // Trigger onFilled when last digit lands
   useEffect(() => {
-    if (value.length === length) onFilled?.(value);
+    if (value.length !== length) {
+      filledValueRef.current = null;
+      return;
+    }
+    if (filledValueRef.current === value) return;
+
+    filledValueRef.current = value;
+    onFilled?.(value);
   }, [value, length, onFilled]);
 
   return (

@@ -64,8 +64,22 @@ export class StripeOnrampProvider implements OnrampWidgetProvider {
         );
       }
     }
-    const url = await this.createCheckoutSession(params);
-    return { widgetUrl: url, internalReference: params.internalReference };
+    try {
+      const url = await this.createCheckoutSession(params);
+      return { widgetUrl: url, internalReference: params.internalReference };
+    } catch (err) {
+      const error = err as Error;
+      if (error.message?.includes('Invalid API Key') || error.message?.includes('authentication')) {
+        this.logger.error(
+          'Stripe API authentication failed. STRIPE_SECRET_KEY may be invalid. ' +
+          'Get a real test key from https://dashboard.stripe.com/test/apikeys'
+        );
+        throw new Error(
+          'Payment provider is not configured. Please contact support or set STRIPE_SECRET_KEY to a valid test key.'
+        );
+      }
+      throw err;
+    }
   }
 
   private async createCryptoOnrampSession(

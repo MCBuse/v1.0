@@ -5,6 +5,7 @@ import {
   type ForgotPasswordRequest,
   type LoginPhoneRequest,
   type LoginRequest,
+  type PrivyLoginRequest,
   type ResetPasswordRequest,
   type SendOtpRequest,
   type SignupRequest,
@@ -32,6 +33,11 @@ export const authRepository = {
 
   async signup(input: SignupRequest): Promise<TokenPairResponse> {
     const raw = await http.post<unknown>('/auth/signup', input);
+    return tokenPairResponse.parse(raw);
+  },
+
+  async privyLogin(input: PrivyLoginRequest): Promise<TokenPairResponse> {
+    const raw = await http.post<unknown>('/auth/privy-login', input);
     return tokenPairResponse.parse(raw);
   },
 

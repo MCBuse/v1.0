@@ -90,11 +90,13 @@ describe('wallet key rotation (integration)', () => {
     await pool.end();
   });
 
+  // The fixture wallets are all custodial, so every row carries a keypair.
   async function ourWallets() {
-    return db
+    const rows = await db
       .select()
       .from(schema.wallets)
       .where(inArray(schema.wallets.id, walletIds));
+    return rows.map((row) => ({ ...row, encryptedKeypair: row.encryptedKeypair! }));
   }
 
   it('reads pre-versioning records as v1', async () => {

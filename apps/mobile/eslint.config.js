@@ -7,6 +7,13 @@ module.exports = defineConfig([
   expoConfig,
   reactCompiler.configs.recommended,
   {
-    ignores: ['dist/*'],
+    ignores: ['dist/*', '.expo/*'],
+  },
+  {
+    // react-hooks v7 (eslint-config-expo 57) promotes these to errors; the flagged
+    // code is intentional (countdowns, one-shot session reads, web hydration).
+    rules: {
+      'react-hooks/set-state-in-effect': 'warn',
+    },
   },
 ]);

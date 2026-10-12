@@ -147,6 +147,10 @@ export class AccountTransferService {
       throw new Error('Refusing to sign a non-positive transfer');
     }
 
+    if (!source.encryptedKeypair) {
+      await this.refuseSigning(operation, source.id, 'no_custodial_key');
+      throw new Error('Server-side signing not available for Privy-managed wallets');
+    }
     const keypair = this.solana.decryptKeypair(source.encryptedKeypair);
     if (keypair.publicKey.toBase58() !== source.solanaPubkey) {
       await this.refuseSigning(operation, source.id, 'address_mismatch');

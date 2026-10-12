@@ -1,23 +1,26 @@
 import { ThemeProvider as RestyleProvider } from '@shopify/restyle';
 import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from '@react-navigation/native';
-import {
   IBMPlexSans_400Regular,
   IBMPlexSans_500Medium,
   IBMPlexSans_600SemiBold,
   IBMPlexSans_700Bold,
 } from '@expo-google-fonts/ibm-plex-sans';
+import { PrivyProvider } from '@privy-io/expo';
+import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
+// Only import reanimated on native platforms to avoid SSR issues
+if (Platform.OS !== 'web') {
+  require('react-native-reanimated');
+}
+
+import { ConnectivityIndicator } from '@/components/ui/ConnectivityIndicator';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ApiProvider } from '@/lib/api';
 import { theme, darkTheme } from '@/theme';
@@ -26,24 +29,26 @@ import { useAppStore } from '@/store/app-store';
 // Hold the splash until fonts are ready
 SplashScreen.preventAutoHideAsync();
 
-function RootNavigator() {
+const privyAppId = Constants.expoConfig?.extra?.privyAppId as string;
+const privyClientId = Constants.expoConfig?.extra?.privyClientId as string;
+
+function RootNavigator({ isDark }: { isDark: boolean }) {
   const isAuthenticated = useAppStore((s) => s.isAuthenticated);
 
   return (
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="(guest)" options={{ headerShown: false }} />
+    <Stack screenOptions={{
+      headerShown: false,
+      contentStyle: { backgroundColor: isDark ? '#000' : '#fff' }
+    }}>
+      {/* index.tsx handles the boot redirect */}
+      <Stack.Screen name="index" />
+      <Stack.Screen name="(guest)" />
       <Stack.Protected guard={isAuthenticated}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="(flows)"
-          options={{ headerShown: false, presentation: 'modal' }}
-        />
-        <Stack.Screen
-          name="modal"
-          options={{ presentation: 'modal', title: 'Modal' }}
-        />
-        <Stack.Screen name="receive" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" />
+        {/* Transaction flows — presented as modals over the tab bar */}
+        <Stack.Screen name="(flows)" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen name="receive" />
       </Stack.Protected>
     </Stack>
   );
@@ -68,13 +73,14 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <RestyleProvider theme={isDark ? darkTheme : theme}>
-      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+    <PrivyProvider appId={privyAppId} clientId={privyClientId}>
+      <RestyleProvider theme={isDark ? darkTheme : theme}>
         <ApiProvider>
-          <RootNavigator />
+          <ConnectivityIndicator />
+          <RootNavigator isDark={isDark} />
           <StatusBar style={isDark ? 'light' : 'dark'} />
         </ApiProvider>
-      </ThemeProvider>
-    </RestyleProvider>
+      </RestyleProvider>
+    </PrivyProvider>
   );
 }
