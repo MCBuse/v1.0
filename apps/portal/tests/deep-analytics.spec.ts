@@ -262,7 +262,7 @@ test("the view switch links to General analytics and marks Deep analytics curren
 }) => {
   await page.goto("/analytics/deep");
   const views = page.getByRole("navigation", { name: "Analytics views" });
-  await expect(views.getByRole("button", { name: "Deep analytics" })).toHaveAttribute(
+  await expect(views.getByRole("link", { name: "Deep analytics" })).toHaveAttribute(
     "aria-current",
     "page",
   );

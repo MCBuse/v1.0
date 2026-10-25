@@ -6,7 +6,8 @@ import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardHeader } from "@repo/ui/card";
 import { Skeleton } from "@repo/ui/skeleton";
-import { RefreshCw } from "lucide-react";
+import { ArrowRight, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
 
 const tone = (
@@ -177,6 +178,16 @@ function InsightCard({ insight }: { insight: MerchantInsight }) {
           <p className="text-xs leading-5 text-slate-500">
             {insight.limitations.join(" ")}
           </p>
+        ) : null}
+        {insight.changeCaseId ? (
+          <Link
+            href={`/analytics/changes/${insight.changeCaseId}`}
+            className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-md font-medium text-blue-700 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+          >
+            View explanation
+            <ArrowRight size={16} aria-hidden="true" />
+            <span className="sr-only">: {insight.title}</span>
+          </Link>
         ) : null}
         <p className="text-[11px] uppercase tracking-wide text-slate-400">
           {insight.narrationSource === "groq"

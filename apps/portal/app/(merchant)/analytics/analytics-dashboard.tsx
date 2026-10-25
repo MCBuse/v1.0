@@ -15,7 +15,6 @@ import {
   TableRow,
 } from "@repo/ui/table";
 import { RefreshCw } from "lucide-react";
-import Link from "next/link";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
 import {
   AnalyticsFilters,
@@ -23,6 +22,7 @@ import {
 } from "@/components/analytics-filters";
 import { MerchantInsightsPanel } from "@/components/merchant-insights";
 import { PageSection } from "@/components/page-section";
+import { AnalyticsNav } from "@/components/analytics-nav";
 
 /**
  * Deep analytics: only what General analytics does not already show.
@@ -44,12 +44,7 @@ export function AnalyticsDashboard() {
           established facts about turnover, profit or cause.
         </p>
       </div>
-      <nav aria-label="Analytics views" className="flex flex-wrap gap-2">
-        <Button asChild variant="secondary">
-          <Link href="/analytics/general">General analytics</Link>
-        </Button>
-        <Button aria-current="page">Deep analytics</Button>
-      </nav>
+      <AnalyticsNav />
       <MerchantInsightsPanel />
       <RecordedPatterns />
     </div>
