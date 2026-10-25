@@ -167,6 +167,15 @@ export class MerchantController {
     return this.inventory.listProducts(user.id, query);
   }
 
+  @Get('products/:id')
+  @ApiOperation({ summary: 'Get one inventory product' })
+  getProduct(
+    @CurrentUser() user: { id: string },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.inventory.getProduct(user.id, id);
+  }
+
   @Post('products')
   @ApiOperation({ summary: 'Create an inventory product' })
   createProduct(

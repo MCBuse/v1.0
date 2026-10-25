@@ -150,6 +150,20 @@ export class MerchantInventoryService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /** One product for the inventory deep link; same shape as a list item. 404 outside the merchant. */
+  async getProduct(userId: string, productId: string): Promise<MerchantProductPage['items'][number]> {
+    const merchant = await this.merchants.requireMerchant(userId);
+    const row = await this.requireProduct(merchant.merchantId, productId);
+    const sources = await this.db
+      .selectDistinct({ sourceName: schema.merchantProductSourceMappings.sourceName })
+      .from(schema.merchantProductSourceMappings)
+      .where(and(
+        eq(schema.merchantProductSourceMappings.merchantId, merchant.merchantId),
+        eq(schema.merchantProductSourceMappings.productId, row.id),
+      ));
+    return { ...this.productResponse(row), sourceNames: sources.map((s) => s.sourceName) };
+  }
+
   async lowStockCount(userId: string): Promise<number> {
     const merchant = await this.merchants.requireMerchant(userId);
     const rows = await this.db

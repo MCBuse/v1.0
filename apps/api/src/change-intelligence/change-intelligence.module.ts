@@ -3,13 +3,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ChangeIntelligenceConfig } from './change-intelligence.config';
 import { ChangePublisherService } from './change-publisher.service';
 import { ChangeProcessorService } from './change-processor.service';
+import { ChangeReadService } from './change-read.service';
 import { ChangeSourceLoader } from './change-source.loader';
 import { ChangeWorkQueueService } from './change-work-queue.service';
 
 /**
  * Change Intelligence services. No timers: processing runs only in the
- * dedicated worker (change-worker.ts). Read APIs (Stage 4) import this module
- * for `ChangeIntelligenceConfig.isEnabledFor` and the queue's status helpers.
+ * dedicated worker (change-worker.ts). The API imports this module for the
+ * merchant read side (ChangeReadService) and the Deep Analytics adapter.
  * Constructing the config validates settings and the registry, so a bad
  * configuration refuses to start.
  */
@@ -26,11 +27,13 @@ import { ChangeWorkQueueService } from './change-work-queue.service';
     ChangeSourceLoader,
     ChangePublisherService,
     ChangeProcessorService,
+    ChangeReadService,
   ],
   exports: [
     ChangeIntelligenceConfig,
     ChangeWorkQueueService,
     ChangeProcessorService,
+    ChangeReadService,
   ],
 })
 export class ChangeIntelligenceModule {}

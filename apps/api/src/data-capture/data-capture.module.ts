@@ -16,10 +16,13 @@ import { MerchantEvidenceAttachmentService } from './merchant-evidence-attachmen
 import { AnalyticsIntelligenceModule } from '../analytics-intelligence/analytics-intelligence.module';
 import { GeneralAnalyticsService } from './analytics/general-analytics.service';
 import { MerchantAssessmentService } from './assessment/merchant-assessment.service';
+import { ChangeIntelligenceModule } from '../change-intelligence/change-intelligence.module';
+import { ChangeController } from '../change-intelligence/change.controller';
 
 @Module({
-  imports: [RatesModule, AnalyticsIntelligenceModule],
-  controllers: [MerchantController, MerchantCreditController, StaffCreditController],
+  imports: [RatesModule, AnalyticsIntelligenceModule, ChangeIntelligenceModule],
+  // ChangeController lives here because it needs MerchantService owner resolution.
+  controllers: [MerchantController, ChangeController, MerchantCreditController, StaffCreditController],
   providers: [
     ScoringClient, CreditEvidenceService, CreditAccessService, CreditAnalystGuard, StaffCreditService,
     GeneralAnalyticsService,

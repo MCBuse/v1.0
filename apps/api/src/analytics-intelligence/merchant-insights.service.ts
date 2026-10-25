@@ -1,7 +1,7 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
-import type { MerchantInsightsResponse } from '@repo/shared';
+import type { MerchantInsight, MerchantInsightKind, MerchantInsightsResponse } from '@repo/shared';
 import { and, asc, desc, eq, gte, isNotNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
@@ -9,10 +9,14 @@ import * as schema from '../database/schema';
 import {
   ANALYTICS_CALCULATION_VERSION,
   calculateMerchantIntelligence,
+  supersededByChangeIntelligence,
   type IntelligenceActivity,
   type IntelligenceProductLine,
 } from './merchant-insights.engine';
 import { GroqNarrationService } from './groq-narration.service';
+import { ChangeReadService } from '../change-intelligence/change-read.service';
+
+const KIND_ORDER: Record<MerchantInsightKind, number> = { stock_risk: 0, discrepancy: 1, anomaly: 2, performance: 3 };
 
 const WORKER_LOCK_ID = 742_026_091;
 
@@ -24,10 +28,12 @@ export class MerchantInsightsService {
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly config: ConfigService,
     private readonly narration: GroqNarrationService,
+    /** Absent = legacy only. Present: Change Intelligence owns product stock-risk and demand outputs where it is initialized (§2.5). */
+    @Optional() private readonly changes?: ChangeReadService,
   ) {}
 
   async getForUser(userId: string): Promise<MerchantInsightsResponse> {
-    const rows = await this.db.select({ merchantId: schema.merchants.id, publicId: schema.merchants.publicId }).from(schema.merchantMemberships).innerJoin(schema.merchants, eq(schema.merchants.id, schema.merchantMemberships.merchantId)).where(eq(schema.merchantMemberships.userId, userId)).limit(1);
+    const rows = await this.db.select({ merchantId: schema.merchants.id, publicId: schema.merchants.publicId, isActive: schema.merchants.isActive }).from(schema.merchantMemberships).innerJoin(schema.merchants, eq(schema.merchants.id, schema.merchantMemberships.merchantId)).where(eq(schema.merchantMemberships.userId, userId)).limit(1);
     const merchant = rows[0];
     if (!merchant) return this.emptyResponse('disabled', 'Business intelligence is not enabled for this merchant.');
     const [work] = await this.db.select().from(schema.merchantAnalyticsWork).where(eq(schema.merchantAnalyticsWork.merchantId, merchant.merchantId)).limit(1);
@@ -38,6 +44,8 @@ export class MerchantInsightsService {
     const snapshot = snapshots[0];
     const lastFailure = await this.lastFailure(merchant.merchantId);
     if (!snapshot) return { ...this.emptyResponse('updating', 'Insights are being prepared from recorded activity.'), stale: Boolean(work), backlog, lastFailure };
+    // Read-time guard too: a snapshot calculated before the switch must not show a second forecast.
+    const adapter = await this.changes?.deepAnalyticsInsights({ id: merchant.merchantId, publicId: merchant.publicId, isActive: merchant.isActive });
     const rowsForSnapshot = await this.db.select().from(schema.merchantInsights).where(and(eq(schema.merchantInsights.snapshotId, snapshot.id), eq(schema.merchantInsights.active, true))).orderBy(asc(schema.merchantInsights.priority), asc(schema.merchantInsights.code));
     const sourceCoverage = snapshot.sourceCoverage as Record<string, number>;
     const snapshotBody = snapshot.snapshot as { metrics?: Record<string, unknown> };
@@ -60,9 +68,16 @@ export class MerchantInsightsService {
         staleAfterMinutes,
       },
       lastFailure,
-      insights: rowsForSnapshot.map((row) => ({ id: row.id, code: row.code, kind: row.kind as 'stock_risk' | 'discrepancy' | 'anomaly' | 'performance', priority: row.priority, title: row.title, summary: row.summary, recommendation: row.recommendation, evidence: row.evidence as Array<{ id: string; label: string; value: string }>, limitations: row.limitations as string[], narrationSource: row.narrationSource as 'deterministic' | 'groq' })),
+      insights: this.withChangeIntelligence(rowsForSnapshot.map((row): MerchantInsight => ({ id: row.id, code: row.code, kind: row.kind as MerchantInsightKind, priority: row.priority, title: row.title, summary: row.summary, recommendation: row.recommendation, evidence: row.evidence as Array<{ id: string; label: string; value: string }>, limitations: row.limitations as string[], narrationSource: row.narrationSource as 'deterministic' | 'groq' })), adapter),
       message: mixedData ? 'Mixed recorded activity—included test or unclassified records.' : null,
     };
+  }
+
+  /** Replaces legacy product stock-risk/demand codes with Change Intelligence insights when it is authoritative. */
+  private withChangeIntelligence(legacy: MerchantInsight[], adapter: MerchantInsight[] | null | undefined): MerchantInsight[] {
+    if (!adapter) return legacy;
+    return [...legacy.filter((insight) => !supersededByChangeIntelligence(insight.code)), ...adapter]
+      .sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind] || left.priority - right.priority || left.code.localeCompare(right.code));
   }
 
   /** The full sweep feeds the same leased queue as source changes. */
@@ -112,8 +127,9 @@ export class MerchantInsightsService {
       ...digitalLines.filter((item): item is typeof item & { productId: string } => Boolean(item.productId)).map((item) => ({ ...item, source: 'mcbuse_payment' as const, stockAccountedFor: false })),
       ...cashLines.filter((item): item is typeof item & { productId: string } => Boolean(item.productId)).map((item) => ({ ...item, source: 'merchant_cash' as const })),
     ];
-    const calculation = calculateMerchantIntelligence({ now, timezone: merchant.timezone, activities, productLines, products: products.map((product) => ({ id: product.id, name: product.name, category: product.category?.trim() || 'Uncategorised', availableQuantity: product.onHandQuantity - product.reservedQuantity, lowStockThreshold: product.lowStockThreshold })), stockMovements: movements });
-    const fingerprint = createHash('sha256').update(JSON.stringify({ periodFrom: calculation.periodFrom, activities, productLines, products, movements, aiNarrationEnabled: this.config.get<string>('MERCHANT_AI_NARRATION_ENABLED') === 'true' }, (_key, value) => typeof value === 'bigint' ? value.toString() : value)).digest('hex');
+    const suppressChangeIntelligenceCodes = (await this.changes?.isAuthoritative({ id: merchant.id, publicId: merchant.publicId, isActive: true })) ?? false;
+    const calculation = calculateMerchantIntelligence({ now, timezone: merchant.timezone, suppressChangeIntelligenceCodes, activities, productLines, products: products.map((product) => ({ id: product.id, name: product.name, category: product.category?.trim() || 'Uncategorised', availableQuantity: product.onHandQuantity - product.reservedQuantity, lowStockThreshold: product.lowStockThreshold })), stockMovements: movements });
+    const fingerprint = createHash('sha256').update(JSON.stringify({ periodFrom: calculation.periodFrom, activities, productLines, products, movements, aiNarrationEnabled: this.config.get<string>('MERCHANT_AI_NARRATION_ENABLED') === 'true', suppressChangeIntelligenceCodes }, (_key, value) => typeof value === 'bigint' ? value.toString() : value)).digest('hex');
     const existing = await this.db.select({ id: schema.merchantAnalyticsSnapshots.id }).from(schema.merchantAnalyticsSnapshots).where(and(eq(schema.merchantAnalyticsSnapshots.merchantId, merchant.id), eq(schema.merchantAnalyticsSnapshots.calculationVersion, ANALYTICS_CALCULATION_VERSION), eq(schema.merchantAnalyticsSnapshots.inputFingerprint, fingerprint))).limit(1);
     if (existing[0]) {
       await this.db.update(schema.merchantAnalyticsSnapshots).set({ periodTo: calculation.periodTo, sourceCoverage: calculation.sourceCoverage, snapshot: { metrics: calculation.metrics, mixedData: calculation.mixedData }, generatedAt: now }).where(eq(schema.merchantAnalyticsSnapshots.id, existing[0].id));

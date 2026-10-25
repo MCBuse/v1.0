@@ -345,6 +345,8 @@ export type MerchantInsight = {
   /** Set when Change Intelligence produced this insight (§2.5). */
   modelVersion?: string;
   changeCaseId?: string;
+  /** When Change Intelligence last confirmed this insight; legacy items use `generatedAt`. */
+  calculatedAt?: string;
 };
 
 export type MerchantInsightsResponse = {
