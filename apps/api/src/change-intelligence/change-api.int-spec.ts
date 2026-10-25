@@ -294,7 +294,10 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
     app = mod.createNestApplication();
     app.useGlobalPipes(globalValidationPipe);
     app.useGlobalFilters(new HttpExceptionFilter());
-    await app.init();
+    // Listen once on a fixed loopback address: supertest otherwise listens on an ephemeral
+    // wildcard port and closes it after every request, and a reused keep-alive socket or
+    // a port held by another local process then fails the request (socket hang up, 404).
+    await app.listen(0, '127.0.0.1');
 
     // demand: five weeks steady, then A sells 6/day for a week; confirmed on D1.
     productA = await product(demand.merchantId, {

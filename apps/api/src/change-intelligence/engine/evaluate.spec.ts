@@ -687,6 +687,24 @@ describe('change intelligence engine (§9.1)', () => {
     );
     expect(later.flatMap(demandOps)).toEqual([]);
     expect(store.activeCases.map((item) => item.type)).toEqual(['stock_risk']);
+
+    // Stage 7A: restocking during the gap resolves the low-stock case even though no
+    // projection is available ("I restocked but it still says low stock").
+    const restock = run(store, {
+      asOf: at(addDays(D1, 3), 9),
+      reason: 'source_change',
+      sales,
+      products: products({ [A]: { onHand: 30 } }),
+      affected: fields({ [A]: ['on_hand'] }),
+    });
+    expect(value(store, 'stock_risk', A).level).toBe('forecast_unavailable');
+    expect(
+      restock.caseOperations.map((op) => [op.op, op.type, op.productId]),
+    ).toEqual([['resolve', 'stock_risk', A]]);
+    expect(opsOf(restock, 'stock_risk')[0]).toMatchObject({
+      resolution: 'stock_normal',
+    });
+    expect(store.activeCases).toEqual([]);
   });
 
   it('9.1.19 past recording gap in a baseline week → building_baseline, no false increase', () => {
@@ -842,6 +860,62 @@ describe('change intelligence engine (§9.1)', () => {
     expect(store.activeCases.map((item) => item.type)).toContain(
       'unit_demand_increase',
     );
+  });
+
+  it('a full re-evaluation reports a threshold changed during a capture gap', () => {
+    const store = createStore({ timezone: TZ });
+    const sales = [...lines(A, flat), ...lines(B, flat)];
+    run(store, {
+      asOf: at(D1),
+      reason: 'initialization',
+      sales,
+      products: products(),
+    });
+    // Unchanged threshold: a reconciliation opens nothing.
+    const quiet = run(store, {
+      asOf: at(D1, 9),
+      reason: 'reconciliation',
+      sales,
+      products: products(),
+    });
+    expect(opsOf(quiet, 'stock_threshold_change')).toEqual([]);
+    // No event lists `threshold` (capture was off), affected = 'all'.
+    const result = run(store, {
+      asOf: at(D1, 10),
+      reason: 'reconciliation',
+      sales,
+      products: products({ [A]: { threshold: 10 } }),
+    });
+    expect(opsOf(result, 'stock_threshold_change')).toMatchObject([
+      { op: 'open', productId: A, facts: { previousMinimum: 5, minimum: 10 } },
+    ]);
+    const upgrade = run(store, {
+      asOf: at(D1, 11),
+      reason: 'model_upgrade',
+      sales,
+      products: products({ [A]: { threshold: 12 } }),
+    });
+    expect(opsOf(upgrade, 'stock_threshold_change')).toMatchObject([
+      { op: 'append', facts: { previousMinimum: 10, minimum: 12 } },
+    ]);
+  });
+
+  it('a re-initialization does not invent threshold changes', () => {
+    const store = createStore({ timezone: TZ });
+    const sales = [...lines(A, flat), ...lines(B, flat)];
+    run(store, {
+      asOf: at(D1),
+      reason: 'initialization',
+      sales,
+      products: products(),
+    });
+    const again = run(store, {
+      asOf: at(D1, 10),
+      reason: 'initialization',
+      sales,
+      products: products({ [A]: { threshold: 10 } }),
+    });
+    expect(opsOf(again, 'stock_threshold_change')).toEqual([]);
   });
 
   it('initialization never opens demand cases and labels existing stock risks', () => {

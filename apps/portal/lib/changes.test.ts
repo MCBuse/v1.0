@@ -183,7 +183,7 @@ describe("status copy", () => {
     const [notice] = readinessNotices(
       status({ readiness: { trends: "building_baseline", requiredHistoryDays: 28, daysUntilTrendsReady: 9, minUsualWeeklyUnits: 5 } }),
     );
-    expect(notice?.title).toBe("Sales trends need 28 days of recorded sales. 9 days more are needed.");
+    expect(notice?.title).toBe("Sales trends need 28 days of recorded sales. 9 more days needed.");
   });
 
   it("names the requirement when product history is insufficient", () => {

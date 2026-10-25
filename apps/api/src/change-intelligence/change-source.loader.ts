@@ -243,8 +243,10 @@ export class ChangeSourceLoader {
     tx: ChangeDbExecutor,
     merchantId: string,
   ): Promise<ProductObservation[]> {
-    // ponytail: first-sale lookup scans the merchant's full sale history once per run;
-    // store a first_sale_at per product if the §9.6 benchmark shows it matters.
+    // ponytail: first-sale lookup scans the merchant's full sale history once per run
+    // (~25 ms at 100k sales, §9.6). MATERIALIZED + join: inlined as a per-product
+    // subquery it re-joined every line per product (~230 ms). Store a first_sale_at per
+    // product if history grows far beyond that.
     const found = await rows<{
       id: string;
       name: string;
@@ -255,7 +257,7 @@ export class ChangeSourceLoader {
       history_start: string | Date | null;
     }>(
       tx,
-      sql`WITH first_sale AS (
+      sql`WITH first_sale AS MATERIALIZED (
             SELECT product_id, min(occurred_at) AS at FROM (
               SELECT i.product_id, s.occurred_at FROM merchant_cash_sales s
                 JOIN merchant_cash_sale_items i ON i.cash_sale_id = s.id
@@ -269,8 +271,9 @@ export class ChangeSourceLoader {
           SELECT p.id, p.name, p.status, p.on_hand_quantity, p.reserved_quantity, p.low_stock_threshold,
             LEAST(p.created_at,
               (SELECT min(m.occurred_at) FROM merchant_stock_movements m WHERE m.product_id = p.id),
-              (SELECT f.at FROM first_sale f WHERE f.product_id = p.id)) AS history_start
-          FROM merchant_products p WHERE p.merchant_id = ${merchantId}::uuid ORDER BY p.id`,
+              f.at) AS history_start
+          FROM merchant_products p LEFT JOIN first_sale f ON f.product_id = p.id
+          WHERE p.merchant_id = ${merchantId}::uuid ORDER BY p.id`,
     );
     return found.map((row) => ({
       id: row.id,

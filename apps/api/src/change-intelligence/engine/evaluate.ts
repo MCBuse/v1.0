@@ -664,21 +664,31 @@ function deriveCaseOperations(d: DeriveInput): CaseOperation[] {
             values(previousLevel),
             values(risk.level),
           );
-      } else if (existing && risk.level === 'normal') {
+      } else if (
+        existing &&
+        (risk.level === 'normal' ||
+          // Restocked above the minimum while no projection is available (recording gap,
+          // building history): the current-stock problem is gone. A projected risk that only
+          // lost its projection stays open (readiness loss is not recovery).
+          (risk.level === 'forecast_unavailable' &&
+            (previousLevel === 'low_stock' || previousLevel === 'out_of_stock')))
+      ) {
         resolve(existing, product, 'stock_normal', facts, refs);
       }
     }
 
-    // Threshold change (interpretation: opens/appends on a changed low_stock_threshold).
+    // Threshold change: the saved minimum differs from the recalculated one. Compared on
+    // the node value, not the event field, so a reconciliation after a capture gap still
+    // reports it. Initialization never invents historical changes.
     const minimumRef = instanceKey('minimum_stock_policy', pid);
     const previousMinimum = previous('minimum_stock_policy', pid);
     const minimum = next('minimum_stock_policy', pid);
     if (
       input.reason !== 'initialization' &&
-      d.fields(pid).includes('threshold') &&
       changed.has(minimumRef) &&
       previousMinimum &&
-      minimum
+      minimum &&
+      previousMinimum.minimum !== minimum.minimum
     ) {
       const facts: CaseFacts = {
         ...name,

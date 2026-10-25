@@ -28,9 +28,23 @@ import { createPgPoolConfig } from './database.config';
           ),
         });
 
-        const client = await pool.connect();
-        await client.query('SELECT 1');
-        client.release();
+        // pg removes the failed idle client itself. Handle its error event so
+        // a dropped connection does not terminate the entire API process.
+        pool.on('error', (error: NodeJS.ErrnoException) => {
+          // Do not log the error object: pg attaches the client and its
+          // connection details to it.
+          Logger.error(
+            `Idle database connection lost (${error.code ?? 'UNKNOWN'}); removed from pool`,
+            'DatabaseModule',
+          );
+        });
+
+        try {
+          await pool.query('SELECT 1');
+        } catch (error) {
+          await pool.end();
+          throw error;
+        }
         Logger.log('Database connected', 'DatabaseModule');
 
         return drizzle(pool, { schema });

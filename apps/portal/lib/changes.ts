@@ -345,7 +345,9 @@ export function readinessNotices(status: ChangeStatusResponse): Notice[] {
       id: "building-baseline",
       tone: "info",
       title: `Sales trends need ${requiredHistoryDays} days of recorded sales.${
-        daysUntilTrendsReady ? ` ${withUnit(daysUntilTrendsReady, "days")} more ${daysUntilTrendsReady === 1 ? "is" : "are"} needed.` : ""
+        daysUntilTrendsReady
+          ? ` ${formatCount(daysUntilTrendsReady)} more ${daysUntilTrendsReady === 1 ? "day" : "days"} needed.`
+          : ""
       }`,
       body: "Stock problems are already checked and shown below.",
     });

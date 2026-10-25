@@ -19,10 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/table";
-import { ArrowRight, ChevronDown, CircleCheck, Minus, Package, PackageCheck, RefreshCw, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Minus, Package, PackageCheck, RefreshCw, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { AnalyticsNav } from "@/components/analytics-nav";
-import { PageSection } from "@/components/page-section";
 import {
   ENVIRONMENT_LABELS,
   formatChangeValue,
@@ -86,14 +85,18 @@ export function ChangeDetailView({ changeId }: { changeId: string }) {
 
   return (
     <div className="grid min-w-0 gap-6 [&>*]:min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/analytics/changes" className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-slate-600 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+          <ArrowLeft className="size-4" aria-hidden="true" /> Back to Changes
+        </Link>
+        <AnalyticsNav changesAvailable={status.data?.available ?? true} />
+      </div>
       {data ? (
-        <div className="grid gap-2">
-          <p className="text-sm font-medium text-slate-600">
-            <ProductLabel change={data.change} />
-          </p>
+        <div className="grid gap-3 border-b border-slate-200 pb-6">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 [overflow-wrap:anywhere]">
             {data.change.headline}
           </h1>
+          <p className="text-sm text-slate-600"><ProductLabel change={data.change} /></p>
           <div className="flex flex-wrap items-center gap-2">
             <KindBadge change={data.change} />
             <StateBadge change={data.change} />
@@ -113,7 +116,6 @@ export function ChangeDetailView({ changeId }: { changeId: string }) {
           <Skeleton className="h-4 w-64" />
         </div>
       )}
-      <AnalyticsNav changesAvailable={status.data?.available ?? true} />
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {status.announcement}
       </p>
@@ -166,18 +168,33 @@ function DetailSkeleton() {
   );
 }
 
+function DetailSection({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  return (
+    <section aria-labelledby={id} className="grid min-w-0 scroll-mt-28 gap-3">
+      <h2 id={id} className="text-base font-semibold text-slate-950">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
 function DetailSections({ data }: { data: ChangeDetailResponse }) {
   return (
-    <>
-      <WhatChanged data={data} />
+    <div className="grid min-w-0 gap-8">
+      <div className="grid min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 p-5 sm:p-6"><WhatChanged data={data} /></div>
+        <div className="min-w-0 border-t border-slate-200 bg-slate-50 p-5 sm:p-6 xl:border-l xl:border-t-0">
+          <SuggestedAction data={data} />
+        </div>
+      </div>
+      <DetailSection id="before-and-after" title={data.change.identifiedDuringInitialAnalysis ? "First assessment" : "Before and after"}>
+        {data.change.identifiedDuringInitialAnalysis ? (
+          <p className="max-w-prose text-sm leading-relaxed text-slate-600">This finding was identified during the first analysis. There is no earlier assessment to compare it with.</p>
+        ) : <BeforeAfter before={data.change.before} after={data.change.after} size="full" />}
+      </DetailSection>
       <Impact data={data} />
-      <PageSection id="before-and-after" title="Before and after">
-        <BeforeAfter before={data.change.before} after={data.change.after} size="full" />
-      </PageSection>
-      <SuggestedAction data={data} />
       <HowCalculated data={data} />
       <SourceInformation data={data} />
-    </>
+    </div>
   );
 }
 
@@ -185,10 +202,36 @@ function WhatChanged({ data }: { data: ChangeDetailResponse }) {
   const { recent, usualWeekly, baselineWeeks } = data.whatChanged;
   const unit = usualWeekly?.unit === "sales" || recent?.unit === "sales" ? "sales" : "units";
   const period = data.calculation.recentWindow ?? data.change.observation;
+  const stockReadings = data.change.type === "stock_risk"
+    ? data.impact.flatMap((step) => step.after && ["available", "minimum", "days_to_minimum"].includes(step.after.key) ? [step.after] : [])
+    : [];
+  const available = stockReadings.find((value) => value.key === "available");
+  const minimum = stockReadings.find((value) => value.key === "minimum");
+  const deficit = typeof available?.value === "number" && typeof minimum?.value === "number"
+    ? minimum.value - available.value : null;
   return (
-    <PageSection id="what-changed" title="What changed">
-      {data.change.summary ? <p className="text-sm text-slate-700">{data.change.summary}</p> : null}
-      {recent || usualWeekly ? (
+    <DetailSection id="what-changed" title="What changed">
+      {data.change.summary ? <p className="max-w-prose text-base leading-relaxed text-slate-700">{data.change.summary}</p> : null}
+      {stockReadings.length ? (
+        <div className="grid gap-5 pt-2">
+          <dl className="grid grid-cols-2 gap-6">
+            {stockReadings.filter((value) => value.key !== "days_to_minimum").map((value) => (
+              <div key={value.key} className="min-w-0">
+                <dt className="text-sm text-slate-600">{value.key === "available" ? "Available stock" : value.label}</dt>
+                <dd className={`mt-2 font-mono text-3xl font-semibold tabular-nums ${value.key === "available" && deficit !== null && deficit > 0 ? "text-amber-800" : "text-slate-950"}`}>{formatChangeValue(value)}</dd>
+              </div>
+            ))}
+          </dl>
+          {deficit !== null && deficit > 0 ? (
+            <p className="flex items-center gap-2 text-sm font-medium text-amber-800"><TriangleAlert className="size-4 shrink-0" aria-hidden="true" />{withUnit(deficit, "units")} below minimum stock</p>
+          ) : null}
+          {stockReadings.filter((value) => value.key === "days_to_minimum").map((value) => (
+            <p key={value.key} className="border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-600">
+              {value.value === null ? <>Stock projection unavailable · {formatChangeValue(value)}</> : <>{value.label}: <span className="font-medium text-slate-950">{formatChangeValue(value)}</span></>}
+            </p>
+          ))}
+        </div>
+      ) : recent || usualWeekly ? (
         <dl className="grid gap-3 sm:grid-cols-2">
           {recent ? (
             <Figure
@@ -239,13 +282,13 @@ function WhatChanged({ data }: { data: ChangeDetailResponse }) {
           </Table>
         </Card>
       ) : null}
-    </PageSection>
+    </DetailSection>
   );
 }
 
 function Figure({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-slate-200 bg-white px-4 py-3">
+    <div className="min-w-0 py-1">
       <dt className="text-sm text-slate-500">{label}</dt>
       <dd className="mt-1 font-mono text-xl font-semibold tabular-nums text-slate-950 [overflow-wrap:anywhere]">
         {value}
@@ -258,54 +301,49 @@ function Figure({ label, value, hint }: { label: string; value: string; hint?: s
 const show = (value: ChangeValue | null) => (value ? formatChangeValue(value) : "Not recorded");
 
 function Impact({ data }: { data: ChangeDetailResponse }) {
+  const firstCalculation = data.impact.length > 0 && data.impact.every((step) => step.before === null);
   return (
-    <PageSection id="impact" title="Impact">
+    <DetailSection
+      id="impact"
+      title={data.change.type === "stock_risk" ? "Why this stock warning appeared" : "Why this change appeared"}
+    >
+      <p className="max-w-prose text-sm leading-relaxed text-slate-600">
+        {firstCalculation
+          ? "These are the first saved readings for this analysis. They establish a starting point; they do not show a change from an earlier reading."
+          : "The saved readings behind this finding. Compare the previous reading with the value used in this analysis."}
+      </p>
       {data.impact.length ? (
-        <ol className="grid gap-0 rounded-xl border border-slate-200 bg-white">
-          {data.impact.map((step, index) => (
-            <li
-              key={`${step.label}-${index}`}
-              className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 gap-y-1 border-b border-slate-100 px-4 py-3 last:border-b-0 sm:grid-cols-[1.75rem_minmax(0,1fr)_auto]"
-            >
-              <span
-                aria-hidden="true"
-                className="flex size-7 items-center justify-center rounded-full bg-slate-100 font-mono text-sm font-semibold tabular-nums text-slate-700"
-              >
-                {index + 1}
-              </span>
-              <div className="min-w-0">
-                <p className="font-medium text-slate-950">{step.label}</p>
-                <p className="mt-0.5 font-mono text-sm tabular-nums text-slate-700 [overflow-wrap:anywhere]">
-                  {step.changed && step.before ? (
-                    <>
-                      {show(step.before)} <span aria-hidden="true">→</span>
-                      <span className="sr-only">to</span> {show(step.after)}
-                    </>
-                  ) : (
-                    show(step.after ?? step.before)
-                  )}
-                </p>
-              </div>
-              <p className="col-start-2 inline-flex items-center gap-1 text-xs font-medium text-slate-500 sm:col-start-3 sm:self-center">
-                {step.changed ? (
-                  <>
-                    <ArrowRight className="size-3.5" aria-hidden="true" /> Changed
-                  </>
-                ) : (
-                  <>
-                    <Minus className="size-3.5" aria-hidden="true" /> Unchanged
-                  </>
-                )}
-              </p>
-            </li>
-          ))}
-        </ol>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_8rem] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-xs font-medium text-slate-600 md:grid">
+            <span>Reading</span><span>Value in this analysis</span><span>Status</span>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {data.impact.map((step, index) => {
+              const initial = step.before === null && step.after !== null;
+              return (
+                <li key={`${step.label}-${index}`} className="grid min-w-0 gap-2 px-4 py-4 sm:px-5 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_8rem] md:items-center md:gap-4">
+                  <p className="text-sm font-medium text-slate-950 [overflow-wrap:anywhere]">{step.label}</p>
+                  <div className="min-w-0 text-sm [overflow-wrap:anywhere]">
+                    {step.changed && step.before ? (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono tabular-nums">
+                        <span className="text-slate-500"><span className="sr-only">Previous reading: </span>{show(step.before)}</span>
+                        <ArrowRight className="size-3.5 shrink-0 text-slate-400" aria-hidden="true" />
+                        <span className="font-medium text-slate-950"><span className="sr-only">to </span>{show(step.after)}</span>
+                      </div>
+                    ) : <p className="font-mono tabular-nums text-slate-950">{show(step.after ?? step.before)}</p>}
+                  </div>
+                  <p className={`inline-flex items-center gap-1.5 text-xs ${step.changed && !initial ? "font-medium text-blue-700" : "text-slate-500"}`}>
+                    {initial ? "First calculation" : step.changed ? <><ArrowRight className="size-3.5" aria-hidden="true" /> Changed</> : <><Minus className="size-3.5" aria-hidden="true" /> Unchanged</>}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ) : (
-        <p className="text-sm text-slate-500">
-          The saved calculation links this change to no other stock or sales reading.
-        </p>
+        <p className="text-sm text-slate-500">The saved calculation links this change to no other stock or sales reading.</p>
       )}
-    </PageSection>
+    </DetailSection>
   );
 }
 
@@ -333,7 +371,7 @@ function SuggestedAction({ data }: { data: ChangeDetailResponse }) {
     );
   };
   return (
-    <PageSection id="suggested-action" title="Suggested action">
+    <DetailSection id="suggested-action" title="Suggested action">
       <div className="grid gap-2 text-sm text-slate-700">
         {change.consequence ? <p>{change.consequence}</p> : null}
         <p className="font-medium text-slate-950">
@@ -358,7 +396,7 @@ function SuggestedAction({ data }: { data: ChangeDetailResponse }) {
           Opening the product does not close this change. It closes when a later update shows the situation has changed.
         </p>
       )}
-    </PageSection>
+    </DetailSection>
   );
 }
 
@@ -378,7 +416,7 @@ function HowCalculated({ data }: { data: ChangeDetailResponse }) {
     <section aria-labelledby="how-calculated">
       <details className="group rounded-xl border border-slate-200 bg-white">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 rounded-xl px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:px-5 [&::-webkit-details-marker]:hidden">
-          <h2 id="how-calculated" className="text-xl font-semibold tracking-tight text-slate-950">
+          <h2 id="how-calculated" className="text-base font-semibold text-slate-950">
             How this was calculated
           </h2>
           <ChevronDown
@@ -451,18 +489,7 @@ function SourceInformation({ data }: { data: ChangeDetailResponse }) {
   const s = data.source;
   const digital = ENVIRONMENTS.filter((env) => (s.digitalSalesByEnvironment[env] ?? 0) > 0);
   return (
-    <PageSection id="source-information" title="Source information">
-      {s.includesTestPayments ? (
-        <p className="inline-flex items-center gap-2 text-sm font-medium text-amber-800">
-          <TriangleAlert className="size-4" aria-hidden="true" />
-          Includes test payments
-        </p>
-      ) : (
-        <p className="inline-flex items-center gap-2 text-sm text-slate-600">
-          <CircleCheck className="size-4 text-emerald-700" aria-hidden="true" />
-          No test payments in the analysed period
-        </p>
-      )}
+    <DetailSection id="source-information" title="Source information">
       <Card>
         <CardContent className="pt-5">
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -490,6 +517,6 @@ function SourceInformation({ data }: { data: ChangeDetailResponse }) {
           ))}
         </ul>
       ) : null}
-    </PageSection>
+    </DetailSection>
   );
 }

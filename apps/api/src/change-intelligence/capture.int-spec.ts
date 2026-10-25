@@ -687,12 +687,15 @@ describe('change capture (integration)', () => {
   });
 
   /**
-   * Plan §9.6 "Source-write p95 regression ≤ 10%" — the measurement Stage 7
-   * cites. Same operations with the change_capture_* triggers enabled and then
-   * disabled (legacy analytics triggers stay on in both runs).
+   * Smoke version of plan §9.6 "Source-write p95 regression ≤ 10%": same
+   * operations with the change_capture_* triggers enabled and then disabled
+   * (legacy analytics triggers stay on in both runs). The gate itself is
+   * measured through the HTTP API by `pnpm changes:load`
+   * (docs/evaluations/change-intelligence/performance.md); 1,000 rounds here
+   * (10,000 writes) exceeded the timeout on a loaded machine.
    */
   it('measures source-write overhead of capture', async () => {
-    const ROUNDS = 1000;
+    const ROUNDS = 200;
     const productId = await product({ onHand: 100_000 });
     const captureTriggers = [
       ['merchant_products', 'change_capture_products_update'],

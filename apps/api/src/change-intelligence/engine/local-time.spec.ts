@@ -89,4 +89,30 @@ describe('local time', () => {
     expect(daysBetween('2026-08-27', '2026-09-28')).toBe(32);
     expect(daysBetween('2026-09-28', '2026-08-27')).toBe(-32);
   });
+
+  it('localDate matches Intl minute by minute across DST changes and odd offsets', () => {
+    const reference = (instant: Date, timeZone: string) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(instant);
+    const spans: Array<[string, string]> = [
+      ['Europe/Berlin', '2026-10-24T20:00:00Z'], // 25 h day
+      ['Europe/Berlin', '2026-03-28T20:00:00Z'], // 23 h day
+      ['Asia/Kathmandu', '2026-06-01T16:00:00Z'], // +05:45
+      ['America/St_Johns', '2026-11-01T00:00:00Z'], // −03:30, DST end
+      ['Australia/Lord_Howe', '2026-04-04T10:00:00Z'], // 30-minute DST
+      ['America/Santiago', '2026-04-04T23:00:00Z'], // DST end at local midnight
+    ];
+    for (const [tz, start] of spans) {
+      for (let minute = 0; minute < 36 * 60; minute += 1) {
+        for (const ms of [0, 59_999]) {
+          const instant = new Date(Date.parse(start) + minute * 60_000 + ms);
+          expect(localDate(instant, tz)).toBe(reference(instant, tz));
+        }
+      }
+    }
+  });
 });

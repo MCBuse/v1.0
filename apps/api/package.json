@@ -33,6 +33,8 @@
     "merchant:changes-worker": "node dist/src/change-intelligence/change-worker.js",
     "changes:ops": "ts-node -T src/change-intelligence/change-worker.ts",
     "changes:evaluate": "ts-node -T src/change-intelligence/evaluation/change-evaluation.cli.ts",
+    "changes:load": "ts-node -T src/change-intelligence/change-intelligence.load.ts",
+    "changes:release-checks": "bash scripts/change-intelligence-release-checks.sh",
     "merchant:analytics-load": "ts-node src/analytics-intelligence/merchant-insights.load.ts",
     "test:integration": "jest --config ./jest-integration.json --runInBand --watchman=false",
     "wallets:key-status": "ts-node src/solana/rotate-wallet-keys.cli.ts status",

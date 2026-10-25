@@ -1,0 +1,260 @@
+{
+  "generatedAt": "2026-10-25T11:45:52.294Z",
+  "environment": {
+    "cpu": "Apple M1 Pro",
+    "logicalCpus": 10,
+    "memoryGiB": 16,
+    "node": "v24.11.1",
+    "database": "mcbuse_ci_perf",
+    "databaseSize": "288 MB",
+    "changeTablesSize": "140 MB",
+    "concurrency": "worker measurements: one merchant, sequential runs, pool max 4, same machine as Postgres"
+  },
+  "fixture": {
+    "products": 1000,
+    "cash_sales": 75000,
+    "cash_lines": 90000,
+    "digital_sales": 25000,
+    "db_bytes": "144806371",
+    "buildMs": 138389.1,
+    "timezone": "Europe/Berlin",
+    "d0": "2026-10-15"
+  },
+  "startup": {
+    "configAndFirstQueryMs": 28.4,
+    "enqueueScheduledMs": 22.1
+  },
+  "gates": {
+    "oneProductIncrementalP95Ms": {
+      "n": 40,
+      "min": 183.6,
+      "p50": 203.9,
+      "p95": 299.6,
+      "max": 571.1,
+      "gateMs": 2000,
+      "pass": true,
+      "evaluatedNodes": {
+        "n": 40,
+        "min": 7,
+        "p50": 8,
+        "p95": 8,
+        "max": 9
+      }
+    },
+    "stockOnlyP95Ms": {
+      "n": 40,
+      "min": 196.3,
+      "p50": 212.9,
+      "p95": 490.9,
+      "max": 733.6,
+      "gateMs": 500,
+      "pass": true,
+      "evaluatedNodes": {
+        "n": 40,
+        "min": 4,
+        "p50": 5,
+        "p95": 5,
+        "max": 6
+      }
+    },
+    "dailyClock1000ProductsMs": {
+      "n": 5,
+      "min": 1119.2,
+      "p50": 1181.4,
+      "p95": 1211.7,
+      "max": 1211.7,
+      "gateMs": 30000,
+      "pass": true,
+      "runs": [
+        {
+          "day": "2026-10-16",
+          "tickMs": 1119.2,
+          "counts": {
+            "evaluated": 7646,
+            "changed": 5425,
+            "skipped": 4356,
+            "blocked": 0
+          }
+        },
+        {
+          "day": "2026-10-17",
+          "tickMs": 1141.7,
+          "counts": {
+            "evaluated": 7770,
+            "changed": 5561,
+            "skipped": 4232,
+            "blocked": 0
+          }
+        },
+        {
+          "day": "2026-10-18",
+          "tickMs": 1193.3,
+          "counts": {
+            "evaluated": 7545,
+            "changed": 5331,
+            "skipped": 4457,
+            "blocked": 0
+          }
+        },
+        {
+          "day": "2026-10-19",
+          "tickMs": 1181.4,
+          "counts": {
+            "evaluated": 7544,
+            "changed": 5335,
+            "skipped": 4458,
+            "blocked": 0
+          }
+        },
+        {
+          "day": "2026-10-20",
+          "tickMs": 1211.7,
+          "counts": {
+            "evaluated": 7653,
+            "changed": 5444,
+            "skipped": 4349,
+            "blocked": 0
+          }
+        }
+      ]
+    },
+    "fullInitializationMs": {
+      "runs": [
+        {
+          "condition": "cold (first run in process)",
+          "claimMs": 3.1,
+          "processMs": 1672.2,
+          "reason": "initialization",
+          "counts": {
+            "evaluated": 12002,
+            "changed": 12002,
+            "skipped": 0,
+            "blocked": 0
+          }
+        },
+        {
+          "condition": "warm",
+          "claimMs": 1.4,
+          "processMs": 1555.4,
+          "reason": "initialization",
+          "counts": {
+            "evaluated": 12002,
+            "changed": 12002,
+            "skipped": 0,
+            "blocked": 0
+          }
+        },
+        {
+          "condition": "warm",
+          "claimMs": 0.7,
+          "processMs": 1789.4,
+          "reason": "initialization",
+          "counts": {
+            "evaluated": 12002,
+            "changed": 12002,
+            "skipped": 0,
+            "blocked": 0
+          }
+        }
+      ],
+      "gateMs": 120000,
+      "pass": true
+    },
+    "sourceWriteP95Regression": {
+      "POST /merchants/me/cash-sales @ concurrency 1": {
+        "off": {
+          "n": 1000,
+          "min": 3.5,
+          "p50": 11,
+          "p95": 33,
+          "max": 139.5
+        },
+        "on": {
+          "n": 1000,
+          "min": 3.4,
+          "p50": 9.9,
+          "p95": 27.2,
+          "max": 233
+        },
+        "p95RegressionPct": -17.7,
+        "p50RegressionPct": -10.6,
+        "gatePct": 10,
+        "pass": true
+      },
+      "POST /merchants/me/products/:id/stock-adjustments @ concurrency 1": {
+        "off": {
+          "n": 1000,
+          "min": 2.4,
+          "p50": 7.6,
+          "p95": 19.8,
+          "max": 68.4
+        },
+        "on": {
+          "n": 1000,
+          "min": 2.8,
+          "p50": 8.8,
+          "p95": 29.7,
+          "max": 257
+        },
+        "p95RegressionPct": 50.2,
+        "p50RegressionPct": 15.4,
+        "gatePct": 10,
+        "pass": false
+      },
+      "POST /merchants/me/cash-sales @ concurrency 8": {
+        "off": {
+          "n": 1000,
+          "min": 3.7,
+          "p50": 12.5,
+          "p95": 36.9,
+          "max": 96
+        },
+        "on": {
+          "n": 1000,
+          "min": 3.8,
+          "p50": 13.1,
+          "p95": 39.4,
+          "max": 78.3
+        },
+        "p95RegressionPct": 6.8,
+        "p50RegressionPct": 4.9,
+        "gatePct": 10,
+        "pass": true
+      },
+      "POST /merchants/me/products/:id/stock-adjustments @ concurrency 8": {
+        "off": {
+          "n": 1000,
+          "min": 2.4,
+          "p50": 6.8,
+          "p95": 18.8,
+          "max": 45.5
+        },
+        "on": {
+          "n": 1000,
+          "min": 2.4,
+          "p50": 7.1,
+          "p95": 18.9,
+          "max": 41.3
+        },
+        "p95RegressionPct": 0.4,
+        "p50RegressionPct": 5.2,
+        "gatePct": 10,
+        "pass": true
+      }
+    }
+  },
+  "breakdown": {
+    "initialization": {
+      "loadMs": 197.4,
+      "evaluateMs": 498.4,
+      "saleLines": 44440,
+      "states": 12002
+    },
+    "stockOnly": {
+      "loadMs": 139.3,
+      "evaluateMs": 39.9,
+      "saleLines": 44440,
+      "states": 12002
+    }
+  }
+}

@@ -590,9 +590,9 @@ test("a change's details are directly linkable, survive a refresh and match the 
 
   await expect(main(page).getByRole("heading", { level: 2 })).toHaveText([
     "What changed",
-    "Impact",
-    "Before and after",
     "Suggested action",
+    "Before and after",
+    "Why this change appeared",
     "How this was calculated",
     "Source information",
   ]);
@@ -602,10 +602,10 @@ test("a change's details are directly linkable, survive a refresh and match the 
   await expect(what.getByRole("row")).toHaveCount(5);
   await expect(what.getByRole("row").nth(1)).toHaveText(/11–17 Oct 2026\s*27 units/);
 
-  const impact = main(page).getByRole("region", { name: "Impact" }).getByRole("listitem");
+  const impact = main(page).getByRole("region", { name: "Why this change appeared" }).getByRole("listitem");
   await expect(impact).toHaveCount(3);
   await expect(impact.nth(1)).toContainText("Days until minimum stock");
-  await expect(impact.nth(1)).toContainText(/9 days\s*→\s*to\s*6 days/);
+  await expect(impact.nth(1)).toContainText(/9 days\s*to\s*6 days/);
   await expect(impact.nth(2)).toContainText("Unchanged");
 
   const beforeAfter = main(page).getByRole("region", { name: "Before and after" });
@@ -634,13 +634,36 @@ test("a change's details are directly linkable, survive a refresh and match the 
   await expect(how).not.toContainText("2.5");
 
   const source = main(page).getByRole("region", { name: "Source information" });
-  await expect(source.getByText("Includes test payments")).toBeVisible();
   await expect(source.getByText("31 sales")).toBeVisible();
   await expect(source.getByText("9 sales · live or test not recorded")).toBeVisible();
 
   await noDiagnostics(page);
   await noHorizontalScroll(page);
   await page.screenshot({ path: `${SHOTS}/detail-${info.project.name}.png`, fullPage: true });
+});
+
+test("stock explanation presents first readings and keeps the action accessible", async ({ page }, info) => {
+  const initial = detail({ ...STOCK, identifiedDuringInitialAnalysis: true, before: [] });
+  initial.whatChanged = { recent: null, usualWeekly: null, baselineWeeks: [] };
+  initial.impact = [
+    { label: "Sales recorded across all products", after: { key: "recent", label: "Recorded units", value: 0, unit: "units" } },
+    { label: "Recorded units", after: { key: "recent", label: "Recorded units", value: 0, unit: "units" } },
+    { label: "Usual daily demand", after: { key: "per_day", label: "Usual daily demand", value: 0.1, unit: "units_per_day" } },
+    { label: "Available stock", after: { key: "available", label: "Available stock", value: 3, unit: "units" } },
+    { label: "Minimum stock", after: { key: "minimum", label: "Minimum stock", value: 5, unit: "units" } },
+    { label: "Days until minimum stock", after: { key: "days_to_minimum", label: "Days until minimum stock", value: null, unit: "days", reason: "no_recent_activity" } },
+    { label: "Stock risk", after: { key: "risk", label: "Stock risk", value: "low_stock", unit: "risk" } },
+  ].map((step) => ({ ...step, before: null, changed: true })) as ChangeDetailResponse["impact"];
+  await setup(page, { detail: () => initial });
+  await page.goto(`/analytics/changes/${STOCK_ID}`);
+  const explanation = main(page).getByRole("region", { name: "Why this stock warning appeared" });
+  await expect(explanation.getByText("First calculation", { exact: true })).toHaveCount(7);
+  await expect(explanation.getByText("Changed", { exact: true })).toHaveCount(0);
+  await expect(explanation).toContainText("They establish a starting point");
+  await expect(main(page).getByRole("region", { name: "What changed" }).getByText("3 units", { exact: true })).toBeVisible();
+  await expect(main(page).getByRole("link", { name: "Review stock", exact: true })).toHaveAttribute("href", `/inventory?productId=${OAT}&action=stock`);
+  await noHorizontalScroll(page);
+  await page.screenshot({ path: `${SHOTS}/stock-initial-${info.project.name}.png`, fullPage: true });
 });
 
 test("an archived product keeps its history and its actions are disabled", async ({ page }, info) => {
@@ -760,7 +783,7 @@ test("building baseline gives the day count and still shows stock problems", asy
     list: () => ({ items: [STOCK], nextCursor: null, timezone: TZ }),
   });
   await page.goto("/analytics/changes");
-  await expect(main(page).getByText("Sales trends need 28 days of recorded sales. 9 days more are needed.")).toBeVisible();
+  await expect(main(page).getByText("Sales trends need 28 days of recorded sales. 9 more days needed.")).toBeVisible();
   await expect(entry(page, STOCK.headline)).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/building-baseline-${info.project.name}.png`, fullPage: true });
 });

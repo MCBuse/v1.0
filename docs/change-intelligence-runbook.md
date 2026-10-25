@@ -268,9 +268,12 @@ the detail page's impact trail then shows fewer steps (it tolerates missing node
    `DISABLE TRIGGER ALL` would also disable the legacy analytics and integrity triggers.)
 3. **After re-enabling capture** a gap exists: run
    `node dist/src/change-intelligence/change-worker.js --rebuild reconciliation` (or the CLI
-   equivalent) before treating results as fresh. Note: a reconciliation recomputes minimums and
-   risk but does not open "stock threshold changed" cases for threshold edits made during the gap
-   (see the evaluation report's propagation findings).
+   equivalent) before treating results as fresh. The worker cannot see the gap by itself (no
+   events were written); once the rebuild is requested the Changes status shows `pending` until
+   the reconciliation completes. The reconciliation recomputes stock, minimums, risk and sales
+   windows, and opens "stock threshold changed" cases for threshold edits made during the gap
+   (it compares the saved minimum with the current one). Proven by
+   `src/change-intelligence/change-resilience.int-spec.ts`.
 4. **Application rollback**: restore the previous API revision. Migrations `0038`/`0039` are
    additive and stay.
 
@@ -285,3 +288,24 @@ npx jest --config ./jest-integration.json --runInBand --watchman=false src/chang
 pnpm build
 cd ../portal && pnpm check-types && npx vitest run lib/server && pnpm exec playwright test tests/staff-changes.spec.ts
 ```
+
+Release checks (plan §8, local PostgreSQL only; needs `pnpm build` first):
+
+```bash
+cd apps/api
+pnpm changes:release-checks          # migrations: fresh 0000-0039 and upgrade-from-0037, identical schema
+                                     # backup: pg_dump -> restore -> API reads + worker on the copy,
+                                     #   pending events/revisions intact, API survives terminated DB connections
+npx jest --config ./jest-integration.json --runInBand --watchman=false src/change-intelligence/change-resilience
+                                     # rollback (flag off/on) and capture gap + reconciliation
+```
+
+Performance (§9.6) on an empty migrated local database, with a local API on a free port:
+
+```bash
+DATABASE_URL=postgres://fred@localhost:5432/mcbuse_ci_perf DATABASE_SSL=false \
+  pnpm changes:load --api http://127.0.0.1:3405/api/v1 \
+  --out ../../docs/evaluations/change-intelligence/performance.json
+```
+
+Results and method: `docs/evaluations/change-intelligence/performance.md`.

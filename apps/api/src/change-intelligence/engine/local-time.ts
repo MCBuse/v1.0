@@ -19,8 +19,37 @@ function formatter(timeZone: string, kind: 'date' | 'offset') {
   return found;
 }
 
-/** Local calendar date (YYYY-MM-DD) of an instant in an IANA timezone. */
+const HOUR_MS = 3_600_000;
+/** `${timeZone}|${utc hour}` → local date, for hours that lie within one local date. */
+const hourDates = new Map<string, string>();
+
+/**
+ * Local calendar date (YYYY-MM-DD) of an instant in an IANA timezone.
+ * Memoized per UTC hour (a run formats every sale line, §9.6): an hour whose
+ * first and last millisecond share a local date is cached; an hour containing
+ * a local midnight (any offset, e.g. +05:45) is computed exactly every time.
+ * Assumes no clock change jumps back across local midnight and returns to the
+ * same date within one hour (none in current tz data; a DST end at midnight,
+ * e.g. America/Santiago, is covered by the spec).
+ */
 export function localDate(instant: Date, timeZone: string): string {
+  const hour = Math.floor(instant.getTime() / HOUR_MS);
+  const key = `${timeZone}|${hour}`;
+  const cached = hourDates.get(key);
+  if (cached) return cached;
+  const date = formatLocalDate(instant, timeZone);
+  if (
+    formatLocalDate(new Date(hour * HOUR_MS), timeZone) === date &&
+    formatLocalDate(new Date((hour + 1) * HOUR_MS - 1), timeZone) === date
+  ) {
+    // ponytail: bounded by clearing; an LRU is not worth it for ~2k hours per run.
+    if (hourDates.size >= 100_000) hourDates.clear();
+    hourDates.set(key, date);
+  }
+  return date;
+}
+
+function formatLocalDate(instant: Date, timeZone: string): string {
   const parts = formatter(timeZone, 'date').formatToParts(instant);
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value ?? '';
