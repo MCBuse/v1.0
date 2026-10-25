@@ -713,6 +713,7 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
           trends: 'ready',
           requiredHistoryDays: 28,
           daysUntilTrendsReady: 0,
+          minUsualWeeklyUnits: 5,
         },
         recordingGap: false,
         lastRecordedSaleDate: D1,

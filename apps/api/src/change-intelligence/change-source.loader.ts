@@ -238,8 +238,8 @@ export class ChangeSourceLoader {
     };
   }
 
-  /** Every product, archived included, with its observation history start. */
-  private async products(
+  /** Every product, archived included, with its observation history start. Also used read-only by the evaluation export. */
+  async products(
     tx: ChangeDbExecutor,
     merchantId: string,
   ): Promise<ProductObservation[]> {
@@ -283,8 +283,8 @@ export class ChangeSourceLoader {
     }));
   }
 
-  /** Eligible and excluded sale lines with `occurred_at` in [from, to). */
-  private async sales(
+  /** Eligible and excluded sale lines with `occurred_at` in [from, to). Also used by the evaluation export. */
+  async sales(
     tx: ChangeDbExecutor,
     merchantId: string,
     from: Date,

@@ -234,6 +234,8 @@ export type ChangeStatusResponse = {
     trends: ChangeReadiness;
     requiredHistoryDays: number;
     daysUntilTrendsReady: number | null;
+    /** Usual weekly units a product needs before its sales changes are assessed. */
+    minUsualWeeklyUnits: number;
   };
   recordingGap: boolean;
   lastRecordedSaleDate: string | null;

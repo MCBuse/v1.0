@@ -96,9 +96,6 @@ export class StaffCreditController {
     private readonly access: CreditAccessService,
     private readonly scoring: ScoringClient,
   ) {}
-  @Get('me') me() {
-    return { permission: 'credit_analyst' };
-  }
   @Get('credit-assessments/merchants') merchants(
     @CurrentUser() u: { id: string },
   ) {

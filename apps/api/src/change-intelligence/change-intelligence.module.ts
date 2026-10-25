@@ -4,6 +4,7 @@ import { ChangeIntelligenceConfig } from './change-intelligence.config';
 import { ChangePublisherService } from './change-publisher.service';
 import { ChangeProcessorService } from './change-processor.service';
 import { ChangeReadService } from './change-read.service';
+import { ChangeRetentionService } from './change-retention.service';
 import { ChangeSourceLoader } from './change-source.loader';
 import { ChangeWorkQueueService } from './change-work-queue.service';
 
@@ -28,12 +29,14 @@ import { ChangeWorkQueueService } from './change-work-queue.service';
     ChangePublisherService,
     ChangeProcessorService,
     ChangeReadService,
+    ChangeRetentionService,
   ],
   exports: [
     ChangeIntelligenceConfig,
     ChangeWorkQueueService,
     ChangeProcessorService,
     ChangeReadService,
+    ChangeRetentionService,
   ],
 })
 export class ChangeIntelligenceModule {}

@@ -33,6 +33,8 @@ export type ClaimedChangeWork = {
   settingsFingerprint: string | null;
   lastDailyEvaluationDate: string | null;
   attempts: number;
+  /** Staff user behind a pending "Update now", recorded on the run. */
+  requestedByUserId: string | null;
 };
 
 export class LeaseLostError extends Error {
@@ -53,6 +55,7 @@ type ClaimRow = {
   settings_fingerprint: string | null;
   last_daily_evaluation_date: string | null;
   attempts: number;
+  requested_by_user_id: string | null;
 };
 
 export type ChangeBacklog = {
@@ -62,7 +65,11 @@ export type ChangeBacklog = {
   failed: number;
   retrying: number;
   oldestPendingEventAt: string | null;
+  /** Oldest request among eligible due work (event or not). */
+  oldestDueAt: string | null;
   lastSuccessAt: string | null;
+  /** Merchants whose retries are exhausted (status `failed`). */
+  failedMerchantIds: string[];
 };
 
 /**
@@ -114,7 +121,7 @@ export class ChangeWorkQueueService {
       FROM due WHERE w.merchant_id = due.merchant_id
       RETURNING w.merchant_id, w.lease_token, w.claimed_revision::text, w.processed_revision::text,
         w.requested_reason, w.bootstrap_status, w.model_version, w.settings_fingerprint,
-        w.last_daily_evaluation_date::text, w.attempts`);
+        w.last_daily_evaluation_date::text, w.attempts, w.requested_by_user_id::text`);
     const row = (result.rows as unknown as ClaimRow[])[0];
     if (!row) return null;
     return {
@@ -128,6 +135,7 @@ export class ChangeWorkQueueService {
       settingsFingerprint: row.settings_fingerprint,
       lastDailyEvaluationDate: row.last_daily_evaluation_date,
       attempts: row.attempts,
+      requestedByUserId: row.requested_by_user_id,
     };
   }
 
@@ -182,7 +190,7 @@ export class ChangeWorkQueueService {
         attempts = 0, next_attempt_at = NULL, last_error = NULL, last_success_at = now(),
         requested_reason = CASE WHEN requested_reason IS NOT DISTINCT FROM ${work.requestedReason}::varchar
           THEN NULL ELSE requested_reason END,
-        bootstrap_status = 'completed', model_version = ${MODEL_VERSION},
+        bootstrap_status = 'completed', model_version = ${MODEL_VERSION}, requested_by_user_id = NULL,
         settings_fingerprint = ${outcome.settingsFingerprint},
         last_daily_evaluation_date = COALESCE(${outcome.lastDailyEvaluationDate}::date, last_daily_evaluation_date),
         next_daily_evaluation_at = ${outcome.nextDailyEvaluationAt.toISOString()}::timestamptz
@@ -252,6 +260,22 @@ export class ChangeWorkQueueService {
   }
 
   /**
+   * Operator rebuild (model upgrade / reconciliation): one merchant, or every
+   * enabled merchant. A full re-evaluation of every product and node.
+   */
+  async requestRebuild(
+    reason: 'model_upgrade' | 'reconciliation',
+    merchantId?: string,
+  ): Promise<string[]> {
+    return this.bump(
+      sql`SELECT m.id AS merchant_id FROM merchants m WHERE ${this.eligible()}
+        ${merchantId ? sql`AND m.id = ${merchantId}::uuid` : sql``}`,
+      reason,
+      true,
+    );
+  }
+
+  /**
    * Hourly scheduling (§4.6, §5.11, model upgrade): requests initialization
    * for enabled merchants without work, a model_upgrade or settings_change
    * when the stored identity differs, and a clock run when the merchant-local
@@ -301,12 +325,13 @@ export class ChangeWorkQueueService {
     source: SQL,
     reason: RunReason,
     dueNow = false,
+    executor: ChangeDbExecutor = this.db,
   ): Promise<string[]> {
     const full = sql.join(
       FULL_REASONS.map((r) => sql`${r}`),
       sql`, `,
     );
-    const result = await this.db.execute(sql`
+    const result = await executor.execute(sql`
       INSERT INTO merchant_change_work AS w (merchant_id, requested_revision, requested_reason, last_requested_at)
       SELECT s.merchant_id, 1, ${reason}, now() FROM (${source}) s
       ON CONFLICT (merchant_id) DO UPDATE SET
@@ -336,6 +361,37 @@ export class ChangeWorkQueueService {
     );
   }
 
+  /**
+   * Staff "Update now" (plan §8), inside the caller's transaction: marks the
+   * merchant due now for `userId` unless a run started for it within the last
+   * minute or a live lease is held, in which case nothing changes. Only due
+   * work is ever processed, so no rule is bypassed.
+   */
+  async requestUpdateNow(
+    tx: ChangeDbExecutor,
+    merchantId: string,
+    userId: string,
+  ): Promise<'queued' | 'already_running'> {
+    await tx.execute(sql`
+      INSERT INTO merchant_change_work (merchant_id) VALUES (${merchantId}::uuid) ON CONFLICT (merchant_id) DO NOTHING`);
+    const locked = await tx.execute(sql`
+      SELECT (status = 'processing' AND lease_until > now()) AS running,
+        COALESCE(last_update_now_at > now() - interval '1 minute', false) AS recent
+      FROM merchant_change_work WHERE merchant_id = ${merchantId}::uuid FOR UPDATE`);
+    const row = locked.rows[0] as { running: boolean; recent: boolean };
+    if (row.running || row.recent) return 'already_running';
+    await this.bump(
+      sql`SELECT ${merchantId}::uuid AS merchant_id`,
+      'source_change',
+      true,
+      tx,
+    );
+    await tx.execute(sql`
+      UPDATE merchant_change_work SET last_update_now_at = now(), requested_by_user_id = ${userId}::uuid
+      WHERE merchant_id = ${merchantId}::uuid`);
+    return 'queued';
+  }
+
   /** "Already running" for Update now: a live lease is held. */
   async isRunning(merchantId: string): Promise<boolean> {
     const result = await this.db.execute(sql`
@@ -355,7 +411,9 @@ export class ChangeWorkQueueService {
           WHERE e.status = 'pending' AND e.merchant_id IN (
             SELECT w2.merchant_id FROM merchant_change_work w2 JOIN merchants m ON m.id = w2.merchant_id WHERE ${this.eligible()})
         ) AS oldest,
-        max(w.last_success_at) AS last_success
+        min(w.last_requested_at) FILTER (WHERE w.requested_revision > w.processed_revision AND w.status <> 'failed') AS oldest_due,
+        max(w.last_success_at) AS last_success,
+        COALESCE(array_agg(w.merchant_id::text ORDER BY w.merchant_id) FILTER (WHERE w.status = 'failed'), '{}') AS failed_ids
       FROM merchant_change_work w JOIN merchants m ON m.id = w.merchant_id
       WHERE ${this.eligible()}`);
     const row = result.rows[0] as {
@@ -364,7 +422,9 @@ export class ChangeWorkQueueService {
       failed: number;
       retrying: number;
       oldest: string | Date | null;
+      oldest_due: string | Date | null;
       last_success: string | Date | null;
+      failed_ids: string[];
     };
     const iso = (value: string | Date | null) =>
       value === null ? null : new Date(value).toISOString();
@@ -374,7 +434,24 @@ export class ChangeWorkQueueService {
       failed: row.failed,
       retrying: row.retrying,
       oldestPendingEventAt: iso(row.oldest),
+      oldestDueAt: iso(row.oldest_due),
       lastSuccessAt: iso(row.last_success),
+      failedMerchantIds: row.failed_ids,
     };
+  }
+
+  /**
+   * Initialized, enabled merchants whose daily evaluation for yesterday
+   * (merchant-local) is missing more than `graceHours` after local midnight.
+   */
+  async missedDailyEvaluations(asOf: Date, graceHours = 2): Promise<string[]> {
+    const result = await this.db.execute(sql`
+      SELECT w.merchant_id::text AS id FROM merchant_change_work w JOIN merchants m ON m.id = w.merchant_id
+      WHERE ${this.eligible()} AND w.bootstrap_status = 'completed'
+        AND (${asOf.toISOString()}::timestamptz AT TIME ZONE m.timezone)::time >= make_time(${graceHours}, 0, 0)
+        AND (w.last_daily_evaluation_date IS NULL
+          OR w.last_daily_evaluation_date < (${asOf.toISOString()}::timestamptz AT TIME ZONE m.timezone)::date - 1)
+      ORDER BY 1`);
+    return (result.rows as Array<{ id: string }>).map((row) => row.id);
   }
 }

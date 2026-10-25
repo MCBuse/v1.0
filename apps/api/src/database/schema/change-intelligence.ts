@@ -78,6 +78,10 @@ export const merchantChangeWork = pgTable('merchant_change_work', {
   lastSuccessAt: timestamp('last_success_at', tz),
   lastFailureAt: timestamp('last_failure_at', tz),
   lastUpdateNowAt: timestamp('last_update_now_at', tz),
+  /** Staff user behind a pending "Update now"; copied to the run, cleared on publish. */
+  requestedByUserId: uuid('requested_by_user_id').references(() => users.id, {
+    onDelete: 'set null',
+  }),
 });
 
 export const merchantChangeRuns = pgTable(

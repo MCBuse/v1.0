@@ -13,6 +13,7 @@ import {
 
 const destinations = new Set([
   "/staff/credit-assessments",
+  "/staff/changes",
   "/overview",
   "/transactions",
   "/business-profile",

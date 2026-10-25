@@ -1,8 +1,30 @@
-import { merchantLocalDateKey } from '../../data-capture/merchant-summary';
+/** Formatters are expensive to build; one per timezone and purpose is reused. */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+function formatter(timeZone: string, kind: 'date' | 'offset') {
+  const key = `${kind}:${timeZone}`;
+  let found = formatters.get(key);
+  if (!found) {
+    found = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      ...(kind === 'offset'
+        ? { hour: 'numeric', minute: 'numeric', second: 'numeric' }
+        : {}),
+    });
+    formatters.set(key, found);
+  }
+  return found;
+}
 
 /** Local calendar date (YYYY-MM-DD) of an instant in an IANA timezone. */
 export function localDate(instant: Date, timeZone: string): string {
-  return merchantLocalDateKey(instant, timeZone);
+  const parts = formatter(timeZone, 'date').formatToParts(instant);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  return `${get('year').padStart(4, '0')}-${get('month')}-${get('day')}`;
 }
 
 export function addDays(date: string, days: number): string {
@@ -26,16 +48,7 @@ export function completedLocalDay(asOf: Date, timeZone: string): string {
 }
 
 function offsetMs(instant: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-  }).formatToParts(instant);
+  const parts = formatter(timeZone, 'offset').formatToParts(instant);
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     Number(parts.find((part) => part.type === type)?.value ?? 0);
   const asUtc = Date.UTC(

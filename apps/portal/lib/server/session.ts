@@ -59,12 +59,14 @@ export function clearSessionCookies(response: NextResponse) {
   });
 }
 
-export async function getMerchantSessionState(resource: "/merchants/me" | "/staff/me" = "/merchants/me"): Promise<MerchantSessionState> {
+async function probeSession(
+  resource: "/merchants/me" | "/staff/me",
+): Promise<{ state: MerchantSessionState; upstream?: Response }> {
   const jar = await cookies();
   const accessToken = jar.get(ACCESS_COOKIE)?.value;
   const refreshToken = jar.get(REFRESH_COOKIE)?.value;
-  if (!accessToken && !refreshToken) return "anonymous";
-  if (!accessToken) return "refresh";
+  if (!accessToken && !refreshToken) return { state: "anonymous" };
+  if (!accessToken) return { state: "refresh" };
 
   try {
     const upstream = await fetch(`${API_URL}${resource}`, {
@@ -75,13 +77,46 @@ export async function getMerchantSessionState(resource: "/merchants/me" | "/staf
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    if (upstream.ok) return "valid";
-    if (upstream.status === 401) return refreshToken ? "refresh" : "rejected";
-    if (upstream.status === 403 || upstream.status === 404) return "rejected";
-    return "unavailable";
+    if (upstream.ok) return { state: "valid", upstream };
+    if (upstream.status === 401)
+      return { state: refreshToken ? "refresh" : "rejected" };
+    if (upstream.status === 403 || upstream.status === 404)
+      return { state: "rejected" };
+    return { state: "unavailable" };
   } catch {
-    return "unavailable";
+    return { state: "unavailable" };
   }
+}
+
+export async function getMerchantSessionState(
+  resource: "/merchants/me" | "/staff/me" = "/merchants/me",
+): Promise<MerchantSessionState> {
+  return (await probeSession(resource)).state;
+}
+
+export type StaffPermission = "credit_analyst" | "change_intelligence_operator";
+
+/** Staff session and the permissions that decide which staff areas are shown. The API enforces each one. */
+export async function getStaffSession(): Promise<{
+  state: MerchantSessionState;
+  permissions: StaffPermission[];
+}> {
+  const { state, upstream } = await probeSession("/staff/me");
+  if (!upstream) return { state, permissions: [] };
+  const body = (await upstream.json().catch(() => ({}))) as {
+    permission?: unknown;
+    permissions?: unknown;
+  };
+  const listed = Array.isArray(body.permissions)
+    ? body.permissions
+    : [body.permission];
+  return {
+    state,
+    permissions: listed.filter(
+      (p): p is StaffPermission =>
+        p === "credit_analyst" || p === "change_intelligence_operator",
+    ),
+  };
 }
 
 export interface RemoteRequestOptions {

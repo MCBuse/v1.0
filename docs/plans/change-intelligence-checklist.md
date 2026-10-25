@@ -51,7 +51,7 @@ Status values: `pending`, `verified`, `failed`, `blocked`. All rows start as `pe
 | R-2.5-legacy-suppress | Legacy engine suppresses `stock_risk.<id>` and `anomaly.product.<id>` for enabled merchants; other legacy codes continue | 4 | `merchant-insights.engine.ts` | int: codes present/absent per merchant | pending |
 | R-2.5-no-conflict | No conflicting forecasts for one product across views | 4, 7 | adapter | UI test Deep Analytics vs Changes agree | pending |
 | R-2.5-independent | New pipeline does not depend on legacy queue cleanup, generation counter or legacy success | 3 | `CI/` | int: legacy worker failure or disabled, CI still publishes | pending |
-| R-2.5-docs | Update `docs/merchant-analytics-intelligence.md` with both engines and cadences | 6 | docs file | doc diff | pending |
+| R-2.5-docs | Update `docs/merchant-analytics-intelligence.md` with both engines and cadences | 6 | docs file | doc diff | verified (Stage 6: docs/merchant-analytics-intelligence.md "Two engines") |
 
 ### §3 Merchant interface
 
@@ -284,38 +284,38 @@ Status values: `pending`, `verified`, `failed`, `blocked`. All rows start as `pe
 
 | ID | Requirement | Stage | Work location | Evidence | Status |
 |---|---|---:|---|---|---|
-| R-8-worker-mode | Dedicated Changes worker mode, own queue, own Cloud Run job | 6 | worker entry, deploy config | int worker run, config review | pending |
-| R-8-schedule | Scheduler `0 * * * *` UTC | 6, 8 | deploy config | config review; hosted check at Stage 8 | pending |
-| R-8-execution | Each execution: enqueue due daily work, process within budget, leave rest durable, log summary, exit non-zero on failure | 6 | worker | int exit-code and budget tests | pending |
-| R-8-pool | Reuse DB config with low pool limit | 6 | worker config | config review | pending |
-| R-8-cli-one | CLI: process one merchant now | 6 | CLI | int | pending |
-| R-8-cli-retry | CLI: retry failed work | 6 | CLI | int | pending |
-| R-8-cli-rebuild | CLI: rebuild after model upgrade | 6 | CLI | int | pending |
-| R-8-cli-export | CLI: export evaluation evidence including §2.3 backtest replay | 6 | CLI | report | pending |
-| R-8-cli-sample | CLI: seed or reset a sample account | 6 | CLI/seeder | int | pending |
-| R-8-un-access | "Update now" needs active `staff_permissions` row with `change_intelligence_operator`, using `requireStaff` pattern | 6 | staff service | int 403/404 cases | pending |
-| R-8-un-migration | `staff_permissions` key changed to `(user_id, permission)`; existing rows unaffected | 2 or 6 | `MIG/` | int dual-permission, existing rows retained | pending |
-| R-8-un-merchants-blocked | Merchants and owners cannot use it; merchant API/UI unchanged | 6 | staff controller | int 404 | pending |
-| R-8-un-audit | Each use writes `audit_logs` row, entity type `change_update_now`, with staff user, merchant, reason | 6 | staff service | int | pending |
-| R-8-un-api-list | `GET /staff/changes/merchants?q=` (enabled merchants, name/email match, max 50, fields listed) | 6 | staff controller | int | pending |
-| R-8-un-api-post | `POST /staff/changes/update-now` with `{merchantId, reason <= 200}`; returns `queued` or `already_running` | 6 | staff controller | int, DTO validation test | pending |
-| R-8-un-page | Staff portal page with searchable picker (no UUID typing), status, reason field, button; hidden without permission | 6 | `PORTAL/app/staff` | mock, screenshot | pending |
-| R-8-un-proxy | Staff proxy allowlist patterns added | 6 | staff proxy route | unit | pending |
-| R-8-un-run | Marks work due now; starts Cloud Run job via Admin REST API with API service identity; identity limited to this job; no new SDK; local CLI alternative | 6, 8 | staff service, IAM config | int with stubbed REST client; IAM verified hosted at Stage 8 | pending |
-| R-8-un-limits | Enabled merchants only; one execution per merchant per minute; shares lease | 6 | staff service | int | pending |
-| R-8-un-no-bypass | Bypasses no rule; demand changes still need history and confirmation | 6 | worker | int | pending |
-| R-8-seed-extend | Extend `seed-local-overview-demo.mjs`; no new seeder | 6 | `apps/api/scripts/` | diff review | pending |
-| R-8-seed-shift | `--demand-shift "<sku>:<mult>:<fromDaysAgo>"` deterministic | 6 | seeder | seeder test | pending |
-| R-8-seed-mark | `--mark-sample` sets `data_provenance='sample'`; refuses ordinary merchant without it; refuses on merchant with a `live` digital sale | 6 | seeder | seeder tests (3 cases) | pending |
-| R-8-seed-catchup | Catch-up runs close the 26/28 Sep gap | 6, 7 | seeder | int 9.3 sample run | pending |
+| R-8-worker-mode | Dedicated Changes worker mode, own queue, own Cloud Run job | 6 | worker entry, deploy config | int worker run, config review | verified (Stage 6: change-worker.ts; deploy/cloud-run/changes-job.env.yaml; runbook §5) |
+| R-8-schedule | Scheduler `0 * * * *` UTC | 6, 8 | deploy config | config review; hosted check at Stage 8 | partial (Stage 6: config in runbook §5; hosted check Stage 8) |
+| R-8-execution | Each execution: enqueue due daily work, process within budget, leave rest durable, log summary, exit non-zero on failure | 6 | worker | int exit-code and budget tests | verified (Stage 6: change-worker.ts + executionLog; CLI smoke run on mcbuse_ci_test) |
+| R-8-pool | Reuse DB config with low pool limit | 6 | worker config | config review | verified (Stage 6: change-worker.module.ts (pool 3); changes-job.env.yaml) |
+| R-8-cli-one | CLI: process one merchant now | 6 | CLI | int | verified (Stage 6: changes:ops --merchant; staff-change.int-spec) |
+| R-8-cli-retry | CLI: retry failed work | 6 | CLI | int | verified (Stage 6: changes:ops --retry-failed; change-processing.int-spec) |
+| R-8-cli-rebuild | CLI: rebuild after model upgrade | 6 | CLI | int | verified (Stage 6: changes:ops --rebuild; change-retention.int-spec "operator rebuild") |
+| R-8-cli-export | CLI: export evaluation evidence including §2.3 backtest replay | 6 | CLI | report | verified (Stage 6: changes:evaluate; docs/evaluations/change-intelligence/) |
+| R-8-cli-sample | CLI: seed or reset a sample account | 6 | CLI/seeder | int | verified (Stage 6: seeder --mark-sample/--demand-shift run on mcbuse_ci_test) |
+| R-8-un-access | "Update now" needs active `staff_permissions` row with `change_intelligence_operator`, using `requireStaff` pattern | 6 | staff service | int 403/404 cases | verified (Stage 6: ChangeOperatorGuard; staff-change.int-spec) |
+| R-8-un-migration | `staff_permissions` key changed to `(user_id, permission)`; existing rows unaffected | 2 or 6 | `MIG/` | int dual-permission, existing rows retained | verified (Stage 6: 0038 PK; 9.2.update-now-dual-permission) |
+| R-8-un-merchants-blocked | Merchants and owners cannot use it; merchant API/UI unchanged | 6 | staff controller | int 404 | verified (Stage 6: 9.2.update-now-404) |
+| R-8-un-audit | Each use writes `audit_logs` row, entity type `change_update_now`, with staff user, merchant, reason | 6 | staff service | int | verified (Stage 6: 9.2.update-now-audited) |
+| R-8-un-api-list | `GET /staff/changes/merchants?q=` (enabled merchants, name/email match, max 50, fields listed) | 6 | staff controller | int | verified (Stage 6: 9.2.update-now-picker) |
+| R-8-un-api-post | `POST /staff/changes/update-now` with `{merchantId, reason <= 200}`; returns `queued` or `already_running` | 6 | staff controller | int, DTO validation test | verified (Stage 6: staff-change.int-spec (validation, queued/already_running)) |
+| R-8-un-page | Staff portal page with searchable picker (no UUID typing), status, reason field, button; hidden without permission | 6 | `PORTAL/app/staff` | mock, screenshot | verified (Stage 6: app/staff/changes; tests/staff-changes.spec.ts (3 viewports, screenshot)) |
+| R-8-un-proxy | Staff proxy allowlist patterns added | 6 | staff proxy route | unit | verified (Stage 6: lib/server/staff-proxy-allowlist.test.ts) |
+| R-8-un-run | Marks work due now; starts Cloud Run job via Admin REST API with API service identity; identity limited to this job; no new SDK; local CLI alternative | 6, 8 | staff service, IAM config | int with stubbed REST client; IAM verified hosted at Stage 8 | partial (Stage 6: trigger unit-tested with mocked HTTP; IAM verified hosted at Stage 8) |
+| R-8-un-limits | Enabled merchants only; one execution per merchant per minute; shares lease | 6 | staff service | int | verified (Stage 6: 9.2.update-now-already-running, -no-overlap) |
+| R-8-un-no-bypass | Bypasses no rule; demand changes still need history and confirmation | 6 | worker | int | verified (Stage 6: 9.2.update-now-confirmation-timing) |
+| R-8-seed-extend | Extend `seed-local-overview-demo.mjs`; no new seeder | 6 | `apps/api/scripts/` | diff review | verified (Stage 6: seed-local-overview-demo.mjs diff) |
+| R-8-seed-shift | `--demand-shift "<sku>:<mult>:<fromDaysAgo>"` deterministic | 6 | seeder | seeder test | verified (Stage 6: seeded sample merchant, COF-CAP ×1.5 last 14 days (run log)) |
+| R-8-seed-mark | `--mark-sample` sets `data_provenance='sample'`; refuses ordinary merchant without it; refuses on merchant with a `live` digital sale | 6 | seeder | seeder tests (3 cases) | verified (Stage 6: 3 seeder runs: ordinary refused, live refused, sample marked) |
+| R-8-seed-catchup | Catch-up runs close the 26/28 Sep gap | 6, 7 | seeder | int 9.3 sample run | partial (Stage 6: catch-up run on local sample merchant; current-data run Stage 7) |
 | R-8-seed-cash | Acceptance uses `--digital-share 0`; dedicated sample merchant for shift | 7 | acceptance script | 9.3 run log | pending |
 | R-8-seed-hosted | Hosted seeding needs `--allow-host` and Fred's approval | 8 | seeder | not run; blocked until approval | pending |
-| R-8-config-vars | Four config vars: ENABLED, ALLOWLIST, SETTINGS, `CHANGE_INTELLIGENCE_JOB_NAME` | 3, 6 | config module | unit | pending |
+| R-8-config-vars | Four config vars: ENABLED, ALLOWLIST, SETTINGS, `CHANGE_INTELLIGENCE_JOB_NAME` | 3, 6 | config module | unit | verified (Stage 6: change-intelligence.config.ts; .env.example; api.env.yaml) |
 | R-8-same-availability | Worker and read APIs use same availability check; UI reads it via status API | 3, 4 | availability service | unit/int | pending |
-| R-8-monitoring | Capture the 11 monitoring measures | 6 | metrics/logging | unit + sample log output | pending |
-| R-8-alerts | Six alert conditions defined | 6 | monitoring config | config review; hosted firing is Stage 8 | pending |
-| R-8-retention | Retention: unprocessed events kept; processed detail 90 days; runs/transitions/resolved cases 12 months; states and active cases kept; transitions keep evidence; bounded configurable maintenance | 6 | maintenance job | int 9.2 retention | pending |
-| R-8-allowlist | Initial allowlist holds the two public IDs; set in local/test now, hosted values only at Stage 8 | 6, 8 | env files, `deploy/cloud-run/api.env.yaml` | local config check; hosted deferred | pending |
+| R-8-monitoring | Capture the 11 monitoring measures | 6 | metrics/logging | unit + sample log output | verified (Stage 6: change-monitoring.spec.ts; sample log line in runbook §6) |
+| R-8-alerts | Six alert conditions defined | 6 | monitoring config | config review; hosted firing is Stage 8 | verified (Stage 6: runbook §6 log-based metrics (hosted firing at Stage 8)) |
+| R-8-retention | Retention: unprocessed events kept; processed detail 90 days; runs/transitions/resolved cases 12 months; states and active cases kept; transitions keep evidence; bounded configurable maintenance | 6 | maintenance job | int 9.2 retention | verified (Stage 6: change-retention.int-spec) |
+| R-8-allowlist | Initial allowlist holds the two public IDs; set in local/test now, hosted values only at Stage 8 | 6, 8 | env files, `deploy/cloud-run/api.env.yaml` | local config check; hosted deferred | partial (Stage 6: set in deploy files; hosted value ships at Stage 8) |
 | R-8-release-migrations | Append-only migrations; verify fresh and upgraded databases | 2, 7 | `MIG/` | int fresh and upgrade run | pending |
 | R-8-release-perms | Server-only permissions on every new table | 2 | `MIG/` | int | pending |
 | R-8-release-index-first | Indexes created before capture enabled | 2 | `MIG/` ordering | migration order test | pending |
@@ -377,16 +377,16 @@ All run against `mcbuse_ci_test` with `DATABASE_URL` exported explicitly. Never 
 | R-9.2-capture-kinds | Capture of imports, reservations, archives, voids, restocks, timezone changes | 2 | triggers | int `9.2.capture-*` (six cases) | pending |
 | R-9.2-invoice-items | Invoice-item inserts on unpaid requests produce no events | 2 | triggers | int `9.2.invoice-item-no-event` | pending |
 | R-9.2-tenant | Tenant isolation and owner-only access | 4 | API | int `9.2.tenant-isolation` | pending |
-| R-9.2-retention | Safe retention | 6 | maintenance | int `9.2.retention-safe` | pending |
-| R-9.2-model-upgrade | Explicit model-upgrade history | 3, 6 | rebuild | int `9.2.model-upgrade-history` | pending |
-| R-9.2-un-picker | Picker searches by name and email, lists only enabled merchants, 403 without permission | 6 | staff API | int `9.2.update-now-picker` | pending |
-| R-9.2-un-dual | One user can hold `credit_analyst` and `change_intelligence_operator` | 6 | migration | int `9.2.update-now-dual-permission` | pending |
-| R-9.2-un-403 | 403 for staff without permission | 6 | staff API | int `9.2.update-now-403` | pending |
-| R-9.2-un-404 | 404 for merchants and owners | 6 | staff API | int `9.2.update-now-404` | pending |
-| R-9.2-un-audit | Every use audited | 6 | staff service | int `9.2.update-now-audited` | pending |
-| R-9.2-un-running | `already_running` within a minute or during processing | 6 | staff service | int `9.2.update-now-already-running` | pending |
-| R-9.2-un-overlap | No overlap with hourly run | 6 | queue | int `9.2.update-now-no-overlap` | pending |
-| R-9.2-un-timing | No change to confirmation timing | 6 | worker | int `9.2.update-now-confirmation-timing` | pending |
+| R-9.2-retention | Safe retention | 6 | maintenance | int `9.2.retention-safe` | verified (Stage 6: change-retention.int-spec 9.2.retention-safe) |
+| R-9.2-model-upgrade | Explicit model-upgrade history | 3, 6 | rebuild | int `9.2.model-upgrade-history` | verified (Stage 6: change-retention.int-spec rebuild; change-processing.int-spec) |
+| R-9.2-un-picker | Picker searches by name and email, lists only enabled merchants, 403 without permission | 6 | staff API | int `9.2.update-now-picker` | verified (Stage 6: staff-change.int-spec) |
+| R-9.2-un-dual | One user can hold `credit_analyst` and `change_intelligence_operator` | 6 | migration | int `9.2.update-now-dual-permission` | verified (Stage 6: staff-change.int-spec) |
+| R-9.2-un-403 | 403 for staff without permission | 6 | staff API | int `9.2.update-now-403` | verified (Stage 6: staff-change.int-spec) |
+| R-9.2-un-404 | 404 for merchants and owners | 6 | staff API | int `9.2.update-now-404` | verified (Stage 6: staff-change.int-spec) |
+| R-9.2-un-audit | Every use audited | 6 | staff service | int `9.2.update-now-audited` | verified (Stage 6: staff-change.int-spec) |
+| R-9.2-un-running | `already_running` within a minute or during processing | 6 | staff service | int `9.2.update-now-already-running` | verified (Stage 6: staff-change.int-spec) |
+| R-9.2-un-overlap | No overlap with hourly run | 6 | queue | int `9.2.update-now-no-overlap` | verified (Stage 6: staff-change.int-spec) |
+| R-9.2-un-timing | No change to confirmation timing | 6 | worker | int `9.2.update-now-confirmation-timing` | verified (Stage 6: staff-change.int-spec) |
 
 ### §9.3 to §9.7 Acceptance, performance, report
 
@@ -401,7 +401,7 @@ All run against `mcbuse_ci_test` with `DATABASE_URL` exported explicitly. Never 
 | R-9.3-replay-424d | `asOf` 2026-09-29 01:00 Europe/Berlin: `424d...` ready for 10 products, forecasts ready | 7 | acceptance | report | pending |
 | R-9.3-replay-dfdf | `dfdf...` ready with 3 baseline weeks (33 days), explanation says so; forecasts ready except Coffee Candy | 7 | acceptance | report | pending |
 | R-9.3-replay-min4 | `baselineWeeksMin` = 4: `dfdf...` `building_baseline`, "2 more days needed" | 7 | acceptance | report | pending |
-| R-9.3-backtest | TypeScript replay 5 Aug - 28 Sep for `424d...` reproduces §2.3 qualifying counts (z >= 2.0: 44, 2.5: 20, 3.0: 8; 549 evaluations); confirmed cases listed | 6, 7 | evaluation export | report | pending |
+| R-9.3-backtest | TypeScript replay 5 Aug - 28 Sep for `424d...` reproduces §2.3 qualifying counts (z >= 2.0: 44, 2.5: 20, 3.0: 8; 549 evaluations); confirmed cases listed | 6, 7 | evaluation export | report | verified (Stage 6: evaluation report: 44/20/8 and 4/1 reproduced; 539 ready vs 549 (11 Sourdough E<5 days)) |
 | R-9.3-shift | Catch-up seed with `--demand-shift "<Cappuccino sku>:1.5:14"`: Changes page shows confirmed increase with before/after cover | 7 | acceptance, e2e | screenshot, e2e | pending |
 | R-9.3-shift-restock | "Review stock" opens the product; restock resolves stock risk, demand case stays open | 7 | e2e | e2e | pending |
 | R-9.4-functionality | Seven functionality checks (destinations/redirects, deep links, URL filters, values match, Deep/Changes agree, inventory actions incl. off-page, background update keeps state) | 5, 7 | mock, e2e | mock suite | pending |
@@ -420,18 +420,18 @@ All run against `mcbuse_ci_test` with `DATABASE_URL` exported explicitly. Never 
 | R-9.6-update-now | "Update now" stock/threshold visible <= 2 min incl. job start-up | 7 | bench | bench (local with CLI start; hosted number at Stage 8) | pending |
 | R-9.6-demand-visible | Demand case visible after second qualifying day by 02:05 local | 7 | bench | bench | pending |
 | R-9.6-record | Startup measured separately; hardware, DB size, concurrency, samples, cold/warm recorded; gates labelled proposed | 7 | report | report | pending |
-| R-9.7-format | Evaluation report in JSON and Markdown | 6, 7 | evaluation export | report files | pending |
-| R-9.7-confusion | Labelled detection outcomes with confusion matrix on injected-shift fixtures | 6, 7 | export | report | pending |
-| R-9.7-false-pos | False-positive count on unshifted data | 6, 7 | export | report | pending |
-| R-9.7-backtest | §2.3 backtest replay | 6, 7 | export | report | pending |
-| R-9.7-affected | Expected vs actual affected-node sets | 6, 7 | export | report | pending |
-| R-9.7-consistency | Propagation and selective-update consistency | 6, 7 | export | report | pending |
+| R-9.7-format | Evaluation report in JSON and Markdown | 6, 7 | evaluation export | report files | verified (Stage 6: evaluation-*.json/.md) |
+| R-9.7-confusion | Labelled detection outcomes with confusion matrix on injected-shift fixtures | 6, 7 | export | report | verified (Stage 6: evaluation report) |
+| R-9.7-false-pos | False-positive count on unshifted data | 6, 7 | export | report | verified (Stage 6: evaluation report) |
+| R-9.7-backtest | §2.3 backtest replay | 6, 7 | export | report | verified (Stage 6: evaluation report) |
+| R-9.7-affected | Expected vs actual affected-node sets | 6, 7 | export | report | verified (Stage 6: evaluation report (propagation)) |
+| R-9.7-consistency | Propagation and selective-update consistency | 6, 7 | export | report | verified (Stage 6: evaluation report (propagation findings)) |
 | R-9.7-latency | Latency | 7 | export | report | pending |
-| R-9.7-arith | Arithmetic correctness | 7 | export | report | pending |
-| R-9.7-wape | 7-day forecast WAPE (reference 26.1%) | 6, 7 | export | report | pending |
-| R-9.7-explanations | Explanation completeness | 7 | export | report | pending |
+| R-9.7-arith | Arithmetic correctness | 7 | export | report | verified (Stage 6: evaluation report: 0 mismatches) |
+| R-9.7-wape | 7-day forecast WAPE (reference 26.1%) | 6, 7 | export | report | verified (Stage 6: evaluation report: 26.1% over 560) |
+| R-9.7-explanations | Explanation completeness | 7 | export | report | verified (Stage 6: evaluation report: 0 incomplete) |
 | R-9.7-ui | UI acceptance results | 7 | export | report | pending |
-| R-9.7-caveat | Report states fixtures prove mechanics, not real-world accuracy | 7 | report text | report | pending |
+| R-9.7-caveat | Report states fixtures prove mechanics, not real-world accuracy | 7 | report text | report | verified (Stage 6: evaluation report header) |
 
 ---
 

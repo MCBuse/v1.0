@@ -88,6 +88,41 @@ export const DEFAULT_RANGE_DAYS = 30;
 export const MAX_RANGE_DAYS = 366;
 /** Pending work older than this, or a failed lease, is "delayed" (plan §8 alerting). */
 export const DELAYED_AFTER_MINUTES = 75;
+
+/**
+ * Processing columns over `merchant_change_work w` (may be a LEFT JOIN).
+ * Shared by the merchant status API and the staff merchant picker.
+ */
+export const WORK_PROCESSING_SQL = {
+  columns: sql`(w.status = 'processing' AND w.lease_until > now()) AS processing,
+    (w.status = 'failed' OR (w.last_failure_at IS NOT NULL
+      AND (w.last_success_at IS NULL OR w.last_failure_at > w.last_success_at))) AS failed,
+    p.pending_since,
+    p.pending_since < now() - make_interval(mins => ${DELAYED_AFTER_MINUTES}) AS delayed`,
+  lateral: sql`CROSS JOIN LATERAL (
+    SELECT CASE WHEN w.requested_revision > w.processed_revision THEN COALESCE(
+      (SELECT min(e.created_at) FROM merchant_change_events e
+        WHERE e.merchant_id = w.merchant_id AND e.status = 'pending'),
+      w.last_requested_at) END AS pending_since
+  ) p`,
+};
+
+export type WorkProcessingRow = {
+  processing: boolean | null;
+  failed: boolean | null;
+  pending_since: string | Date | null;
+  delayed: boolean | null;
+};
+
+export function processingState(
+  work: WorkProcessingRow | undefined,
+): ChangeProcessingState {
+  if (!work) return 'idle';
+  if (work.processing) return 'processing';
+  if (work.failed) return 'failed';
+  if (work.delayed) return 'delayed';
+  return work.pending_since ? 'pending' : 'idle';
+}
 const HISTORY_LIMIT = 100;
 
 export const PROJECTION_ASSUMPTION =
@@ -452,6 +487,7 @@ export class ChangeReadService {
         trends: 'building_baseline',
         requiredHistoryDays: requiredDays,
         daysUntilTrendsReady: null,
+        minUsualWeeklyUnits: this.config.settings.minExpectedWeekly,
       },
       recordingGap: false,
       lastRecordedSaleDate: null,
@@ -463,19 +499,8 @@ export class ChangeReadService {
     const id = merchant.merchantId;
     const [workRows, states, runs, counts] = await Promise.all([
       this.db.execute(sql`
-        SELECT w.bootstrap_status, w.last_success_at, w.last_failure_at,
-          (w.status = 'processing' AND w.lease_until > now()) AS processing,
-          (w.status = 'failed' OR (w.last_failure_at IS NOT NULL
-            AND (w.last_success_at IS NULL OR w.last_failure_at > w.last_success_at))) AS failed,
-          p.pending_since,
-          p.pending_since < now() - make_interval(mins => ${DELAYED_AFTER_MINUTES}) AS delayed
-        FROM merchant_change_work w
-        CROSS JOIN LATERAL (
-          SELECT CASE WHEN w.requested_revision > w.processed_revision THEN COALESCE(
-            (SELECT min(e.created_at) FROM merchant_change_events e
-              WHERE e.merchant_id = w.merchant_id AND e.status = 'pending'),
-            w.last_requested_at) END AS pending_since
-        ) p
+        SELECT w.bootstrap_status, w.last_success_at, w.last_failure_at, ${WORK_PROCESSING_SQL.columns}
+        FROM merchant_change_work w ${WORK_PROCESSING_SQL.lateral}
         WHERE w.merchant_id = ${id}::uuid`),
       this.db
         .select({
@@ -536,29 +561,15 @@ export class ChangeReadService {
     ]);
 
     const work = workRows.rows[0] as
-      | {
+      | (WorkProcessingRow & {
           bootstrap_status: 'pending' | 'completed';
           last_success_at: string | Date | null;
           last_failure_at: string | Date | null;
-          processing: boolean;
-          failed: boolean;
-          pending_since: string | Date | null;
-          delayed: boolean | null;
-        }
+        })
       | undefined;
     const iso = (value: string | Date | null | undefined) =>
       value ? new Date(value).toISOString() : null;
-    const processing: ChangeProcessingState = !work
-      ? 'idle'
-      : work.processing
-        ? 'processing'
-        : work.failed
-          ? 'failed'
-          : work.delayed
-            ? 'delayed'
-            : work.pending_since
-              ? 'pending'
-              : 'idle';
+    const processing = processingState(work);
 
     const recording = states.find(
       (s) => s.nodeKey === 'merchant_recording_activity',
@@ -578,7 +589,11 @@ export class ChangeReadService {
       processing,
       pendingSince: iso(work?.pending_since),
       lastFailureAt: iso(work?.last_failure_at),
-      readiness: { ...trends, requiredHistoryDays: requiredDays },
+      readiness: {
+        ...trends,
+        requiredHistoryDays: requiredDays,
+        minUsualWeeklyUnits: this.config.settings.minExpectedWeekly,
+      },
       recordingGap: recording?.recordingGap ?? false,
       lastRecordedSaleDate: recording?.lastSaleDate ?? null,
       summary: {

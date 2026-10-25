@@ -41,6 +41,8 @@ export type MerchantRunOutcome = {
   error?: string;
   publish?: PublishSummary;
   counts?: EvaluationResult['counts'];
+  /** Products in the evaluated source snapshot. */
+  products?: number;
 };
 
 export type ChangeTickSummary = {
@@ -76,6 +78,51 @@ const isSerializationFailure = (error: unknown): boolean => {
   }
   return false;
 };
+
+/** Aggregates merchant outcomes into the execution summary (tick and operator commands). */
+export function summarizeRuns(input: {
+  asOf: Date;
+  scheduled?: ChangeTickSummary['scheduled'];
+  merchants: MerchantRunOutcome[];
+  deferred: number;
+  startedMs: number;
+}): ChangeTickSummary {
+  const summary: ChangeTickSummary = {
+    asOf: input.asOf.toISOString(),
+    scheduled: input.scheduled ?? {
+      initialization: 0,
+      modelUpgrade: 0,
+      settingsChange: 0,
+      clock: 0,
+    },
+    processed: 0,
+    failed: 0,
+    deferred: input.deferred,
+    retries: 0,
+    leaseLosses: 0,
+    events: 0,
+    nodes: { evaluated: 0, changed: 0, skipped: 0, blocked: 0 },
+    readiness: {},
+    durationMs: 0,
+    merchants: input.merchants,
+  };
+  for (const outcome of input.merchants) {
+    summary.retries += outcome.retries;
+    if (outcome.status === 'succeeded') summary.processed += 1;
+    else if (outcome.status === 'lease_lost') summary.leaseLosses += 1;
+    else summary.failed += 1;
+    summary.events += outcome.publish?.events ?? 0;
+    for (const key of ['evaluated', 'changed', 'skipped', 'blocked'] as const)
+      summary.nodes[key] += outcome.counts?.[key] ?? 0;
+    for (const [readiness, count] of Object.entries(
+      outcome.publish?.readiness ?? {},
+    ) as Array<[ChangeReadiness, number]>)
+      summary.readiness[readiness] =
+        (summary.readiness[readiness] ?? 0) + count;
+  }
+  summary.durationMs = Date.now() - input.startedMs;
+  return summary;
+}
 
 const messageOf = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
@@ -131,41 +178,18 @@ export class ChangeProcessorService {
       if (!work) break;
       merchants.push(await this.processWork(work, { asOf: options.asOf }));
     }
-    const summary: ChangeTickSummary = {
-      asOf: scheduleAsOf.toISOString(),
+    return summarizeRuns({
+      asOf: scheduleAsOf,
       scheduled: {
         initialization: scheduled.initialization.length,
         modelUpgrade: scheduled.modelUpgrade.length,
         settingsChange: scheduled.settingsChange.length,
         clock: scheduled.clock.length,
       },
-      processed: 0,
-      failed: 0,
-      deferred: (await this.queue.backlog()).pending,
-      retries: 0,
-      leaseLosses: 0,
-      events: 0,
-      nodes: { evaluated: 0, changed: 0, skipped: 0, blocked: 0 },
-      readiness: {},
-      durationMs: 0,
       merchants,
-    };
-    for (const outcome of merchants) {
-      summary.retries += outcome.retries;
-      if (outcome.status === 'succeeded') summary.processed += 1;
-      else if (outcome.status === 'lease_lost') summary.leaseLosses += 1;
-      else summary.failed += 1;
-      summary.events += outcome.publish?.events ?? 0;
-      for (const key of ['evaluated', 'changed', 'skipped', 'blocked'] as const)
-        summary.nodes[key] += outcome.counts?.[key] ?? 0;
-      for (const [readiness, count] of Object.entries(
-        outcome.publish?.readiness ?? {},
-      ) as Array<[ChangeReadiness, number]>)
-        summary.readiness[readiness] =
-          (summary.readiness[readiness] ?? 0) + count;
-    }
-    summary.durationMs = Date.now() - started;
-    return summary;
+      deferred: (await this.queue.backlog()).pending,
+      startedMs: started,
+    });
   }
 
   /** Processes already-claimed work (exposed for tests and operator tooling). */
@@ -176,7 +200,7 @@ export class ChangeProcessorService {
     const run = {
       id: randomUUID(),
       startedAt: new Date(),
-      requestedByUserId: options.requestedBy ?? null,
+      requestedByUserId: options.requestedBy ?? work.requestedByUserId,
     };
     const asOf = options.asOf ?? run.startedAt;
     let reason: RunReason =
@@ -251,6 +275,7 @@ export class ChangeProcessorService {
             retries,
             publish,
             counts: result.counts,
+            products: source.products.length,
           };
         } catch (error) {
           if (

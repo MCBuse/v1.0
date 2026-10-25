@@ -1,3 +1,4 @@
+import { StaffController } from '../staff/staff.controller';
 import type { CreditProfile, StaffCreditAssessment } from '@repo/shared';
 import {
   INestApplication,
@@ -84,7 +85,11 @@ describe('private Python scoring and staff access (integration)', () => {
     merchants = new MerchantService(db, {} as RatesService, config);
     assessments = new MerchantAssessmentService(db, merchants, evidence);
     const mod = await Test.createTestingModule({
-      controllers: [StaffCreditController, MerchantCreditController],
+      controllers: [
+        StaffController,
+        StaffCreditController,
+        MerchantCreditController,
+      ],
       providers: [
         { provide: DRIZZLE, useValue: db },
         { provide: CreditAccessService, useValue: access },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateMutation } from "@/lib/server/request-security";
+import { isAllowedStaffPath } from "@/lib/server/staff-proxy-allowlist";
 import {
   clearSessionCookies,
   CSRF_COOKIE,
@@ -7,16 +8,12 @@ import {
   setCsrfCookie,
   setSessionCookies,
 } from "@/lib/server/session";
-const allowed = [
-  /^me$/,
-  /^credit-assessments(?:\/(?:merchants|model|[a-f0-9-]{36}))?$/i,
-];
 async function forward(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ) {
   const path = (await context.params).path.join("/");
-  if (!allowed.some((p) => p.test(path)))
+  if (!isAllowedStaffPath(path))
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   if (request.method !== "GET" && !validateMutation(request))
     return NextResponse.json(
@@ -47,7 +44,7 @@ async function forward(
     return response;
   } catch {
     return NextResponse.json(
-      { message: "The assessment service is temporarily unavailable" },
+      { message: "The staff service is temporarily unavailable" },
       { status: 503 },
     );
   }

@@ -14,6 +14,7 @@
  *       [--digital-share 0.7] [--digital-days N] [--evidence-environment test]
  *       [--mode mock|sandbox] [--float-usdc 45] [--full-profile]
  *       [--database-url postgres://…] [--allow-db-host db.example.com]
+ *       [--demand-shift "<sku>:<multiplier>:<fromDaysAgo>"] [--mark-sample]
  *
  * Hosted demo merchant (devnet): see docs/demo-merchant-seeding.md.
  *
@@ -61,6 +62,17 @@
  * GO-LIVE: history seeded into a hosted database must be removed before launch
  * (DB reset); see docs/go-live-checklist.md.
  *
+ * Change Intelligence fixtures (plan §8 "Sample data"):
+ *   --demand-shift "COF-CAP:1.5:14" multiplies that product's units on every
+ *     sale of the last 14 local days (today included), deterministically:
+ *     each unit becomes `multiplier` units in expectation, drawn from a seeded
+ *     stream per sale. Use it on a dedicated sample merchant; sales an earlier
+ *     run already recorded keep their quantities.
+ *   --mark-sample sets merchants.data_provenance = 'sample' (needs the
+ *     database). It is refused when the merchant has any live digital sale.
+ *   History is never added to an `ordinary` merchant unless --mark-sample is
+ *     passed. For Change Intelligence acceptance use --digital-share 0.
+ *
  * Safety:
  *   - Local API and local database by default. A remote API is refused unless
  *     its exact hostname is passed with --allow-host, a remote database unless
@@ -105,6 +117,13 @@ const FLOAT_USDC = Number(arg('float-usdc', '45'));
 // so the assessment has complete information.
 const FULL_PROFILE = flag('full-profile');
 const ALLOW_DB_HOST = arg('allow-db-host', '')?.trim().toLowerCase();
+const MARK_SAMPLE = flag('mark-sample');
+const DEMAND_SHIFT = (() => {
+  const raw = arg('demand-shift', null);
+  if (raw === null) return null;
+  const [sku, multiplier, fromDaysAgo] = String(raw).split(':');
+  return { sku: sku?.trim().toUpperCase(), multiplier: Number(multiplier), fromDaysAgo: Number(fromDaysAgo) };
+})();
 const EMAIL = process.env.SEED_EMAIL?.trim().toLowerCase();
 const PASSWORD = process.env.SEED_PASSWORD;
 let TZ = 'Europe/Berlin'; // replaced by the merchant's own timezone after login
@@ -123,6 +142,10 @@ if (!EMAIL || !PASSWORD) {
 }
 if (!['mock', 'sandbox'].includes(MODE)) {
   console.error('--mode must be mock or sandbox.');
+  process.exit(1);
+}
+if (DEMAND_SHIFT && !(DEMAND_SHIFT.multiplier > 0 && DEMAND_SHIFT.multiplier <= 5 && Number.isInteger(DEMAND_SHIFT.fromDaysAgo) && DEMAND_SHIFT.fromDaysAgo >= 1 && DEMAND_SHIFT.fromDaysAgo <= DAYS)) {
+  console.error('--demand-shift must be "<sku>:<multiplier 0–5>:<fromDaysAgo 1–days>", e.g. "COF-CAP:1.5:14".');
   process.exit(1);
 }
 if (!['test', 'synthetic', 'live'].includes(EVIDENCE_ENVIRONMENT)) {
@@ -153,6 +176,10 @@ const CATALOGUE = [
   { sku: 'DRK-OJ', name: 'Fresh orange juice', category: 'Drinks', price: 420, weight: 5, endStock: 25, description: 'Pressed daily, 300 ml' },
 ];
 const LOW_STOCK_THRESHOLD = 5;
+if (DEMAND_SHIFT && !CATALOGUE.some((p) => p.sku === DEMAND_SHIFT.sku)) {
+  console.error(`--demand-shift: unknown SKU ${DEMAND_SHIFT.sku}. Known: ${CATALOGUE.map((p) => p.sku).join(', ')}.`);
+  process.exit(1);
+}
 // Short till notes a cashier might add; most sales have none.
 const NOTES = ['Takeaway', 'Takeaway', 'Table 2', 'Table 4', 'Table 5', 'Oat milk', 'Paid exact', 'Regular', 'Extra shot'];
 const CATERING = ['Office breakfast tray', 'Pastry platter (pre-order)', 'Coffee pots for meeting', 'Sandwich platter'];
@@ -232,6 +259,24 @@ function planSales(now) {
       }
       const voidReason = r() < 0.006 ? VOID_REASONS[Math.floor(r() * VOID_REASONS.length)] : null;
       const key = `${KEY_PREFIX}:${ymd}:${n}`;
+      // Sustained demand shift: its own seeded stream, so nothing else about the sale changes.
+      if (DEMAND_SHIFT && back < DEMAND_SHIFT.fromDaysAgo) {
+        const s = rng(`${key}:shift:${DEMAND_SHIFT.sku}`);
+        for (const line of lines) {
+          if (line.sku !== DEMAND_SHIFT.sku) continue;
+          let quantity = 0;
+          for (let unit = 0; unit < line.quantity; unit++) {
+            if (DEMAND_SHIFT.multiplier < 1) quantity += s() < DEMAND_SHIFT.multiplier ? 1 : 0;
+            else {
+              const extra = DEMAND_SHIFT.multiplier - 1;
+              quantity += 1 + Math.floor(extra) + (s() < extra % 1 ? 1 : 0);
+            }
+          }
+          line.quantity = quantity;
+        }
+        for (let i = lines.length - 1; i >= 0; i--) if (lines[i].quantity === 0) lines.splice(i, 1);
+        if (!lines.length) continue;
+      }
       // The channel draws from its own stream, so every other detail of a sale
       // (and so each cash sale's idempotency fingerprint) is unchanged by it.
       const digital = !voidReason && back < DIGITAL_DAYS && rng(`${key}:channel`)() < DIGITAL_SHARE;
@@ -690,6 +735,34 @@ async function assess() {
   if (c?.unavailableFields?.length) console.log(`  still unavailable: ${c.unavailableFields.join(', ')}`);
 }
 
+/**
+ * Generated history only goes into sample accounts (plan §8). --mark-sample
+ * turns an account into one, unless it has any live digital sale.
+ */
+async function guardProvenance(merchantPublicId) {
+  if (MARK_SAMPLE) {
+    const { db, merchantId } = await connectDatabase(merchantPublicId);
+    try {
+      const live = await db.query(
+        `select 1 from merchant_transactions where merchant_id = $1 and evidence_environment = 'live' limit 1`, [merchantId]);
+      if (live.rowCount) throw new Error('Refusing --mark-sample: this merchant has live digital sales. Its records must stay ordinary.');
+      await db.query(`update merchants set data_provenance = 'sample', updated_at = now() where id = $1 and data_provenance <> 'sample'`, [merchantId]);
+      console.log('  merchant marked as a sample account');
+    } finally {
+      await db.end();
+    }
+    return;
+  }
+  let account;
+  try {
+    account = (await call('GET', '/merchants/me/changes/status'))?.provenance?.account;
+  } catch (e) {
+    throw new Error(`Could not read the account's data provenance (${e.message.slice(0, 120)}). Pass --mark-sample to mark it as a sample account.`);
+  }
+  if (account !== 'sample')
+    throw new Error('Refusing to add generated history to an ordinary merchant account. Pass --mark-sample to mark it as a sample account first.');
+}
+
 async function main() {
   const login = await call('POST', '/auth/login', { email: EMAIL, password: PASSWORD });
   token = login.accessToken;
@@ -698,6 +771,7 @@ async function main() {
   const merchantPublicId = me?.id;
   if (me?.timezone) TZ = me.timezone;
   if (UNDO) return undo();
+  await guardProvenance(merchantPublicId);
 
   console.log(`Seeding ${API} for ${EMAIL} (${DAYS} days, ${TZ})`);
   const manifest = readManifest();
