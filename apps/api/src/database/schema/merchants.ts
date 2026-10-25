@@ -31,6 +31,11 @@ export const merchants = pgTable(
       .notNull()
       .references(() => wallets.id),
     isActive: boolean('is_active').notNull().default(true),
+    /** `sample` only via sample tooling (plan §3.11); CHECK in 0038. */
+    dataProvenance: varchar('data_provenance', { length: 16 })
+      .$type<'ordinary' | 'sample'>()
+      .notNull()
+      .default('ordinary'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
