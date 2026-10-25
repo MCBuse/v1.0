@@ -2,11 +2,10 @@
  * Versioned dependency registry (plan §5.1–§5.2). The model version is a code
  * constant. Calculators are pure; validators are lightweight runtime schemas.
  */
-import {
-  CHANGE_INTELLIGENCE_MODEL_VERSION,
-  type ChangeReadiness,
-  type ChangeValue,
-  type ForecastUnavailableReason,
+import type {
+  ChangeReadiness,
+  ChangeValue,
+  ForecastUnavailableReason,
 } from '@repo/shared';
 import { addDays, localDate } from './local-time';
 import {
@@ -34,7 +33,12 @@ import type {
   SourceField,
 } from './types';
 
-export const MODEL_VERSION = CHANGE_INTELLIGENCE_MODEL_VERSION;
+/**
+ * Runtime copy of `CHANGE_INTELLIGENCE_MODEL_VERSION`: `@repo/shared` is
+ * source-only, so a value import crashes the compiled API. registry.spec.ts
+ * fails if the two differ.
+ */
+export const MODEL_VERSION = 'change-intelligence-v1';
 
 // --------------------------------------------------------------- validators
 
