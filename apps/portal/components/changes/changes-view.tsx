@@ -12,7 +12,7 @@ import { Card } from "@repo/ui/card";
 import { EmptyState } from "@repo/ui/empty-state";
 import { Input } from "@repo/ui/field";
 import { Skeleton } from "@repo/ui/skeleton";
-import { ChevronLeft, ChevronRight, RefreshCw, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -42,6 +42,7 @@ import {
   pageFromSearch,
   pollInterval,
   processingNotice,
+  productReadiness,
   readinessNotices,
   type AnnounceState,
   type ChangeFilters,
@@ -484,9 +485,40 @@ export function ChangesView() {
               />
             )}
           </section>
+
+          {statusData ? <ProductsNotAssessed status={statusData} /> : null}
         </>
       )}
     </div>
+  );
+}
+
+/** §3.8: quiet, collapsed list of products whose trends or stock outlook are not yet assessed. */
+function ProductsNotAssessed({ status }: { status: ChangeStatusResponse }) {
+  const items = productReadiness(status);
+  if (!items.length) return null;
+  return (
+    <details className="group rounded-xl border border-slate-200 bg-white">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700 sm:px-5 [&::-webkit-details-marker]:hidden">
+        <span>
+          Products not yet assessed <span className="text-slate-500">({formatCount(items.length)})</span>
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+      </summary>
+      <ul className="divide-y divide-slate-100 border-t border-slate-200">
+        {items.map((item) => (
+          <li key={item.productId} className="grid gap-1 px-4 py-3 text-sm sm:px-5">
+            <p className="font-medium text-slate-900 [overflow-wrap:anywhere]">{item.name}</p>
+            {item.lines.map((line) => (
+              <p key={line} className="text-slate-600">
+                {line}
+              </p>
+            ))}
+            {item.weeks ? <p className="text-slate-500">{item.weeks}</p> : null}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-25T08:47:40.815Z",
+  "generatedAt": "2026-10-25T12:45:44.313Z",
   "modelVersion": "change-intelligence-v1",
   "source": {
     "database": "mcbuse_current_copy",
@@ -345,7 +345,7 @@
           "projected_stock_dates:d6ebb5c1-e4d7-4928-90fc-df667a0cdb21"
         ]
       },
-      "selectiveMs": 4.66741599998204,
+      "selectiveMs": 1.659125000005588,
       "product": "Cappuccino"
     },
     {
@@ -372,9 +372,7 @@
       "demandCalculatorsInvoked": [],
       "selectiveVsFull": {
         "states": 122,
-        "differing": [
-          "merchant_change_summary"
-        ]
+        "differing": []
       },
       "laterSameDay": {
         "differing": [
@@ -383,27 +381,26 @@
           "projected_stock_dates:766f4302-2fe5-41f6-afff-ef97634789db",
           "projected_stock_dates:b3f22fc9-7f04-4fc1-9aed-6e16e4424ad0",
           "projected_stock_dates:d155ee97-b511-43b2-a409-6c1bf662de28",
-          "projected_stock_dates:d6ebb5c1-e4d7-4928-90fc-df667a0cdb21",
-          "merchant_change_summary"
+          "projected_stock_dates:d6ebb5c1-e4d7-4928-90fc-df667a0cdb21"
         ]
       },
-      "selectiveMs": 4.249041000031866,
+      "selectiveMs": 1.0364169999957085,
       "product": "Cappuccino"
     }
   ],
   "latency": {
     "dailyEvaluationMs": {
       "samples": 64,
-      "p50": 6.098541999999952,
-      "p95": 7.485709000000043,
-      "max": 11.774165999999923
+      "p50": 5.443083000000115,
+      "p95": 14.269166999999925,
+      "max": 17.774834000000055
     },
     "trialEvaluationMs": {
       "samples": 16800,
-      "p50": 5.900792000000365,
-      "p95": 7.46416599999975
+      "p50": 2.4824589999989257,
+      "p95": 4.646167000000787
     },
     "note": "Pure engine time on this machine, in process; no database or job start-up."
   },
-  "runtimeSeconds": 378.114
+  "runtimeSeconds": 1709.336
 }

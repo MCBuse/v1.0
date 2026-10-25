@@ -66,10 +66,20 @@ const formatTime = (iso: string | null) =>
 export function UpdateNowWorkspace() {
   const listId = useId();
   const [query, setQuery] = useState("");
-  const [options, setOptions] = useState<StaffChangeMerchant[]>([]);
+  // Results are tagged with the query that produced them; results for any
+  // other query are never shown or selectable (no stale or out-of-order picks).
+  const [results, setResults] = useState<{
+    query: string | null;
+    merchants: StaffChangeMerchant[];
+  }>({ query: null, merchants: [] });
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1);
-  const [searching, setSearching] = useState(false);
+  // Active option by merchant id, not by index into a list that may change.
+  const [activeMerchantId, setActiveMerchantId] = useState<string | null>(
+    null,
+  );
+  const searching = results.query !== query.trim();
+  const options = searching ? [] : results.merchants;
+  const active = options.findIndex((m) => m.merchantId === activeMerchantId);
   const [selected, setSelected] = useState<StaffChangeMerchant | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -79,22 +89,20 @@ export function UpdateNowWorkspace() {
   // Debounced search by business name or owner email.
   useEffect(() => {
     let cancelled = false;
-    setSearching(true);
+    const q = query.trim();
     const timer = setTimeout(() => {
       api<{ merchants: StaffChangeMerchant[] }>(
-        `changes/merchants${query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ""}`,
+        `changes/merchants${q ? `?q=${encodeURIComponent(q)}` : ""}`,
       )
         .then((result) => {
           if (cancelled) return;
-          setOptions(result.merchants);
-          setActive(result.merchants.length ? 0 : -1);
+          setResults({ query: q, merchants: result.merchants });
+          setActiveMerchantId(result.merchants[0]?.merchantId ?? null);
         })
         .catch((e: unknown) => {
-          if (!cancelled)
-            setError(e instanceof Error ? e.message : "Search failed");
-        })
-        .finally(() => {
-          if (!cancelled) setSearching(false);
+          if (cancelled) return;
+          setResults({ query: q, merchants: [] });
+          setError(e instanceof Error ? e.message : "Search failed");
         });
     }, 250);
     return () => {
@@ -211,10 +219,12 @@ export function UpdateNowWorkspace() {
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
                   setOpen(true);
-                  setActive((i) => Math.min(options.length - 1, i + 1));
+                  const next = options[Math.min(options.length - 1, active + 1)];
+                  if (next) setActiveMerchantId(next.merchantId);
                 } else if (e.key === "ArrowUp") {
                   e.preventDefault();
-                  setActive((i) => Math.max(0, i - 1));
+                  const previous = options[Math.max(0, active - 1)];
+                  if (previous) setActiveMerchantId(previous.merchantId);
                 } else if (e.key === "Enter" && open && options[active]) {
                   e.preventDefault();
                   choose(options[active]);
@@ -240,7 +250,7 @@ export function UpdateNowWorkspace() {
                         e.preventDefault();
                         choose(m);
                       }}
-                      onMouseEnter={() => setActive(i)}
+                      onMouseEnter={() => setActiveMerchantId(m.merchantId)}
                     >
                       {optionLabel(m)}
                     </li>

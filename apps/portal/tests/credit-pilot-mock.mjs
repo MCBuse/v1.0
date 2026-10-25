@@ -20,7 +20,7 @@ const credit = {
 let profile = {};
 let consent = false;
 const records = [];
-// Change Intelligence operator ("Update now", plan §8). Token: operator-access.
+// Change Intelligence operator ("Update now", plan §8). Token: operator-access[.<session>].
 const changeMerchants = [
   {
     merchantId: "7a0f6c1e-4a52-4c1f-9a64-0e7b8a5d2c11",
@@ -48,7 +48,7 @@ const changeMerchants = [
   },
 ];
 const updateNowStarted = new Map();
-async function staffChangesMock(request, response, url, { send, readJson }) {
+async function staffChangesMock(request, response, url, { send, readJson, token }) {
   if (url.pathname === "/api/v1/staff/me")
     send(response, 200, {
       permission: "change_intelligence_operator",
@@ -75,9 +75,11 @@ async function staffChangesMock(request, response, url, { send, readJson }) {
       send(response, 400, { message: ["reason should not be empty"] });
     else if (!merchant) send(response, 404, { message: "Not Found" });
     else {
-      const last = updateNowStarted.get(merchant.merchantId) ?? 0;
+      // Per operator session, so parallel or repeated tests never share a limit.
+      const key = `${token}|${merchant.merchantId}`;
+      const last = updateNowStarted.get(key) ?? 0;
       const recent = Date.now() - last < 60_000;
-      if (!recent) updateNowStarted.set(merchant.merchantId, Date.now());
+      if (!recent) updateNowStarted.set(key, Date.now());
       send(response, 202, { status: recent ? "already_running" : "queued" });
     }
   } else send(response, 403, { message: "Credit analyst access required" });
@@ -94,8 +96,9 @@ export async function creditPilotMock(
     // Only consume this request when it is handled here; caller supplies parsed login.
     return false;
   }
-  if (url.pathname.startsWith("/api/v1/staff/") && token === "operator-access")
-    return staffChangesMock(request, response, url, { send, readJson });
+  // "operator-access" or "operator-access.<session>" (one per test).
+  if (url.pathname.startsWith("/api/v1/staff/") && /^operator-access(\.|$)/.test(token))
+    return staffChangesMock(request, response, url, { send, readJson, token });
   if (
     url.pathname.startsWith("/api/v1/staff/changes/") &&
     ["staff-access", "staff-refreshed"].includes(token)

@@ -16,6 +16,7 @@ import {
   pageFromSearch,
   pollInterval,
   processingNotice,
+  productReadiness,
   readinessNotices,
   withUnit,
 } from "./changes";
@@ -39,6 +40,10 @@ function status(overrides: Partial<ChangeStatusResponse> = {}): ChangeStatusResp
       requiredHistoryDays: 28,
       daysUntilTrendsReady: 0,
       minUsualWeeklyUnits: 5,
+      minBaselineWeeks: 3,
+      forecastMinUnits: 14,
+      forecastWindowDays: 28,
+      products: [],
     },
     recordingGap: false,
     lastRecordedSaleDate: "2026-10-24",
@@ -181,21 +186,21 @@ describe("status copy", () => {
 
   it("uses the building-baseline copy with numbers from the status", () => {
     const [notice] = readinessNotices(
-      status({ readiness: { trends: "building_baseline", requiredHistoryDays: 28, daysUntilTrendsReady: 9, minUsualWeeklyUnits: 5 } }),
+      status({ readiness: { ...status().readiness, trends: "building_baseline", requiredHistoryDays: 28, daysUntilTrendsReady: 9 } }),
     );
     expect(notice?.title).toBe("Sales trends need 28 days of recorded sales. 9 more days needed.");
   });
 
   it("names the requirement when product history is insufficient", () => {
     const [notice] = readinessNotices(
-      status({ readiness: { trends: "insufficient_history", requiredHistoryDays: 28, daysUntilTrendsReady: null, minUsualWeeklyUnits: 5 } }),
+      status({ readiness: { ...status().readiness, trends: "insufficient_history", requiredHistoryDays: 28, daysUntilTrendsReady: null } }),
     );
     expect(notice?.body).toMatch(/at least 5 units sold in a usual week/);
   });
 
   it("uses the recording-gap copy and keeps stock problems visible", () => {
     const notices = readinessNotices(
-      status({ recordingGap: true, lastRecordedSaleDate: "2026-10-12", readiness: { trends: "recording_gap", requiredHistoryDays: 28, daysUntilTrendsReady: null, minUsualWeeklyUnits: 5 } }),
+      status({ recordingGap: true, lastRecordedSaleDate: "2026-10-12", readiness: { ...status().readiness, trends: "recording_gap", requiredHistoryDays: 28, daysUntilTrendsReady: null } }),
     );
     expect(notices).toHaveLength(1);
     expect(notices[0]!.title).toBe("No sales recorded since 12 Oct 2026.");
@@ -215,7 +220,7 @@ describe("empty list copy never hides a problem", () => {
   it("does not claim no changes while trends are not assessed, before the first analysis, or after a failure", () => {
     for (const trends of ["building_baseline", "insufficient_history", "recording_gap", "data_quality_blocked"] as const)
       expect(
-        emptyListCopy(status({ readiness: { trends, requiredHistoryDays: 28, daysUntilTrendsReady: null, minUsualWeeklyUnits: 5 } }), false).description,
+        emptyListCopy(status({ readiness: { ...status().readiness, trends, requiredHistoryDays: 28, daysUntilTrendsReady: null } }), false).description,
       ).not.toMatch(/No significant changes/);
     expect(emptyListCopy(status({ initialized: false, lastSuccessfulAnalysisAt: null }), false).title).toBe(
       "Your first analysis has not finished yet",
@@ -248,5 +253,81 @@ describe("poll interval", () => {
     expect(pollInterval(status({ processing: "processing" }))).toBe(5_000);
     expect(pollInterval(status({ processing: "pending" }))).toBe(60_000);
     expect(pollInterval(null)).toBe(60_000);
+  });
+});
+
+describe("products not yet assessed (§3.8)", () => {
+  const candy = {
+    productId: PRODUCT,
+    productName: "Coffee Candy",
+    trends: "insufficient_history" as const,
+    baselineWeeksUsed: 4,
+    usualWeeklyUnits: 1,
+    daysUntilTrendsReady: null,
+    forecast: { available: false, reason: "insufficient_units" as const },
+  };
+  const readiness = (products: ChangeStatusResponse["readiness"]["products"]) =>
+    status({ readiness: { ...status().readiness, products } });
+
+  it("names what is unavailable, the requirement and the weeks the usual level is based on", () => {
+    expect(productReadiness(readiness([candy]))).toEqual([
+      {
+        productId: PRODUCT,
+        name: "Coffee Candy",
+        lines: [
+          "Sales trends unavailable: needs at least 5 units in a usual week (usual is 1 unit).",
+          "Stock outlook unavailable: needs at least 14 units sold in the last 28 days.",
+        ],
+        weeks: "Usual is based on 4 weeks.",
+      },
+    ]);
+  });
+
+  it("explains a product still building its history, with the days left", () => {
+    const [loaf] = productReadiness(
+      readiness([
+        {
+          ...candy,
+          productName: "Sourdough loaf",
+          trends: "building_baseline",
+          baselineWeeksUsed: 1,
+          usualWeeklyUnits: 28,
+          daysUntilTrendsReady: 15,
+          forecast: { available: false, reason: "building_baseline" },
+        },
+      ]),
+    );
+    expect(loaf!.lines).toEqual([
+      "Sales trends unavailable: needs 3 complete weeks of sales history (15 more days).",
+      "Stock outlook unavailable: needs 28 days of sales history.",
+    ]);
+    expect(loaf!.weeks).toBe("Usual is based on 1 week so far.");
+  });
+
+  it("omits lines for parts that are available, and weeks when none are complete", () => {
+    const [item] = productReadiness(
+      readiness([
+        { ...candy, trends: "ready", forecast: { available: false, reason: "no_positive_demand" } },
+      ]),
+    );
+    expect(item!.lines).toEqual(["Stock outlook unavailable: no units sold recently."]);
+    const [blocked] = productReadiness(
+      readiness([
+        {
+          ...candy,
+          trends: "data_quality_blocked",
+          baselineWeeksUsed: 0,
+          usualWeeklyUnits: null,
+          forecast: { available: true, reason: null },
+        },
+      ]),
+    );
+    expect(blocked!.lines).toEqual(["Sales trends paused: some recorded sales could not be read."]);
+    expect(blocked!.weeks).toBeNull();
+  });
+
+  it("lists nothing during a recording gap or when every product is assessed", () => {
+    expect(productReadiness(readiness([]))).toEqual([]);
+    expect(productReadiness({ ...readiness([candy]), recordingGap: true })).toEqual([]);
   });
 });

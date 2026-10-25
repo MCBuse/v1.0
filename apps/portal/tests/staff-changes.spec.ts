@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 
 const BASE = "http://127.0.0.1:3101";
@@ -6,7 +7,8 @@ async function asOperator(page: Page) {
   await page.context().addCookies([
     {
       name: "mcbuse_portal_access",
-      value: "operator-access",
+      // One operator session per test: the mock's one-minute limit is per session.
+      value: `operator-access.${randomUUID()}`,
       url: BASE,
       httpOnly: true,
     },
@@ -29,7 +31,7 @@ test("operator finds a merchant by name or email and starts one update", async (
   ).toBeVisible();
   await expect(nav.getByRole("link", { name: "Credit pilot" })).toHaveCount(0);
 
-  // The mock's one-minute limit is shared, so each viewport uses its own merchant.
+  // Each viewport uses its own merchant, so the three searches differ.
   const target = {
     mobile: {
       query: "fred@",

@@ -219,6 +219,23 @@ export type ChangeDetailResponse = {
   actions: { viewProduct: boolean; reviewStock: boolean };
 };
 
+/** One product's readiness, from its last saved assessment. Merchant safe. */
+export type ChangeProductReadiness = {
+  productId: string;
+  productName: string;
+  /** Product-level trend readiness; a merchant recording gap is reported separately. */
+  trends: ChangeReadiness;
+  /** Complete weeks the usual level is based on (0 while none are complete). */
+  baselineWeeksUsed: number;
+  /** Usual weekly units from those weeks; null when no week is complete. */
+  usualWeeklyUnits: number | null;
+  daysUntilTrendsReady: number | null;
+  forecast: {
+    available: boolean;
+    reason: ForecastUnavailableReason | null;
+  };
+};
+
 export type ChangeStatusResponse = {
   available: boolean;
   unavailableReason: "disabled" | "not_enabled" | null;
@@ -236,6 +253,16 @@ export type ChangeStatusResponse = {
     daysUntilTrendsReady: number | null;
     /** Usual weekly units a product needs before its sales changes are assessed. */
     minUsualWeeklyUnits: number;
+    /** Complete weeks of history a product needs before its usual level is set. */
+    minBaselineWeeks: number;
+    /** Units a product needs in the forecast window before stock is projected. */
+    forecastMinUnits: number;
+    forecastWindowDays: number;
+    /**
+     * Active products whose sales trends or stock outlook are not yet
+     * assessed (§3.8), in name order. Ready products are left out.
+     */
+    products: ChangeProductReadiness[];
   };
   recordingGap: boolean;
   lastRecordedSaleDate: string | null;

@@ -41,7 +41,16 @@ function status(overrides: Partial<ChangeStatusResponse> = {}): ChangeStatusResp
     processing: "idle",
     pendingSince: null,
     lastFailureAt: null,
-    readiness: { trends: "ready", requiredHistoryDays: 28, daysUntilTrendsReady: 0, minUsualWeeklyUnits: 5 },
+    readiness: {
+      trends: "ready",
+      requiredHistoryDays: 28,
+      daysUntilTrendsReady: 0,
+      minUsualWeeklyUnits: 5,
+      minBaselineWeeks: 3,
+      forecastMinUnits: 14,
+      forecastWindowDays: 28,
+      products: [],
+    },
     recordingGap: false,
     lastRecordedSaleDate: "2026-10-24",
     summary: { activeChanges: 4, productsNeedingStockReview: 2 },
@@ -775,6 +784,10 @@ const READINESS = (trends: ChangeStatusResponse["readiness"]["trends"], days: nu
   requiredHistoryDays: 28,
   daysUntilTrendsReady: days,
   minUsualWeeklyUnits: 5,
+  minBaselineWeeks: 3,
+  forecastMinUnits: 14,
+  forecastWindowDays: 28,
+  products: [],
 });
 
 test("building baseline gives the day count and still shows stock problems", async ({ page }, info) => {
@@ -798,6 +811,57 @@ test("insufficient history names the requirement, and an empty list never claims
   await expect(main(page).getByText(/at least 5 units sold in a usual week/)).toBeVisible();
   await expect(main(page).getByText("No stock problems need attention")).toBeVisible();
   await expect(main(page).getByText(/No significant changes/)).toHaveCount(0);
+});
+
+test("products not yet assessed are named with what is unavailable and the requirement", async ({ page }, info) => {
+  await setup(page, {
+    status: status({
+      readiness: {
+        ...READINESS("ready", 0),
+        products: [
+          {
+            productId: "7d1b0c6e-3a4f-4c1b-9e2a-5f6a7b8c9d01",
+            productName: "Coffee Candy",
+            trends: "insufficient_history",
+            baselineWeeksUsed: 4,
+            usualWeeklyUnits: 1,
+            daysUntilTrendsReady: null,
+            forecast: { available: false, reason: "insufficient_units" },
+          },
+          {
+            productId: "7d1b0c6e-3a4f-4c1b-9e2a-5f6a7b8c9d02",
+            productName: "Sourdough loaf",
+            trends: "building_baseline",
+            baselineWeeksUsed: 1,
+            usualWeeklyUnits: 28,
+            daysUntilTrendsReady: 15,
+            forecast: { available: false, reason: "building_baseline" },
+          },
+        ],
+      },
+    }),
+  });
+  await page.goto("/analytics/changes");
+  await expect(entry(page, DEMAND.headline)).toBeVisible();
+  // Quiet and collapsed by default; details show on request.
+  const toggle = main(page).getByText("Products not yet assessed");
+  await expect(toggle).toBeVisible();
+  const candyLine = main(page).getByText(
+    "Sales trends unavailable: needs at least 5 units in a usual week (usual is 1 unit).",
+  );
+  await expect(candyLine).toBeHidden();
+  await toggle.click();
+  await expect(candyLine).toBeVisible();
+  await expect(main(page).getByText("Coffee Candy", { exact: true })).toBeVisible();
+  await expect(main(page).getByText("Usual is based on 4 weeks.")).toBeVisible();
+  await expect(main(page).getByText("Sourdough loaf", { exact: true })).toBeVisible();
+  await expect(
+    main(page).getByText("Sales trends unavailable: needs 3 complete weeks of sales history (15 more days)."),
+  ).toBeVisible();
+  await expect(main(page).getByText("Usual is based on 1 week so far.")).toBeVisible();
+  expect(await main(page).innerText()).not.toMatch(/unit_demand_change|adjusted_daily_demand|\bz\b/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: `${SHOTS}/products-not-assessed-${info.project.name}.png`, fullPage: true });
 });
 
 test("a recording gap explains itself and keeps current stock problems visible", async ({ page }, info) => {

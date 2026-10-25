@@ -75,6 +75,7 @@ class TestIdentity implements CanActivate {
 const TZ = 'Europe/Berlin';
 const D0 = '2026-09-20';
 const D1 = addDays(D0, 1);
+const D2 = addDays(D0, 2);
 const at = (day: string, hour = 1) => asOfAfter(day, TZ, hour);
 
 /** Keys that must never reach a merchant response (§3.6). */
@@ -133,10 +134,13 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
   let off: MerchantFixture; // not in the allowlist
   let legacyOn: MerchantFixture; // CI enabled + initialized: adapter insights
   let legacyOff: MerchantFixture; // CI not enabled: legacy insights
+  let reopen: MerchantFixture; // like demand, plus a later update to the same case
   let productA: string;
   let productB: string;
   let otherProduct: string;
   let otherRunId: string;
+  let candy: string; // calm: too few units in a usual week
+  let loaf: string; // calm: two weeks of history
 
   const http = () =>
     request(app.getHttpServer() as unknown as Parameters<typeof request>[0]);
@@ -150,7 +154,12 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
 
   const product = async (
     merchantId: string,
-    options: { name: string; onHand: number; threshold?: number },
+    options: {
+      name: string;
+      onHand: number;
+      threshold?: number;
+      createdOn?: string;
+    },
   ) =>
     (
       await q<{ id: string }>(
@@ -161,7 +170,7 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
           options.name,
           options.onHand,
           options.threshold ?? 5,
-          localDayStart('2026-07-01', TZ),
+          localDayStart(options.createdOn ?? '2026-07-01', TZ),
         ],
       )
     )[0].id;
@@ -206,7 +215,7 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
 
   beforeAll(async () => {
     ({ db, pool } = await connectTestDatabase());
-    [demand, many, other, calm, fresh, off, legacyOn, legacyOff] =
+    [demand, many, other, calm, fresh, off, legacyOn, legacyOff, reopen] =
       await Promise.all(
         [
           'ChDemand',
@@ -217,6 +226,7 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
           'ChOff',
           'ChLegOn',
           'ChLegOff',
+          'ChReopen',
         ].map(merchant),
       );
     const [stranger] = await db
@@ -238,6 +248,7 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
         calm,
         fresh,
         legacyOn,
+        reopen,
       ]
         .map((f) => f.merchantId)
         .join(','),
@@ -343,8 +354,45 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
       onHand: 500,
     });
     await cashSeries(calm, calmProduct, D0, repeat(4, 35));
+    // Not yet assessable: too few units in a usual week, and too little history.
+    candy = await product(calm.merchantId, {
+      name: 'Coffee Candy',
+      onHand: 500,
+    });
+    await cashSeries(
+      calm,
+      candy,
+      D0,
+      Array.from({ length: 35 }, (_, i) => (i % 7 === 0 ? 1 : 0)),
+    );
+    loaf = await product(calm.merchantId, {
+      name: 'Sourdough loaf',
+      onHand: 500,
+      createdOn: addDays(D0, -13),
+    });
+    await cashSeries(calm, loaf, D0, repeat(4, 14));
     expect(
       (await processor.processMerchant(calm.merchantId, { asOf: at(D0) }))
+        ?.status,
+    ).toBe('succeeded');
+
+    // reopen: the demand case opens on D1 and is updated on D2 with new values.
+    const reopenProduct = await product(reopen.merchantId, {
+      name: 'Cappuccino',
+      onHand: 40,
+    });
+    await cashSeries(reopen, reopenProduct, D1, [
+      ...repeat(4, 28),
+      ...repeat(6, 8),
+    ]);
+    for (const day of [D0, D1])
+      expect(
+        (await processor.processMerchant(reopen.merchantId, { asOf: at(day) }))
+          ?.status,
+      ).toBe('succeeded');
+    await cashSeries(reopen, reopenProduct, D2, [9]);
+    expect(
+      (await processor.processMerchant(reopen.merchantId, { asOf: at(D2) }))
         ?.status,
     ).toBe('succeeded');
   });
@@ -639,6 +687,35 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
       expect(run.changedCases).toBeGreaterThanOrEqual(2);
     });
 
+    it('before is the state when the change was detected; now is the latest update (list and detail)', async () => {
+      const [c] = (await casesOf(reopen.merchantId)).filter(
+        (x) => x.case_type === 'unit_demand_increase',
+      );
+      const detail = (
+        await get(`/merchants/me/changes/${c.id}`, reopen.userId).expect(200)
+      ).body as ChangeDetailResponse;
+      expect(detail.transitions.map((t) => t.kind)).toEqual([
+        'opened',
+        'updated',
+      ]);
+      const [opened, updated] = detail.transitions;
+      // The two entries carry different readings, so the regression is visible.
+      expect(updated.before).not.toEqual(opened.before);
+      expect(updated.after).not.toEqual(opened.after);
+      expect(detail.change.before).toEqual(opened.before);
+      expect(detail.change.after).toEqual(updated.after);
+      expect(detail.change.after.find((v) => v.key === 'recent')?.value).toBe(
+        45,
+      );
+
+      const list = (
+        await get('/merchants/me/changes', reopen.userId).expect(200)
+      ).body as ChangeListResponse;
+      const card = list.items.find((item) => item.id === c.id)!;
+      expect(card.before).toEqual(opened.before);
+      expect(card.after).toEqual(updated.after);
+    });
+
     it('keeps the settings that created the case after settings change', async () => {
       const tuned = new ChangeIntelligenceConfig({
         MERCHANT_CHANGE_INTELLIGENCE_ENABLED: 'true',
@@ -746,6 +823,42 @@ describe('Changes API and Deep Analytics compatibility (integration)', () => {
         processing: 'idle',
         lastSuccessfulAnalysisAt: null,
       });
+    });
+
+    it('names products not yet assessed, what is unavailable and the requirement (§3.8)', async () => {
+      const s = await status(calm);
+      expect(scan(s)).toEqual([]);
+      expect(s.readiness).toMatchObject({
+        trends: 'ready',
+        minUsualWeeklyUnits: 5,
+        minBaselineWeeks: 3,
+        forecastMinUnits: 14,
+        forecastWindowDays: 28,
+      });
+      // Ready products (Water) are left out; name order.
+      expect(s.readiness.products).toEqual([
+        {
+          productId: candy,
+          productName: 'Coffee Candy',
+          trends: 'insufficient_history',
+          baselineWeeksUsed: 4,
+          usualWeeklyUnits: 1,
+          daysUntilTrendsReady: null,
+          forecast: { available: false, reason: 'insufficient_units' },
+        },
+        {
+          productId: loaf,
+          productName: 'Sourdough loaf',
+          trends: 'building_baseline',
+          baselineWeeksUsed: 1,
+          usualWeeklyUnits: 28,
+          // 14 days of history against the 28 required.
+          daysUntilTrendsReady: 14,
+          forecast: { available: false, reason: 'building_baseline' },
+        },
+      ]);
+      // Another tenant never sees them; a merchant with every product ready lists none.
+      expect((await status(demand)).readiness.products).toEqual([]);
     });
 
     it('distinguishes pending, delayed, processing and failed, and keeps previous results', async () => {

@@ -25,6 +25,7 @@ import type {
   ChangeListResponse,
   ChangeLocalPeriod,
   ChangeProcessingState,
+  ChangeProductReadiness,
   ChangeReadiness,
   ChangeRunEvidence,
   ChangeSourceInformation,
@@ -60,6 +61,7 @@ import {
 } from './engine/registry';
 import { requiredHistoryDays, windowsFor } from './engine/rules';
 import type {
+  AdjustedDemandValue,
   CaseExplanation,
   CaseFacts,
   DemandChangeValue,
@@ -215,8 +217,22 @@ const safePeriod = (
 ): ChangeLocalPeriod | null =>
   period ? { from: period.from, to: period.to } : null;
 
-function summarize(row: CaseRow, product: ProductRef): ChangeCaseSummary {
+/** Saved values of a case's opening entry and of its latest entry with values. */
+type CaseReadings = { opening: unknown; latest: unknown };
+
+/**
+ * Before = the state when the change was detected (the opening entry, §3.5);
+ * Now = the latest saved values. The case evidence only keeps the latest
+ * update's own before/after, so the opening entry wins when it still exists.
+ */
+function summarize(
+  row: CaseRow,
+  product: ProductRef,
+  readings?: CaseReadings,
+): ChangeCaseSummary {
   const evidence = (row.evidence ?? {}) as CaseEvidence;
+  const opening = safeValues(readings?.opening);
+  const latest = safeValues(evidence.after);
   const explanation = evidence.explanation;
   return {
     id: row.id,
@@ -238,8 +254,8 @@ function summarize(row: CaseRow, product: ProductRef): ChangeCaseSummary {
     identifiedDuringInitialAnalysis: row.identifiedDuringInitialAnalysis,
     notRecheckedSince: row.notRecheckedSince ?? null,
     observation: safePeriod(evidence.observation),
-    before: safeValues(evidence.before),
-    after: safeValues(evidence.after),
+    before: opening.length ? opening : safeValues(evidence.before),
+    after: latest.length ? latest : safeValues(readings?.latest),
     modelVersion: row.modelVersion,
   };
 }
@@ -419,9 +435,17 @@ export class ChangeReadService {
 
     const page = rows.slice(0, limit);
     const last = page.at(-1);
+    const readings = await this.readings(
+      merchant.merchantId,
+      page.map((r) => r.row.id),
+    );
     return {
       items: page.map((r) =>
-        summarize(r.row, { name: r.productName, status: r.productStatus }),
+        summarize(
+          r.row,
+          { name: r.productName, status: r.productStatus },
+          readings.get(r.row.id),
+        ),
       ),
       nextCursor:
         rows.length > limit && last
@@ -471,7 +495,14 @@ export class ChangeReadService {
       .where(eq(schema.merchants.id, merchant.merchantId));
     const account = (identity?.provenance ??
       'ordinary') as ChangeDataProvenance;
-    const requiredDays = requiredHistoryDays(this.config.settings);
+    const settings = this.config.settings;
+    const requiredDays = requiredHistoryDays(settings);
+    const requirements = {
+      minUsualWeeklyUnits: settings.minExpectedWeekly,
+      minBaselineWeeks: settings.baselineWeeksMin,
+      forecastMinUnits: settings.forecastMinUnits,
+      forecastWindowDays: settings.forecastWindowDays,
+    };
     const base: ChangeStatusResponse = {
       available: false,
       unavailableReason: this.config.enabled ? 'not_enabled' : 'disabled',
@@ -487,7 +518,8 @@ export class ChangeReadService {
         trends: 'building_baseline',
         requiredHistoryDays: requiredDays,
         daysUntilTrendsReady: null,
-        minUsualWeeklyUnits: this.config.settings.minExpectedWeekly,
+        ...requirements,
+        products: [],
       },
       recordingGap: false,
       lastRecordedSaleDate: null,
@@ -505,7 +537,8 @@ export class ChangeReadService {
       this.db
         .select({
           nodeKey: schema.merchantChangeStates.nodeKey,
-          readiness: schema.merchantChangeStates.readiness,
+          productId: schema.merchantChangeStates.productId,
+          productName: schema.merchantProducts.name,
           value: schema.merchantChangeStates.value,
         })
         .from(schema.merchantChangeStates)
@@ -534,7 +567,10 @@ export class ChangeReadService {
                 isNull(schema.merchantChangeStates.productId),
               ),
               and(
-                eq(schema.merchantChangeStates.nodeKey, 'unit_demand_change'),
+                inArray(schema.merchantChangeStates.nodeKey, [
+                  'unit_demand_change',
+                  'adjusted_daily_demand',
+                ]),
                 eq(schema.merchantProducts.status, 'active'),
               ),
             ),
@@ -574,10 +610,48 @@ export class ChangeReadService {
     const recording = states.find(
       (s) => s.nodeKey === 'merchant_recording_activity',
     )?.value as MerchantRecordingValue | undefined;
-    const demand = states
-      .filter((s) => s.nodeKey === 'unit_demand_change')
-      .map((s) => s.value as DemandChangeValue);
+    const demandStates = states.filter(
+      (s) => s.nodeKey === 'unit_demand_change',
+    );
+    const demand = demandStates.map((s) => s.value as DemandChangeValue);
     const trends = this.trendReadiness(recording, demand, requiredDays);
+    const forecastReasons = new Map(
+      states
+        .filter((s) => s.nodeKey === 'adjusted_daily_demand')
+        .map((s) => [
+          s.productId,
+          (s.value as AdjustedDemandValue).forecastReason,
+        ]),
+    );
+    const products = demandStates
+      .map((s): ChangeProductReadiness => {
+        const { assessment } = s.value as DemandChangeValue;
+        const reason = forecastReasons.get(s.productId) ?? null;
+        return {
+          productId: s.productId!,
+          productName: s.productName ?? '',
+          trends: assessment.baseReadiness,
+          baselineWeeksUsed: assessment.weeksUsed,
+          usualWeeklyUnits: assessment.materiality?.expected ?? null,
+          daysUntilTrendsReady:
+            assessment.baseReadiness === 'building_baseline'
+              ? assessment.daysNeeded || null
+              : null,
+          forecast: { available: reason === null, reason },
+        };
+      })
+      // A merchant-wide recording gap is shown once, not as a reason per product.
+      .filter(
+        (p) =>
+          p.trends !== 'ready' ||
+          (p.forecast.reason !== null &&
+            p.forecast.reason !== 'no_recent_activity'),
+      )
+      .sort(
+        (a, b) =>
+          a.productName.localeCompare(b.productName) ||
+          a.productId.localeCompare(b.productId),
+      );
     const count = counts.rows[0] as { active: number; stock: number };
 
     return {
@@ -592,7 +666,8 @@ export class ChangeReadService {
       readiness: {
         ...trends,
         requiredHistoryDays: requiredDays,
-        minUsualWeeklyUnits: this.config.settings.minExpectedWeekly,
+        ...requirements,
+        products,
       },
       recordingGap: recording?.recordingGap ?? false,
       lastRecordedSaleDate: recording?.lastSaleDate ?? null,
@@ -654,10 +729,12 @@ export class ChangeReadService {
       .where(and(eq(c.id, changeId), eq(c.merchantId, merchant.merchantId)));
     if (!found) throw new NotFoundException();
     const row = found.row;
-    const change = summarize(row, {
-      name: found.productName,
-      status: found.productStatus,
-    });
+    const readings = await this.readings(merchant.merchantId, [row.id]);
+    const change = summarize(
+      row,
+      { name: found.productName, status: found.productStatus },
+      readings.get(row.id),
+    );
 
     const [latest] = row.latestTransitionId
       ? await this.db
@@ -790,6 +867,36 @@ export class ChangeReadService {
         reviewStock: change.productAvailable,
       },
     };
+  }
+
+  /** Opening and latest saved values per case, in one query over the case index. */
+  private async readings(
+    merchantId: string,
+    caseIds: string[],
+  ): Promise<Map<string, CaseReadings>> {
+    if (!caseIds.length) return new Map();
+    // ponytail: aggregates every entry of each case on the page; cases hold few entries.
+    const result = await this.db.execute(sql`
+      SELECT case_id,
+        (array_agg(before_value -> 'values' ORDER BY created_at, id))[1] AS opening,
+        (array_agg(after_value -> 'values' ORDER BY created_at DESC, id DESC)
+          FILTER (WHERE jsonb_array_length(COALESCE(after_value -> 'values', '[]'::jsonb)) > 0))[1] AS latest
+      FROM merchant_change_transitions
+      WHERE merchant_id = ${merchantId}::uuid
+        AND case_id IN (${sql.join(
+          caseIds.map((id) => sql`${id}::uuid`),
+          sql`, `,
+        )})
+      GROUP BY case_id`);
+    return new Map(
+      (
+        result.rows as Array<{
+          case_id: string;
+          opening: unknown;
+          latest: unknown;
+        }>
+      ).map((r) => [r.case_id, { opening: r.opening, latest: r.latest }]),
+    );
   }
 
   /** The saved dependency trail: parent transitions of the latest entry, walked upward within its run. */

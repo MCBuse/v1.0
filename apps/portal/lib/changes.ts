@@ -369,6 +369,64 @@ export function readinessNotices(status: ChangeStatusResponse): Notice[] {
   return notices;
 }
 
+export type ProductReadinessItem = {
+  productId: string;
+  name: string;
+  /** What is unavailable and what it needs, one line each. */
+  lines: string[];
+  /** "Usual is based on N weeks." when at least one week is complete. */
+  weeks: string | null;
+};
+
+/**
+ * Products whose sales trends or stock outlook are not yet assessed (§3.8):
+ * what is unavailable and the requirement. A recording gap is explained once
+ * by its own notice, so no per-product lines are shown then.
+ */
+export function productReadiness(status: ChangeStatusResponse): ProductReadinessItem[] {
+  if (status.recordingGap) return [];
+  const { products, minUsualWeeklyUnits, minBaselineWeeks, forecastMinUnits, forecastWindowDays } =
+    status.readiness;
+  // An API from before per-product readiness sends no list during a rollout.
+  return (products ?? []).map((product) => {
+    const lines: string[] = [];
+    if (product.trends === "insufficient_history")
+      lines.push(
+        `Sales trends unavailable: needs at least ${withUnit(minUsualWeeklyUnits, "units")} in a usual week${
+          product.usualWeeklyUnits !== null ? ` (usual is ${withUnit(product.usualWeeklyUnits, "units")})` : ""
+        }.`,
+      );
+    else if (product.trends === "building_baseline")
+      lines.push(
+        `Sales trends unavailable: needs ${formatCount(minBaselineWeeks)} complete weeks of sales history${
+          product.daysUntilTrendsReady
+            ? ` (${formatCount(product.daysUntilTrendsReady)} more ${product.daysUntilTrendsReady === 1 ? "day" : "days"})`
+            : ""
+        }.`,
+      );
+    else if (product.trends === "data_quality_blocked")
+      lines.push("Sales trends paused: some recorded sales could not be read.");
+    const window = withUnit(forecastWindowDays, "days");
+    const forecast: Partial<Record<NonNullable<typeof product.forecast.reason>, string>> = {
+      insufficient_units: `Stock outlook unavailable: needs at least ${withUnit(forecastMinUnits, "units")} sold in the last ${window}.`,
+      building_baseline: `Stock outlook unavailable: needs ${window} of sales history.`,
+      no_positive_demand: "Stock outlook unavailable: no units sold recently.",
+      data_quality_blocked: "Stock outlook paused: some recorded sales could not be read.",
+    };
+    const line = product.forecast.reason ? forecast[product.forecast.reason] : undefined;
+    if (line) lines.push(line);
+    const weeks = product.baselineWeeksUsed;
+    return {
+      productId: product.productId,
+      name: product.productName,
+      lines,
+      weeks: weeks
+        ? `Usual is based on ${withUnit(weeks, "weeks")}${product.trends === "building_baseline" ? " so far" : ""}.`
+        : null,
+    };
+  });
+}
+
 /**
  * Copy for an empty list. A filtered view says so and offers Clear filters;
  * an unfiltered one never claims "no changes" when trends were not assessed.
