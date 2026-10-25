@@ -30,7 +30,7 @@ async function main() {
           .insert(s.staffPermissions)
           .values({ userId: user.id, active: action === 'grant' })
           .onConflictDoUpdate({
-            target: s.staffPermissions.userId,
+            target: [s.staffPermissions.userId, s.staffPermissions.permission],
             set: { active: action === 'grant', updatedAt: new Date() },
           });
         await tx.insert(s.auditLogs).values({

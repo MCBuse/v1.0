@@ -15,10 +15,16 @@ const LABELS: Record<string, string> = {
   "/analytics": "Analytics",
   "/analytics/general": "General analytics",
   "/analytics/deep": "Deep analytics",
+  "/analytics/changes": "Changes",
   "/credit-assessment": "Credit Assessment",
   "/credit-assessment/business-profile": "Business profile",
   "/credit-assessment/reconciliation": "Payout reconciliation",
   "/finance-match": "Finance Match",
+};
+
+/** Parameterised routes: the parent route plus one id segment. */
+const DYNAMIC: Record<string, string> = {
+  "/analytics/changes": "Change details",
 };
 
 /** Routes that only redirect link straight to the page they open. */
@@ -30,8 +36,9 @@ export function breadcrumbsFor(pathname: string): Crumb[] {
   const trail: Crumb[] = [HOME];
   let route = "";
   for (const segment of pathname.split("/").filter(Boolean)) {
+    const parent = route;
     route += `/${segment}`;
-    const label = LABELS[route];
+    const label = LABELS[route] ?? DYNAMIC[parent];
     if (label) trail.push({ label, href: LANDING[route] ?? route });
   }
   return trail;

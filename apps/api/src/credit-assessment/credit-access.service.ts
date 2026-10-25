@@ -11,6 +11,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE } from '../database/database.provider';
 import * as s from '../database/schema';
 import { CreditEvidenceService } from './credit-evidence.service';
+import { activeStaffPermissions } from '../staff/staff-access';
 @Injectable()
 export class CreditAccessService {
   constructor(
@@ -18,19 +19,12 @@ export class CreditAccessService {
     private readonly evidence: CreditEvidenceService,
   ) {}
   async requireStaff(userId: string) {
-    const [row] = await this.db
-      .select({ id: s.users.id })
-      .from(s.staffPermissions)
-      .innerJoin(s.users, eq(s.users.id, s.staffPermissions.userId))
-      .where(
-        and(
-          eq(s.staffPermissions.userId, userId),
-          eq(s.staffPermissions.permission, 'credit_analyst'),
-          eq(s.staffPermissions.active, true),
-          eq(s.users.isActive, true),
-        ),
-      );
-    if (!row) throw new ForbiddenException('Credit analyst access required');
+    if (
+      !(await activeStaffPermissions(this.db, userId)).includes(
+        'credit_analyst',
+      )
+    )
+      throw new ForbiddenException('Credit analyst access required');
   }
   async requirePilot(merchantId: string) {
     const [row] = await this.db

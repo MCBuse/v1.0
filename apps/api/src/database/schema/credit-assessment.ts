@@ -3,6 +3,7 @@ import {
   index,
   jsonb,
   pgTable,
+  primaryKey,
   timestamp,
   uniqueIndex,
   uuid,
@@ -20,18 +21,29 @@ export const merchantCreditProfiles = pgTable('merchant_credit_profiles', {
     .notNull()
     .defaultNow(),
 });
-export const staffPermissions = pgTable('staff_permissions', {
-  userId: uuid('user_id')
-    .primaryKey()
-    .references(() => users.id),
-  permission: varchar('permission', { length: 40 })
-    .notNull()
-    .default('credit_analyst'),
-  active: boolean('active').notNull().default(true),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+/** One row per (user, permission); CHECK in 0038 lists the permissions. */
+export const staffPermissions = pgTable(
+  'staff_permissions',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    permission: varchar('permission', { length: 40 })
+      .$type<'credit_analyst' | 'change_intelligence_operator'>()
+      .notNull()
+      .default('credit_analyst'),
+    active: boolean('active').notNull().default(true),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({
+      name: 'staff_permissions_pkey',
+      columns: [t.userId, t.permission],
+    }),
+  ],
+);
 export const creditPilotEnrollments = pgTable('credit_pilot_enrollments', {
   merchantId: uuid('merchant_id')
     .primaryKey()

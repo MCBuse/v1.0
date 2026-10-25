@@ -118,6 +118,9 @@ export function InventoryView() {
   const showArchived = search.get("archived") === "1";
   const query = search.get("q") ?? "";
   const page = Math.max(1, Number(search.get("page") ?? 1) || 1);
+  // Deep link from Changes: /inventory?productId=<id>&action=edit|stock (plan §3.7).
+  const linkedProductId = search.get("productId");
+  const linkedAction = search.get("action");
 
   const params = new URLSearchParams({
     source: sourceTab,
@@ -137,7 +140,7 @@ export function InventoryView() {
       if (value) updated.set(key, value);
       else updated.delete(key);
     }
-    if (!("page" in next)) updated.delete("page");
+    if (!("page" in next) && !("productId" in next)) updated.delete("page");
     const url = `/inventory${updated.size ? `?${updated.toString()}` : ""}`;
     if (mode === "push") router.push(url, { scroll: false });
     else router.replace(url, { scroll: false });
@@ -166,7 +169,11 @@ export function InventoryView() {
   }, [resource.data]);
 
   const formTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const lastEdited = useRef<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  /** "stock" when opened to review stock: same editor, focused on the quantities. */
+  const [formMode, setFormMode] = useState<"edit" | "stock">("edit");
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [image, setImage] = useState<File | null>(null);
   const [editing, setEditing] = useState<MerchantProduct | null>(null);
@@ -187,12 +194,20 @@ export function InventoryView() {
 
   function beginCreate(trigger: HTMLButtonElement) {
     formTriggerRef.current = trigger;
+    lastEdited.current = null;
+    setFormMode("edit");
     resetForm();
     setFormOpen(true);
   }
 
-  function beginEdit(product: MerchantProduct, trigger: HTMLButtonElement) {
+  function beginEdit(
+    product: MerchantProduct,
+    trigger: HTMLButtonElement | null,
+    mode: "edit" | "stock" = "edit",
+  ) {
     formTriggerRef.current = trigger;
+    lastEdited.current = product.name;
+    setFormMode(mode);
     setEditing(product);
     setDraft({
       name: product.name,
@@ -211,7 +226,45 @@ export function InventoryView() {
   function handleFormOpenChange(nextOpen: boolean) {
     if (!nextOpen && saving) return;
     setFormOpen(nextOpen);
-    if (!nextOpen) resetForm();
+    if (!nextOpen) {
+      resetForm();
+      // A deep link is spent once its drawer closes; a refresh must not reopen it.
+      if (linkedProductId || linkedAction) navigate({ productId: null, action: null });
+    }
+  }
+
+  // Open the linked product's editor once the first page has loaded. A product
+  // that is not on this page is read on its own. Opening never changes it.
+  const handledLink = useRef<string | null>(null);
+  useEffect(() => {
+    if (!resource.data || !linkedProductId) return;
+    if (linkedAction !== "edit" && linkedAction !== "stock") return;
+    const key = `${linkedProductId}|${linkedAction}`;
+    if (handledLink.current === key) return;
+    handledLink.current = key;
+    const onPage = resource.data.items.find((product) => product.id === linkedProductId);
+    if (onPage) {
+      beginEdit(onPage, null, linkedAction);
+      return;
+    }
+    portalApi<MerchantProduct>(`me/products/${encodeURIComponent(linkedProductId)}`)
+      .then((product) => beginEdit(product, null, linkedAction))
+      .catch(() =>
+        setPageError("The linked product could not be opened. It may have been removed from your inventory."),
+      );
+  }, [resource.data, linkedProductId, linkedAction]);
+
+  /** Back to what opened the drawer, else the product's row, else the page heading. */
+  function restoreFocus() {
+    const target =
+      formTriggerRef.current ??
+      (lastEdited.current
+        ? document.querySelector<HTMLButtonElement>(
+            `[aria-label="${CSS.escape(`More actions for ${lastEdited.current}`)}"]`,
+          )
+        : null) ??
+      headingRef.current;
+    target?.focus();
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -262,6 +315,7 @@ export function InventoryView() {
       await resource.refresh();
       setFormOpen(false);
       resetForm();
+      if (linkedProductId || linkedAction) navigate({ productId: null, action: null });
     } catch (reason) {
       setFormError(
         reason instanceof Error
@@ -338,7 +392,11 @@ export function InventoryView() {
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-3xl font-semibold tracking-tight text-slate-950 focus:outline-none"
+        >
           Products and stock
         </h1>
         <p className="mt-2 text-sm text-slate-500">
@@ -600,17 +658,24 @@ export function InventoryView() {
       >
         <DrawerContent
           className="h-dvh w-full overflow-hidden rounded-none sm:max-w-md"
+          onOpenAutoFocus={(event) => {
+            if (formMode !== "stock") return;
+            event.preventDefault();
+            document.getElementById("product-stock")?.focus();
+          }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            formTriggerRef.current?.focus();
+            restoreFocus();
           }}
         >
           <DrawerHeader className="relative border-b border-slate-200 pr-16">
             <DrawerTitle className="text-xl font-semibold text-slate-950">
-              {editing ? "Edit product" : "Add product"}
+              {editing ? (formMode === "stock" ? "Review stock" : "Edit product") : "Add product"}
             </DrawerTitle>
             <DrawerDescription className="leading-6 text-slate-500">
-              Prices are in euros. Changes do not alter existing invoices.
+              {editing && formMode === "stock"
+                ? `Update what is on hand or the low-stock level for ${editing.name}.`
+                : "Prices are in euros. Changes do not alter existing invoices."}
             </DrawerDescription>
             <DrawerClose asChild>
               <Button

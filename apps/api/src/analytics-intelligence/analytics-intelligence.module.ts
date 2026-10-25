@@ -4,9 +4,10 @@ import { GroqNarrationService } from './groq-narration.service';
 import { MerchantInsightsService } from './merchant-insights.service';
 import { AnalyticsWorkQueueService } from './analytics-work-queue.service';
 import { AnalyticsOrchestratorService } from './analytics-orchestrator.service';
+import { ChangeIntelligenceModule } from '../change-intelligence/change-intelligence.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, ChangeIntelligenceModule],
   providers: [
     GroqNarrationService,
     MerchantInsightsService,

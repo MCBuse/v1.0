@@ -93,6 +93,14 @@ function anomaly(current: number, baseline: number[]) {
   return difference >= 5 && difference >= average * 0.5 && difference > standardDeviation(baseline) * 3;
 }
 
+/**
+ * Product codes Change Intelligence owns for merchants where it is enabled and
+ * initialized (plan §2.5). Other legacy codes are unaffected.
+ */
+export function supersededByChangeIntelligence(code: string): boolean {
+  return code.startsWith('stock_risk.') || code.startsWith('anomaly.product.');
+}
+
 export function calculateMerchantIntelligence(input: {
   now: Date;
   timezone: string;
@@ -100,6 +108,8 @@ export function calculateMerchantIntelligence(input: {
   productLines: IntelligenceProductLine[];
   products: IntelligenceProduct[];
   stockMovements: IntelligenceStockMovement[];
+  /** Change Intelligence is authoritative: omit its product codes. */
+  suppressChangeIntelligenceCodes?: boolean;
 }): IntelligenceCalculation {
   const today = merchantLocalDateKey(input.now, input.timezone);
   const lastCompleteDay = shiftDay(today, -1);
@@ -307,6 +317,8 @@ export function calculateMerchantIntelligence(input: {
     sourceCoverage,
     mixedData,
     metrics: { currentSevenDaySalesMinor: currentSales.toString(), previousSevenDaySalesMinor: previousSales.toString(), forecastEligible: hasForecastHistory },
-    insights,
+    insights: input.suppressChangeIntelligenceCodes
+      ? insights.filter((insight) => !supersededByChangeIntelligence(insight.code))
+      : insights,
   };
 }

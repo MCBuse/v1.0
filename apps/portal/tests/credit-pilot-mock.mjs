@@ -20,6 +20,71 @@ const credit = {
 let profile = {};
 let consent = false;
 const records = [];
+// Change Intelligence operator ("Update now", plan §8). Token: operator-access[.<session>].
+const changeMerchants = [
+  {
+    merchantId: "7a0f6c1e-4a52-4c1f-9a64-0e7b8a5d2c11",
+    publicId: "mrc_88d1fb39ebb04b24bb42",
+    businessName: "Aci Café",
+    ownerEmail: "owner@aci.example",
+    lastSuccessfulUpdateAt: "2026-10-25T08:00:00.000Z",
+    processing: "idle",
+  },
+  {
+    merchantId: "1b2c3d4e-5f60-4a71-8b92-a3b4c5d6e7f8",
+    publicId: "mrc_7226ebf0b0b84c81b775",
+    businessName: "MCBuse",
+    ownerEmail: "fred@mcbuse.example",
+    lastSuccessfulUpdateAt: null,
+    processing: "failed",
+  },
+  {
+    merchantId: "9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+    publicId: "mrc_0f1e2d3c4b5a69788796",
+    businessName: "Bäckerei Nord",
+    ownerEmail: "team@baeckerei.example",
+    lastSuccessfulUpdateAt: "2026-10-25T07:00:00.000Z",
+    processing: "pending",
+  },
+];
+const updateNowStarted = new Map();
+async function staffChangesMock(request, response, url, { send, readJson, token }) {
+  if (url.pathname === "/api/v1/staff/me")
+    send(response, 200, {
+      permission: "change_intelligence_operator",
+      permissions: ["change_intelligence_operator"],
+    });
+  else if (url.pathname === "/api/v1/staff/changes/merchants") {
+    const q = (url.searchParams.get("q") ?? "").toLowerCase();
+    send(response, 200, {
+      merchants: changeMerchants.filter(
+        (m) =>
+          m.businessName.toLowerCase().includes(q) ||
+          (m.ownerEmail ?? "").toLowerCase().includes(q),
+      ),
+    });
+  } else if (
+    url.pathname === "/api/v1/staff/changes/update-now" &&
+    request.method === "POST"
+  ) {
+    const body = await readJson(request);
+    const merchant = changeMerchants.find(
+      (m) => m.merchantId === body.merchantId,
+    );
+    if (!body.reason?.trim() || body.reason.length > 200)
+      send(response, 400, { message: ["reason should not be empty"] });
+    else if (!merchant) send(response, 404, { message: "Not Found" });
+    else {
+      // Per operator session, so parallel or repeated tests never share a limit.
+      const key = `${token}|${merchant.merchantId}`;
+      const last = updateNowStarted.get(key) ?? 0;
+      const recent = Date.now() - last < 60_000;
+      if (!recent) updateNowStarted.set(key, Date.now());
+      send(response, 202, { status: recent ? "already_running" : "queued" });
+    }
+  } else send(response, 403, { message: "Credit analyst access required" });
+  return true;
+}
 export async function creditPilotMock(
   request,
   response,
@@ -31,9 +96,23 @@ export async function creditPilotMock(
     // Only consume this request when it is handled here; caller supplies parsed login.
     return false;
   }
+  // "operator-access" or "operator-access.<session>" (one per test).
+  if (url.pathname.startsWith("/api/v1/staff/") && /^operator-access(\.|$)/.test(token))
+    return staffChangesMock(request, response, url, { send, readJson, token });
+  if (
+    url.pathname.startsWith("/api/v1/staff/changes/") &&
+    ["staff-access", "staff-refreshed"].includes(token)
+  ) {
+    send(response, 403, {
+      message: "Change Intelligence operator access required",
+    });
+    return true;
+  }
   if (url.pathname.startsWith("/api/v1/staff/")) {
     if (!["staff-access", "staff-refreshed"].includes(token)) {
-      send(response, token && token !== "expired-access" ? 403 : 401, { message: "Credit analyst access required" });
+      send(response, token && token !== "expired-access" ? 403 : 401, {
+        message: "Credit analyst access required",
+      });
       return true;
     }
     if (url.pathname === "/api/v1/staff/me")

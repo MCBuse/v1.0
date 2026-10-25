@@ -36,6 +36,21 @@ describe("breadcrumbsFor", () => {
     });
   });
 
+  it("covers the Changes list and a change's details", () => {
+    expect(labels("/analytics/changes")).toEqual(["Overview", "Analytics", "Changes"]);
+    expect(
+      breadcrumbsFor("/analytics/changes/5f0c6a52-1c1e-4a57-9d43-3b1c4e1f2a10"),
+    ).toEqual([
+      { label: "Overview", href: "/overview" },
+      { label: "Analytics", href: "/analytics/general" },
+      { label: "Changes", href: "/analytics/changes" },
+      {
+        label: "Change details",
+        href: "/analytics/changes/5f0c6a52-1c1e-4a57-9d43-3b1c4e1f2a10",
+      },
+    ]);
+  });
+
   it("ignores trailing slashes and unknown segments", () => {
     expect(labels("/payment/")).toEqual(["Overview", "Payment"]);
     expect(labels("/payment/unknown")).toEqual(["Overview", "Payment"]);

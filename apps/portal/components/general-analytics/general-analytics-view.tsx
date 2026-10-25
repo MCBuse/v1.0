@@ -7,10 +7,10 @@ import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardHeader } from "@repo/ui/card";
 import { Skeleton } from "@repo/ui/skeleton";
 import { RefreshCw } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { usePortalResource } from "@/lib/client/use-portal-resource";
+import { AnalyticsNav } from "@/components/analytics-nav";
 import {
   FacetFilter,
   ResetFilters,
@@ -137,12 +137,7 @@ export function GeneralAnalyticsView() {
         </p>
       </div>
 
-      <nav aria-label="Analytics views" className="flex flex-wrap gap-2">
-        <Button aria-current="page">General analytics</Button>
-        <Button asChild variant="secondary">
-          <Link href="/analytics/deep">Deep analytics</Link>
-        </Button>
-      </nav>
+      <AnalyticsNav />
 
       <div
         role="group"

@@ -18,3 +18,4 @@ export * from './merchant-analytics-work';
 export * from './merchant-assessments';
 export * from './credit-assessment';
 export * from './issuers';
+export * from './change-intelligence';

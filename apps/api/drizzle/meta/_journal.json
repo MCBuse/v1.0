@@ -267,6 +267,20 @@
       "when": 1799733000009,
       "tag": "0037_request_changes_workflow",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1799733000010,
+      "tag": "0038_change_intelligence",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1799733000011,
+      "tag": "0039_change_update_now_requester",
+      "breakpoints": true
     }
   ]
 }

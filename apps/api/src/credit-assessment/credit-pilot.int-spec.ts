@@ -1,3 +1,4 @@
+import { StaffController } from '../staff/staff.controller';
 import type { CreditProfile, StaffCreditAssessment } from '@repo/shared';
 import {
   INestApplication,
@@ -84,7 +85,11 @@ describe('private Python scoring and staff access (integration)', () => {
     merchants = new MerchantService(db, {} as RatesService, config);
     assessments = new MerchantAssessmentService(db, merchants, evidence);
     const mod = await Test.createTestingModule({
-      controllers: [StaffCreditController, MerchantCreditController],
+      controllers: [
+        StaffController,
+        StaffCreditController,
+        MerchantCreditController,
+      ],
       providers: [
         { provide: DRIZZLE, useValue: db },
         { provide: CreditAccessService, useValue: access },
@@ -100,7 +105,10 @@ describe('private Python scoring and staff access (integration)', () => {
       .compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(globalValidationPipe);
-    await app.init();
+    // Listen once on a fixed loopback address: supertest otherwise listens on an ephemeral
+    // wildcard port and closes it after every request, and a reused keep-alive socket or
+    // a port held by another local process then fails the request (socket hang up, 404).
+    await app.listen(0, '127.0.0.1');
   });
   afterAll(async () => {
     await app?.close();

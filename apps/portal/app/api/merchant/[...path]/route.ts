@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateMutation } from "@/lib/server/request-security";
+import { isAllowedMerchantPath } from "@/lib/server/merchant-proxy-allowlist";
 import {
   clearSessionCookies,
   CSRF_COOKIE,
@@ -8,47 +9,13 @@ import {
   setSessionCookies,
 } from "@/lib/server/session";
 
-const allowed = [
-  /^me\/credit-profile$/,
-  /^me\/credit-inputs$/,
-  /^me$/,
-  /^me\/summary$/,
-  /^me\/transactions$/,
-  /^me\/payment-requests$/,
-  /^me\/payment-requests\/[0-9a-f-]{36}$/i,
-  /^me\/payment-requests\/[0-9a-f-]{36}\/present$/i,
-  /^me\/presented-request$/,
-  /^me\/events$/,
-  /^me\/events\/stream$/,
-  /^me\/products(?:\/[0-9a-f-]{36}(?:\/(?:image|stock-adjustments))?)?$/i,
-  /^me\/invoices(?:\/[0-9a-f-]{36}(?:\/cancel)?)?$/i,
-  /^me\/consents$/,
-  /^me\/evidence-readiness$/,
-  /^me\/credit-assessment$/,
-  /^me\/activity$/,
-  /^me\/analytics$/,
-  /^me\/cash-sales(?:\/[0-9a-f-]{36}\/(?:void|attachment))?$/i,
-  /^me\/imports\/preview$/,
-  /^me\/imports\/(?:inventory|settlement)\/preview$/,
-  /^me\/imports$/,
-  /^me\/imports\/[0-9a-f-]{36}\/mapping$/i,
-  /^me\/imports\/[0-9a-f-]{36}\/commit$/i,
-  /^me\/reconciliation$/,
-  /^me\/finance-packages$/,
-  /^me\/finance-packages\/email-attempts$/,
-  /^me\/finance-packages\/[0-9a-f-]{36}(?:\/(?:pdf|data|email|preview|assessment))?$/i,
-  /^me\/assessments(?:\/[0-9a-f-]{36})?$/i,
-  /^me\/insights$/,
-  /^me\/analytics\/general$/,
-];
-
 async function forward(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ) {
   const segments = (await context.params).path;
   const relative = segments.join("/");
-  if (!allowed.some((pattern) => pattern.test(relative)))
+  if (!isAllowedMerchantPath(relative))
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   if (request.method !== "GET" && !validateMutation(request))
     return NextResponse.json(

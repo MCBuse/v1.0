@@ -6,7 +6,39 @@ General Analytics reports recorded activity. It does not claim complete turnover
 
 Business intelligence reads committed merchant records and writes derived snapshots. It never changes payments, invoices, stock, evidence packages, or credit-readiness results. Forecasts and anomalies are operational signals for review.
 
-## Feature flags
+## Two engines
+
+Merchant analytics has three views backed by two calculation engines.
+
+| View | Responsibility | Engine |
+|---|---|---|
+| General Analytics | Descriptive reporting on recorded activity | computed on request |
+| Deep Analytics | Current signals, forecasts and risks | legacy business-intelligence worker, plus Change Intelligence outputs through an adapter |
+| Changes | What changed, what it affected and how the guidance changed | Change Intelligence |
+
+| | Legacy business intelligence | Change Intelligence |
+|---|---|---|
+| Code | `apps/api/src/analytics-intelligence/` | `apps/api/src/change-intelligence/` |
+| Job | `mcbuse-api-analytics` (`worker.js`) | `mcbuse-api-changes` (`change-worker.js`) |
+| Cadence | every six hours (`0 */6 * * *` UTC) | hourly (`0 * * * *` UTC) for stock, reservation, threshold, archive and correction changes; one daily evaluation per merchant after local midnight for sales trends; staff "Update now" between runs |
+| Input | committed records, legacy outbox and work queue (`0029`) | `change_capture_*` triggers and its own durable queue (`0038`); independent of legacy queue cleanup, generation counters or legacy success |
+| Flags | `MERCHANT_INTELLIGENCE_ENABLED`, `MERCHANT_INTELLIGENCE_ALLOWLIST` | `MERCHANT_CHANGE_INTELLIGENCE_ENABLED`, `MERCHANT_CHANGE_INTELLIGENCE_ALLOWLIST`, `MERCHANT_CHANGE_INTELLIGENCE_SETTINGS`, `CHANGE_INTELLIGENCE_JOB_NAME` |
+| Model identity | `merchant-intelligence-v1` | `change-intelligence-v1` |
+
+**Authority split.** For a merchant where Change Intelligence is enabled and initialized, it is
+authoritative for product demand changes and stock risk. Deep Analytics reads those through a
+compatibility adapter, and the legacy engine suppresses its `stock_risk.<productId>` and
+`anomaly.product.<productId>` insights for that merchant, so no product shows two forecasts.
+The other legacy codes (performance, volume anomalies, payment mix and so on) continue with
+their own model identity, calculation time and six-hour cadence. Where Change Intelligence is
+disabled or not yet initialized, the legacy engine stays authoritative for everything; this is
+also the rollback path.
+
+Operations, configuration, Update now, monitoring, retention and rollback for Change
+Intelligence: `docs/change-intelligence-runbook.md`. Its rules are in plan §5; evaluation
+evidence is in `docs/evaluations/change-intelligence/`.
+
+## Feature flags (legacy engine)
 
 - `MERCHANT_GENERAL_ANALYTICS_ENABLED`: set to `false` to disable the expanded analytics endpoint. Defaults to enabled when unset.
 - `MERCHANT_INTELLIGENCE_ENABLED`: must be `true` for the worker and insights endpoint.
@@ -16,7 +48,7 @@ Business intelligence reads committed merchant records and writes derived snapsh
 
 Keep Groq credentials in Secret Manager. Do not copy them into `.env`, `api.env.yaml`, shell history, source control, or logs. Existing credentials are managed separately and are not changed by this rollout.
 
-## Worker scheduling
+## Worker scheduling (legacy engine)
 
 The worker runs every six hours at 00:00, 06:00, 12:00 and 18:00 UTC (also Ghana time). This is four scheduled runs per day. Ordinary sales and inventory reports do not depend on this worker schedule.
 
@@ -32,7 +64,9 @@ The deployment script defaults to `MCBUSE_ANALYTICS_SCHEDULER_ENABLED=true` and 
 
 `MERCHANT_INTELLIGENCE_STALE_AFTER_MINUTES` controls when the insights API marks data delayed. Its default is 375 minutes: six hours plus a 15-minute execution grace period. Existing insights retain their actual calculation timestamp; a manual run refreshes them sooner. Keep this threshold longer than the chosen schedule.
 
-## Calculation rules
+## Calculation rules (legacy engine)
+
+Change Intelligence uses different, versioned rules (plan §5): 3–4 baseline weeks, z ≥ 2.5 with two consecutive qualifying local days, a 28-day forecast rate and at least 14 linked units.
 
 - Performance compares the last seven complete merchant-local days with the preceding seven.
 - Seven-day forecasts require at least 28 days of activity and use the previous four matching weekdays.
