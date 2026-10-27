@@ -64,9 +64,6 @@ export function SignInForm() {
       <Button type="submit" size="lg" disabled={pending}>
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-      <p className="text-center text-xs leading-5 text-slate-400">
-        Access is limited to provisioned merchant and MCBuse staff accounts.
-      </p>
     </form>
   );
 }
