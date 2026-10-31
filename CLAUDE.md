@@ -12,7 +12,7 @@ The project consists of three main applications:
 
 - **API (NestJS)** (`apps/api/`) - Backend service with authentication, payment processing, Solana integration, and database management
 - **Portal (Next.js)** (`apps/portal/`) - Merchant and administrator application
-- **Mobile App (Expo/React Native)** (`apps/mobile/`) - Mobile application with NFC payment capabilities
+- **Mobile App (Expo/React Native)** (`apps/mobile/`) - Mobile application for consumer payments
 
 ## Key Technologies
 

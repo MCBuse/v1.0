@@ -1,11 +1,16 @@
 import { useTheme } from '@shopify/restyle';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLoginWithEmail } from '@privy-io/expo';
 
-import { usePrivySession } from '@/features/auth';
+import {
+  useCommitPendingAuth,
+  useSendEmailOtp,
+  useVerifyEmailOtp,
+} from '@/features/auth/hooks';
+import { usePendingAuthStore } from '@/features/auth/pending-store';
+import { ApiError, authSession } from '@/lib/api';
 
 import type { Theme } from '@/theme';
 import { OtpInput } from '@/components/auth/OtpInput';
@@ -21,85 +26,62 @@ export default function OtpScreen() {
     flow: 'login' | 'register';
   }>();
 
-  const { sendCode, loginWithCode, state } = useLoginWithEmail();
-  const {
-    status: sessionStatus,
-    error: sessionError,
-    retry: retryPrivySession,
-    hasPrivyUser,
-  } = usePrivySession();
+  const clearPending  = usePendingAuthStore((s) => s.clear);
+  const commitPending = useCommitPendingAuth();
+  const sendOtp       = useSendEmailOtp();
+  const verifyOtp     = useVerifyEmailOtp();
 
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_SECONDS);
-  const [canResend, setCanResend] = useState(false);
-  const [submittingCode, setSubmittingCode] = useState(false);
 
-  const verifying = state.status === 'submitting-code' || submittingCode;
-  const exchanging = sessionStatus === 'creating-wallet' || sessionStatus === 'exchanging';
-  const canSubmit = hasPrivyUser || code.length >= 6;
+  const verifying = verifyOtp.isPending;
+  const canResend = countdown <= 0 && !sendOtp.isPending;
+
+  // Deep-linked here with no pending auth → back to login. Mount-only: a
+  // successful verify clears the pending store, which must not bounce us.
+  useEffect(() => {
+    if (!usePendingAuthStore.getState().pending) router.replace('/(guest)/auth/login');
+  }, []);
 
   useEffect(() => {
-    if (countdown <= 0) { setCanResend(true); return; }
+    if (countdown <= 0) return;
     const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(id);
   }, [countdown]);
 
-  useEffect(() => {
-    if (sessionStatus === 'success') {
-      router.replace('/(tabs)');
-    }
-  }, [sessionStatus]);
-
   const handleResend = async () => {
-    if (!canResend || !identifier) return;
+    if (!canResend) return;
     try {
-      if (hasPrivyUser) {
-        await retryPrivySession();
-        return;
-      }
-      await sendCode({ email: identifier });
+      await sendOtp.mutateAsync();
       setCode('');
       setError(false);
       setCountdown(RESEND_SECONDS);
-      setCanResend(false);
-    } catch {
-      // surface via state.status === 'error' below
+    } catch (err) {
+      Alert.alert('Could not resend code', err instanceof ApiError ? err.message : 'Please try again.');
     }
   };
 
   const handleVerify = useCallback(
     async (val?: string) => {
       const otp = val ?? code;
-      if (verifying || exchanging) return;
+      if (otp.length < 6 || verifying) return;
 
-      setSubmittingCode(true);
-      setError(false);
       try {
-        if (hasPrivyUser) {
-          await retryPrivySession();
-          return;
+        await verifyOtp.mutateAsync({ code: otp });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 400) {
+          setError(true);
+        } else {
+          Alert.alert('Verification failed', err instanceof ApiError ? err.message : 'Please try again.');
         }
-        if (otp.length < 6) return;
-        await loginWithCode({ code: otp, email: identifier });
-        setCode('');
-        // Privy now has a user → usePrivySession exchanges → effect above navigates.
-      } catch (e) {
-        console.log(e)
-        setError(true);
-      } finally {
-        setSubmittingCode(false);
+        return;
       }
+
+      const ok = await commitPending();
+      router.replace(ok ? '/(tabs)' : '/(guest)/auth/login');
     },
-    [
-      code,
-      verifying,
-      exchanging,
-      hasPrivyUser,
-      retryPrivySession,
-      loginWithCode,
-      identifier,
-    ],
+    [code, verifying, verifyOtp, commitPending],
   );
 
   const handleChange = (val: string) => {
@@ -107,9 +89,15 @@ export default function OtpScreen() {
     if (error) setError(false);
   };
 
-  const maskedIdentifier = identifier.includes('@')
-    ? identifier.replace(/(.{2}).+(@.+)/, '$1•••$2')
-    : identifier;
+  // Tokens were written to the session so the OTP calls carry a bearer;
+  // drop them too so an unverified session is not resumed on next launch.
+  const handleBack = async () => {
+    clearPending();
+    await authSession.clear();
+    router.back();
+  };
+
+  const maskedIdentifier = identifier.replace(/(.{2}).+(@.+)/, '$1•••$2');
 
   return (
     <KeyboardAvoidingView
@@ -139,25 +127,15 @@ export default function OtpScreen() {
           />
           {error && (
             <Text variant="caption" color="error" textAlign="center" marginTop="m">
-              Incorrect code. Please try again.
-            </Text>
-          )}
-          {sessionError && !error && (
-            <Text variant="caption" color="error" textAlign="center" marginTop="m">
-              {sessionError}
+              Incorrect or expired code. Please try again.
             </Text>
           )}
         </Box>
 
         <Button
-          label={
-            exchanging ? 'Setting up your wallet…' :
-              verifying ? 'Verifying…' :
-                hasPrivyUser ? 'Finish sign in' :
-                  'Verify'
-          }
+          label={verifying ? 'Verifying…' : 'Verify'}
           variant="primary"
-          disabled={!canSubmit || verifying || exchanging}
+          disabled={code.length < 6 || verifying}
           onPress={() => handleVerify()}
         />
 
@@ -165,17 +143,17 @@ export default function OtpScreen() {
           <Text variant="caption" color="textSecondary">
             Didn&apos;t receive it?{' '}
           </Text>
-          {canResend ? (
+          {countdown > 0 ? (
+            <Text variant="caption" color="textTertiary">
+              Resend in {countdown}s
+            </Text>
+          ) : (
             <Text
               variant="caption"
               style={[styles.resendLink, { color: colors.textPrimary }]}
               onPress={handleResend}
             >
-              Resend code
-            </Text>
-          ) : (
-            <Text variant="caption" color="textTertiary">
-              Resend in {countdown}s
+              {sendOtp.isPending ? 'Sending…' : 'Resend code'}
             </Text>
           )}
         </Box>
@@ -185,7 +163,7 @@ export default function OtpScreen() {
             variant="caption"
             color="textSecondary"
             style={styles.changeLink}
-            onPress={() => router.back()}
+            onPress={handleBack}
           >
             Change email
           </Text>

@@ -14,7 +14,7 @@ import { VerifiedEmailGuard } from './guards/verified-email.guard';
 import { UsersModule } from '../users/users.module';
 import { OtpModule } from '../otp/otp.module';
 import { WalletsModule } from '../wallets/wallets.module';
-import { PrivyJwtService } from './privy/privy-jwt.service';
+import { MailService } from '../mail/mail.service';
 
 @Module({
   imports: [
@@ -34,7 +34,7 @@ import { PrivyJwtService } from './privy/privy-jwt.service';
     LocalAuthGuard,
     PhoneAuthGuard,
     VerifiedEmailGuard,
-    PrivyJwtService,
+    MailService,
   ],
   controllers: [AuthController],
   exports: [JwtAuthGuard, LocalAuthGuard, PhoneAuthGuard, VerifiedEmailGuard],

@@ -337,11 +337,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (!merchantPaymentRequest)
       await this.assertAvailableBalance(payerWallet.id, currency, amount);
     if (process.env.MONEY_INITIATION_ENABLED === 'false') throw new BadRequestException('New money movements are temporarily disabled');
-    if (!payerWallet.encryptedKeypair) {
-      throw new BadRequestException(
-        'Server-side signing not available for Privy-managed wallets; transfers must be initiated client-side',
-      );
-    }
     const transferResult = await this.transferProvider.execute({
       payerWalletId: payerWallet.id,
       payerPubkey: payerWallet.solanaPubkey,

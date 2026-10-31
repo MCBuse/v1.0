@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useDemoStore, type UserRole } from '@/store/demo-store';
-import type { ConnectivityMode } from '@/features/offline/models';
+import type { ConnectivityMode } from '@/hooks/use-connectivity-mode';
 import { t } from '@/lib/i18n';
 
 import Box from './Box';
@@ -133,15 +133,6 @@ export function DemoPanel() {
           </Text>
         </Pressable>
       </Box>
-
-      <Pressable
-        onPress={demo.simulateSmsDelivery}
-        style={styles.actionBtn}
-      >
-        <Text variant="caption" style={{ color: '#3B82F6' }}>
-          {t('demo.simulateSms')}
-        </Text>
-      </Pressable>
 
       <Pressable onPress={demo.resetDemo} style={styles.actionBtn}>
         <Text variant="caption" color="textTertiary">

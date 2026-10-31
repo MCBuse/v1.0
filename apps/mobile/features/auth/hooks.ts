@@ -1,7 +1,8 @@
-import { usePrivy } from '@privy-io/expo';
 import { useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { useCallback } from 'react';
 
+import { usersRepository } from '@/features/users/repository';
 import { authSession, useOperation } from '@/lib/api';
 import { useAppStore } from '@/store/app-store';
 
@@ -13,9 +14,10 @@ import type {
   SendOtpRequest,
   SignupRequest,
   TokenPairResponse,
+  VerifyEmailOtpRequest,
   VerifyOtpRequest,
 } from './models';
-import { usePendingAuthStore } from './pending-store';
+import { usePendingAuthStore, type PendingAuthChannel, type PendingAuthFlow } from './pending-store';
 import { authRepository } from './repository';
 
 export function useLogin() {
@@ -59,30 +61,67 @@ export function useCommitPendingAuth() {
 }
 
 /**
+ * Finishes login/sign-up once the API has issued tokens, and navigates.
+ *   phone → straight in (SMS OTP not shipped yet).
+ *   email → straight in if already verified, otherwise park the tokens in the
+ *           pending store, send an email code and go to the OTP screen.
+ * Tokens go into `authSession` first so the profile / send-otp calls carry
+ * the bearer; on failure the session is cleared again and the error rethrown.
+ */
+export function useFinishSignIn() {
+  const completeAuth = useCompleteAuth();
+  const setPending   = usePendingAuthStore((s) => s.set);
+
+  return useCallback(async (
+    tokens: TokenPairResponse,
+    ctx: { identifier: string; channel: PendingAuthChannel; flow: PendingAuthFlow },
+  ) => {
+    if (ctx.channel === 'email') {
+      try {
+        await authSession.set(tokens);
+        const profile = await usersRepository.getProfile();
+        if (!profile.isEmailVerified) {
+          setPending({ tokens, ...ctx });
+          await authRepository.sendEmailOtp();
+          router.push({
+            pathname: '/(guest)/auth/otp',
+            params:   { identifier: ctx.identifier, flow: ctx.flow },
+          });
+          return;
+        }
+      } catch (err) {
+        await authSession.clear();
+        throw err;
+      }
+    }
+
+    await completeAuth(tokens);
+    router.replace('/(tabs)');
+  }, [completeAuth, setPending]);
+}
+
+/**
  * Revokes the refresh token server-side, clears secure storage and the query
  * cache, and flips the app store out of authenticated state.
  */
 export function useSignOut() {
-  const signOut       = useAppStore((s) => s.signOut);
-  const clearPending  = usePendingAuthStore((s) => s.clear);
-  const queryClient   = useQueryClient();
-  const { logout: privyLogout } = usePrivy();
-
-  const finish = async () => {
-    queryClient.clear();
-    clearPending();
-    signOut();
-    try {
-      await privyLogout();
-    } catch {
-      // Privy logout failure shouldn't trap the user in a half-signed-out state.
-    }
-  };
+  const signOut      = useAppStore((s) => s.signOut);
+  const clearPending = usePendingAuthStore((s) => s.clear);
+  const queryClient  = useQueryClient();
 
   return useOperation<void, void>({
     mutationFn: () => authRepository.logout(),
-    onSuccess: finish,
-    onError:   finish,
+    onSuccess:  () => {
+      queryClient.clear();
+      clearPending();
+      signOut();
+    },
+    // Even if the server call fails we still want the user signed out locally.
+    onError: () => {
+      queryClient.clear();
+      clearPending();
+      signOut();
+    },
   });
 }
 
@@ -95,6 +134,18 @@ export function useSendPhoneOtp() {
 export function useVerifyPhoneOtp() {
   return useOperation<VerifyOtpRequest, void>({
     mutationFn: (input) => authRepository.verifyPhoneOtp(input),
+  });
+}
+
+export function useSendEmailOtp() {
+  return useOperation<void, void>({
+    mutationFn: () => authRepository.sendEmailOtp(),
+  });
+}
+
+export function useVerifyEmailOtp() {
+  return useOperation<VerifyEmailOtpRequest, void>({
+    mutationFn: (input) => authRepository.verifyEmailOtp(input),
   });
 }
 

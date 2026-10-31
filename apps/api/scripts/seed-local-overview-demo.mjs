@@ -389,7 +389,7 @@ function uuidFrom(text) {
 }
 
 /** Signs the seed customer in (creating the account the first time). */
-async function payerLogin() {
+async function payerLogin(db) {
   try {
     const login = await call('POST', '/auth/login', { email: PAYER_EMAIL, password: PAYER_PASSWORD }, {}, 0, '');
     return login.accessToken;
@@ -403,6 +403,8 @@ async function payerLogin() {
     lastName: 'Customer',
     username: PAYER_USERNAME,
   }, {}, 0, '');
+  // Email sign-ups start unverified and money routes require verification.
+  await db.query('update users set is_email_verified = true where email = $1', [PAYER_EMAIL]);
   console.log(`  created seed customer ${PAYER_EMAIL}`);
   return signup.accessToken;
 }
@@ -823,7 +825,7 @@ async function main() {
   if (sales.some((s) => s.channel === 'digital')) {
     ({ db, merchantId } = await connectDatabase(merchantPublicId));
     if (digitalToPay.length) {
-      payerToken = await payerLogin();
+      payerToken = await payerLogin(db);
       const floatBaseUnits = BigInt(Math.round(FLOAT_USDC * 1e6));
       const largest = Math.max(...digitalToPay.map(saleCents));
       if (BigInt(largest) * BASE_UNITS_PER_EURO_CENT > floatBaseUnits)

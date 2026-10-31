@@ -5,8 +5,6 @@ import {
   IBMPlexSans_600SemiBold,
   IBMPlexSans_700Bold,
 } from '@expo-google-fonts/ibm-plex-sans';
-import { PrivyProvider } from '@privy-io/expo';
-import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -28,9 +26,6 @@ import { useAppStore } from '@/store/app-store';
 
 // Hold the splash until fonts are ready
 SplashScreen.preventAutoHideAsync();
-
-const privyAppId = Constants.expoConfig?.extra?.privyAppId as string;
-const privyClientId = Constants.expoConfig?.extra?.privyClientId as string;
 
 function RootNavigator({ isDark }: { isDark: boolean }) {
   const isAuthenticated = useAppStore((s) => s.isAuthenticated);
@@ -73,14 +68,12 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <PrivyProvider appId={privyAppId} clientId={privyClientId}>
-      <RestyleProvider theme={isDark ? darkTheme : theme}>
-        <ApiProvider>
-          <ConnectivityIndicator />
-          <RootNavigator isDark={isDark} />
-          <StatusBar style={isDark ? 'light' : 'dark'} />
-        </ApiProvider>
-      </RestyleProvider>
-    </PrivyProvider>
+    <RestyleProvider theme={isDark ? darkTheme : theme}>
+      <ApiProvider>
+        <ConnectivityIndicator />
+        <RootNavigator isDark={isDark} />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+      </ApiProvider>
+    </RestyleProvider>
   );
 }
