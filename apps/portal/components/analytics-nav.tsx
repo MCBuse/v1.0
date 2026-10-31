@@ -1,62 +1,39 @@
 "use client";
 
-import type { ChangeStatusResponse } from "@repo/shared";
-import { Button } from "@repo/ui/button";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { portalApi } from "@/lib/client/api";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const VIEWS = [
   { href: "/analytics/general", label: "General analytics" },
   { href: "/analytics/deep", label: "Deep analytics" },
-  { href: "/analytics/changes", label: "Changes" },
+  { href: "/analytics/changes", label: "Change Intelligence" },
 ] as const;
 
 /**
- * The switch between the three Analytics destinations. Changes is listed only
- * when the status endpoint says the feature is available: non-owner members
- * get a 404 there, and a merchant without the feature gets `available: false`.
- *
- * `changesAvailable` lets the Changes pages pass what they already polled
- * instead of asking again.
+ * The switch between the three Analytics destinations. Every tab is always
+ * shown; when Change Intelligence is unavailable (switched off, merchant not
+ * enabled, or a non-owner), its page says so instead of the tab disappearing.
  */
-export function AnalyticsNav({ changesAvailable }: { changesAvailable?: boolean }) {
+export function AnalyticsNav() {
   const pathname = usePathname();
-  const [fetched, setFetched] = useState(false);
-
-  useEffect(() => {
-    if (changesAvailable !== undefined) return;
-    let active = true;
-    portalApi<ChangeStatusResponse>("me/changes/status")
-      .then((status) => {
-        if (active) setFetched(status.available);
-      })
-      .catch(() => {
-        if (active) setFetched(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [changesAvailable]);
-
-  const showChanges = changesAvailable ?? fetched;
+  const active = VIEWS.find(
+    (view) => pathname === view.href || pathname.startsWith(`${view.href}/`),
+  )?.href;
+  // Route-driven tabs: each trigger is a link, so no TabsContent panels.
   return (
-    <nav aria-label="Analytics views" className="flex flex-wrap gap-2">
-      {VIEWS.filter((view) => view.href !== "/analytics/changes" || showChanges).map((view) => {
-        const exact = pathname === view.href;
-        const within = exact || pathname.startsWith(`${view.href}/`);
-        return (
-          <Button key={view.href} asChild variant={within ? "primary" : "secondary"}>
-            <Link
-              href={view.href}
-              aria-current={exact ? "page" : within ? "true" : undefined}
-            >
-              {view.label}
-            </Link>
-          </Button>
-        );
-      })}
+    <nav aria-label="Analytics views" className="min-w-0">
+      <Tabs value={active ?? ""}>
+        <TabsList className="max-w-full justify-start overflow-x-auto">
+          {VIEWS.map((view) => (
+            <TabsTrigger key={view.href} value={view.href} asChild>
+              <Link href={view.href} aria-current={pathname === view.href ? "page" : undefined}>
+                {view.label}
+              </Link>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
     </nav>
   );
 }

@@ -168,8 +168,8 @@ export function ChangesUnavailable({ status }: { status: ChangeStatusResponse | 
       <EmptyState
         title={
           status?.unavailableReason === "disabled"
-            ? "Changes is temporarily unavailable"
-            : "Changes is not available for this account"
+            ? "Change Intelligence is temporarily unavailable"
+            : "Change Intelligence is not available for this account"
         }
         description="Your sales and stock records are not affected. General and Deep analytics remain available."
         action={
@@ -288,7 +288,7 @@ export function ChangesView() {
   return (
     <div className="grid min-w-0 gap-6 [&>*]:min-w-0">
       <ChangesHeader status={statusData} onRefresh={status.unavailable ? undefined : refreshAll} refreshing={refreshing} />
-      <AnalyticsNav changesAvailable={statusData ? statusData.available : status.unavailable ? false : true} />
+      <AnalyticsNav />
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {status.announcement}
       </p>

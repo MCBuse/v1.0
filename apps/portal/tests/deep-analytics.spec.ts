@@ -262,11 +262,11 @@ test("the view switch links to General analytics and marks Deep analytics curren
 }) => {
   await page.goto("/analytics/deep");
   const views = page.getByRole("navigation", { name: "Analytics views" });
-  await expect(views.getByRole("link", { name: "Deep analytics" })).toHaveAttribute(
+  await expect(views.getByRole("tab", { name: "Deep analytics" })).toHaveAttribute(
     "aria-current",
     "page",
   );
-  const general = views.getByRole("link", { name: "General analytics" });
+  const general = views.getByRole("tab", { name: "General analytics" });
   await expect(general).toHaveAttribute("href", "/analytics/general");
   await general.click();
   await expect(page).toHaveURL(/\/analytics\/general(\?.*)?$/);

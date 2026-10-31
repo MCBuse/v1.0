@@ -59,7 +59,7 @@ export function ChangeDetailView({ changeId }: { changeId: string }) {
     return (
       <div className="grid min-w-0 gap-6">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Change details</h1>
-        <AnalyticsNav changesAvailable={false} />
+        <AnalyticsNav />
         <ChangesUnavailable status={status.data} />
       </div>
     );
@@ -68,7 +68,7 @@ export function ChangeDetailView({ changeId }: { changeId: string }) {
     return (
       <div className="grid min-w-0 gap-6">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Change details</h1>
-        <AnalyticsNav changesAvailable={status.data?.available ?? true} />
+        <AnalyticsNav />
         <Card>
           <EmptyState
             title="This change could not be found"
@@ -89,7 +89,7 @@ export function ChangeDetailView({ changeId }: { changeId: string }) {
         <Link href="/analytics/changes" className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-slate-600 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
           <ArrowLeft className="size-4" aria-hidden="true" /> Back to Changes
         </Link>
-        <AnalyticsNav changesAvailable={status.data?.available ?? true} />
+        <AnalyticsNav />
       </div>
       {data ? (
         <div className="grid gap-3 border-b border-slate-200 pb-6">

@@ -394,12 +394,12 @@ test("all three Analytics destinations share one navigation and the legacy redir
   for (const [path, current] of [
     ["/analytics/general", "General analytics"],
     ["/analytics/deep", "Deep analytics"],
-    ["/analytics/changes", "Changes"],
+    ["/analytics/changes", "Change Intelligence"],
   ] as const) {
     await page.goto(path);
     const nav = main(page).getByRole("navigation", { name: "Analytics views" });
-    await expect(nav.getByRole("link")).toHaveText(["General analytics", "Deep analytics", "Changes"]);
-    await expect(nav.getByRole("link", { name: current })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("tab")).toHaveText(["General analytics", "Deep analytics", "Change Intelligence"]);
+    await expect(nav.getByRole("tab", { name: current })).toHaveAttribute("aria-current", "page");
   }
   await page.goto("/analytics");
   await expect(page).toHaveURL(/\/analytics\/general$/);
@@ -409,24 +409,27 @@ test("all three Analytics destinations share one navigation and the legacy redir
   await expect(page).toHaveURL(/\/payment\/transactions$/);
 });
 
-test("Changes is hidden from the navigation for non-owners and where the feature is unavailable", async ({ page }, info) => {
+test("Change Intelligence stays in the navigation and explains itself when unavailable", async ({ page }, info) => {
   desktopOnly(info.project.name);
   const backend = await setup(page, { status: 404 });
-  await page.goto("/analytics/deep");
   const nav = main(page).getByRole("navigation", { name: "Analytics views" });
-  await expect(nav.getByRole("link", { name: "Deep analytics" })).toBeVisible();
-  await expect.poll(() => statusRequests(backend).length).toBeGreaterThan(0);
-  await expect(nav.getByRole("link", { name: "Changes" })).toHaveCount(0);
+
+  // The tab never depends on the status call, so it cannot flash.
+  for (const path of ["/analytics/deep", "/analytics/general"]) {
+    await page.goto(path);
+    await expect(nav.getByRole("tab", { name: "Change Intelligence" })).toBeVisible();
+  }
+  expect(statusRequests(backend)).toHaveLength(0);
+
+  // Non-owner (404): the page says so.
+  await nav.getByRole("tab", { name: "Change Intelligence" }).click();
+  await expect(page).toHaveURL(/\/analytics\/changes$/);
+  await expect(main(page).getByText("Change Intelligence is not available for this account")).toBeVisible();
 
   backend.status = status({ available: false, unavailableReason: "not_enabled" });
-  await page.goto("/analytics/general");
-  await expect(nav.getByRole("link", { name: "General analytics" })).toBeVisible();
-  await expect.poll(() => statusRequests(backend).length).toBeGreaterThan(1);
-  await expect(nav.getByRole("link", { name: "Changes" })).toHaveCount(0);
-
   // The page itself explains rather than showing an empty list.
   await page.goto("/analytics/changes");
-  await expect(main(page).getByText("Changes is not available for this account")).toBeVisible();
+  await expect(main(page).getByText("Change Intelligence is not available for this account")).toBeVisible();
   await expect(main(page).getByText(/No significant changes/)).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/unavailable-${info.project.name}.png`, fullPage: true });
 });
@@ -1005,7 +1008,7 @@ test("no horizontal page scroll on the Analytics pages", async ({ page }) => {
     await page.goto(path);
     await expect(main(page).getByRole("heading", { level: 1 })).toBeVisible();
     await page.waitForLoadState("networkidle");
-    // The shared navigation always fits, wrapping rather than scrolling.
+    // The shared navigation always fits, scrolling its tabs rather than overflowing.
     const nav = await main(page).getByRole("navigation", { name: "Analytics views" }).boundingBox();
     const width = await page.evaluate(() => document.documentElement.clientWidth);
     expect((nav?.x ?? 0) + (nav?.width ?? 0)).toBeLessThanOrEqual(width);
