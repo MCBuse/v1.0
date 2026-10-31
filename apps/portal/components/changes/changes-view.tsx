@@ -12,7 +12,7 @@ import { Card } from "@repo/ui/card";
 import { EmptyState } from "@repo/ui/empty-state";
 import { Input } from "@repo/ui/field";
 import { Skeleton } from "@repo/ui/skeleton";
-import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw, X } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -24,12 +24,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  CHANGE_GROUPS,
   CHANGE_STATUSES,
   CHANGE_TYPES,
   DEFAULT_RANGE_DAYS,
   announcement,
+  changeGroup,
   changesListPath,
   dateRangeError,
   emptyListCopy,
@@ -44,15 +47,12 @@ import {
   processingNotice,
   productReadiness,
   readinessNotices,
+  summaryCounts,
   type AnnounceState,
   type ChangeFilters,
 } from "@/lib/changes";
 import { usePolledResource } from "@/lib/client/use-polled-resource";
-import { ChangeEntry, NoticeBox } from "./change-parts";
-
-export const CHANGES_SUPPORTING_TEXT =
-  "See what changed in your recorded activity and how it affects your stock and sales outlook.";
-export const CHANGES_CADENCE = "Stock updates hourly. Sales trends update once a day.";
+import { ChangeEntry, LEDGER_COLUMNS, NoticeBox } from "./change-parts";
 
 const ALL = "all";
 
@@ -98,9 +98,10 @@ export function ChangesHeader({
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
+  const counts = status ? summaryCounts(status.summary) : null;
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div className="min-w-0 max-w-2xl">
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Changes</h1>
           {status?.provenance.account === "sample" ? (
@@ -109,56 +110,44 @@ export function ChangesHeader({
             </Badge>
           ) : null}
         </div>
-        <p className="mt-2 text-sm text-slate-500">{CHANGES_SUPPORTING_TEXT}</p>
-        <p className="mt-1 text-sm text-slate-500">{CHANGES_CADENCE}</p>
-      </div>
-      {onRefresh ? (
-        <Button variant="secondary" onClick={onRefresh} aria-busy={refreshing}>
-          <RefreshCw className="size-4" aria-hidden="true" />
-          Refresh
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-function SummaryStrip({ status }: { status: ChangeStatusResponse | null }) {
-  const value = (text: string | null) =>
-    text === null ? <Skeleton className="mt-1 h-6 w-20" /> : text;
-  const items = [
-    {
-      label: "Active changes",
-      value: value(status ? formatCount(status.summary.activeChanges) : null),
-    },
-    {
-      label: "Products needing stock review",
-      value: value(status ? formatCount(status.summary.productsNeedingStockReview) : null),
-    },
-    {
-      label: "Latest analysis",
-      value: value(
-        status
-          ? status.lastSuccessfulAnalysisAt
-            ? formatDateTime(status.lastSuccessfulAnalysisAt, status.timezone)
-            : "Not yet completed"
-          : null,
-      ),
-    },
-  ];
-  return (
-    <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white sm:grid-cols-3">
-      {items.map((item, index) => (
-        <div
-          key={item.label}
-          className={`min-w-0 px-4 py-3 ${index === 2 ? "col-span-2 border-t border-slate-200 sm:col-span-1 sm:border-t-0 sm:border-l" : index === 1 ? "border-l border-slate-200" : ""}`}
-        >
-          <dt className="text-xs text-slate-500">{item.label}</dt>
-          <dd className="mt-1 min-h-6 font-mono text-base font-semibold tabular-nums text-slate-950">
-            {item.value}
-          </dd>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {status ? (
+            <p className="text-xs text-slate-500">
+              {status.lastSuccessfulAnalysisAt ? (
+                <>
+                  Analysed{" "}
+                  <time dateTime={status.lastSuccessfulAnalysisAt} className="font-mono text-slate-700">
+                    {formatDateTime(status.lastSuccessfulAnalysisAt, status.timezone)}
+                  </time>
+                </>
+              ) : (
+                "Not analysed yet"
+              )}
+            </p>
+          ) : null}
+          {onRefresh ? (
+            <Button variant="secondary" onClick={onRefresh} aria-busy={refreshing}>
+              <RefreshCw className="size-4" aria-hidden="true" />
+              Refresh
+            </Button>
+          ) : null}
         </div>
-      ))}
-    </dl>
+      </div>
+      {counts === null ? (
+        onRefresh ? <Skeleton className="h-6 w-80 max-w-full" /> : null
+      ) : (
+        <p data-summary className="text-base text-slate-600">
+          {counts.length
+            ? counts.map(([count, words], index) => (
+                <span key={words}>
+                  {index ? " " : null}
+                  <span className="font-mono font-semibold text-slate-950">{formatCount(count)}</span> {words}
+                </span>
+              ))
+            : "No active changes."}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -184,23 +173,21 @@ export function ChangesUnavailable({ status }: { status: ChangeStatusResponse | 
 
 function ListSkeleton() {
   return (
-    <Card aria-hidden="true" className="divide-y divide-slate-100">
-      {[0, 1, 2].map((row) => (
-        <div key={row} className="grid gap-3 px-4 py-4 sm:px-5">
-          <div className="flex justify-between gap-2">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-6 w-28 rounded-full" />
+    <div aria-hidden="true" className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 sm:px-5">
+        <Skeleton className="h-4 w-24" />
+      </div>
+      <div className="divide-y divide-slate-100">
+        {[0, 1, 2, 3].map((row) => (
+          <div key={row} className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 px-4 py-4 sm:px-5 ${LEDGER_COLUMNS}`}>
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="hidden h-4 w-20 justify-self-end sm:block" />
+            <Skeleton className="hidden h-4 w-20 justify-self-end sm:block" />
+            <Skeleton className="h-4 w-16 justify-self-end" />
           </div>
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-4 w-2/3" />
-          <Skeleton className="h-28 w-full rounded-lg" />
-          <div className="flex justify-between gap-2">
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-11 w-36" />
-          </div>
-        </div>
-      ))}
-    </Card>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -297,8 +284,6 @@ export function ChangesView() {
         <ChangesUnavailable status={statusData} />
       ) : (
         <>
-          <SummaryStrip status={statusData} />
-
           {offline ? (
             <NoticeBox
               notice={{
@@ -324,61 +309,17 @@ export function ChangesView() {
             <NoticeBox key={notice.id} notice={notice} />
           ))}
 
-          <section aria-labelledby="changes-list" className="grid gap-4">
-            <div className="flex min-h-11 items-center justify-between gap-4 border-b border-slate-200 pb-3">
-              <h2
-                id="changes-list"
-                ref={listHeading}
-                tabIndex={-1}
-                className="scroll-mt-28 text-xl font-semibold tracking-tight text-slate-950 focus:outline-none"
-              >
-                {listTitle}
-              </h2>
-            </div>
+          <section aria-labelledby="changes-list" className="grid gap-3">
+            <h2
+              id="changes-list"
+              ref={listHeading}
+              tabIndex={-1}
+              className="sr-only scroll-mt-28 focus:outline-none"
+            >
+              {listTitle}
+            </h2>
 
-            <div role="group" aria-label="Change filters" className="flex flex-wrap items-end gap-2">
-              <Select
-                value={filters.productId ?? ALL}
-                onValueChange={(value) => setFilter({ productId: value === ALL ? null : value })}
-              >
-                <SelectTrigger className="h-11 w-full max-w-full sm:w-auto sm:max-w-72" aria-label="Product">
-                  <span className="text-slate-500">Product</span>
-                  <span className="min-w-0 truncate">
-                    <SelectValue />
-                  </span>
-                </SelectTrigger>
-                <SelectContent className="max-h-80">
-                  <SelectItem value={ALL}>All products</SelectItem>
-                  {selectedProductMissing ? (
-                    <SelectItem value={filters.productId!}>Selected product</SelectItem>
-                  ) : null}
-                  {productOptions.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name}
-                      {product.status === "archived" ? " (archived)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={filters.type ?? ALL}
-                onValueChange={(value) =>
-                  setFilter({ type: value === ALL ? null : (value as ChangeTypeFilter) })
-                }
-              >
-                <SelectTrigger className="h-11 w-full sm:w-auto" aria-label="Change type">
-                  <span className="text-slate-500">Type</span>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All types</SelectItem>
-                  {CHANGE_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div role="group" aria-label="Change filters" className="flex flex-wrap items-center gap-2">
               <ToggleGroup
                 type="single"
                 aria-label="Status"
@@ -389,52 +330,113 @@ export function ChangesView() {
                 className="h-auto p-0"
               >
                 {CHANGE_STATUSES.map((option) => (
-                  <ToggleGroupItem key={option.value} value={option.value} className="min-h-11 min-w-11">
+                  <ToggleGroupItem
+                    key={option.value}
+                    value={option.value}
+                    className="min-h-11 min-w-11 data-[state=on]:text-blue-700"
+                  >
                     {option.label}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
-              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                <label className="grid min-w-0 flex-1 gap-1 text-xs text-slate-500 sm:flex-none">
-                  From
-                  <Input
-                    type="date"
-                    value={filters.from ?? ""}
-                    max={filters.to ?? undefined}
-                    onChange={(event) => setFilter({ from: event.target.value || null })}
-                    className="w-full sm:w-auto"
-                  />
-                </label>
-                <label className="grid min-w-0 flex-1 gap-1 text-xs text-slate-500 sm:flex-none">
-                  To
-                  <Input
-                    type="date"
-                    value={filters.to ?? ""}
-                    min={filters.from ?? undefined}
-                    onChange={(event) => setFilter({ to: event.target.value || null })}
-                    className="w-full sm:w-auto"
-                  />
-                </label>
-              </div>
-              {filtered ? (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setHistory([]);
-                    router.replace(pathname, { scroll: false });
-                  }}
+              <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
+                <Select
+                  value={filters.productId ?? ALL}
+                  onValueChange={(value) => setFilter({ productId: value === ALL ? null : value })}
                 >
-                  Clear filters
-                  <X className="size-4" aria-hidden="true" />
-                </Button>
-              ) : null}
+                  <SelectTrigger className="h-11 min-w-0 basis-full sm:max-w-64 sm:basis-auto" aria-label="Product">
+                    <span className="text-slate-500">Product</span>
+                    <span className="min-w-0 truncate">
+                      <SelectValue />
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    <SelectItem value={ALL}>All products</SelectItem>
+                    {selectedProductMissing ? (
+                      <SelectItem value={filters.productId!}>Selected product</SelectItem>
+                    ) : null}
+                    {productOptions.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.name}
+                        {product.status === "archived" ? " (archived)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filters.type ?? ALL}
+                  onValueChange={(value) =>
+                    setFilter({ type: value === ALL ? null : (value as ChangeTypeFilter) })
+                  }
+                >
+                  <SelectTrigger className="h-11 min-w-0 flex-1 sm:flex-none" aria-label="Change type">
+                    <span className="text-slate-500">Type</span>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>All types</SelectItem>
+                    {CHANGE_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="secondary" className="h-11 font-normal">
+                      <CalendarDays className="size-4 text-slate-500" aria-hidden="true" />
+                      {filters.from || filters.to ? (
+                        <span className="font-mono text-xs">
+                          {filters.from ? formatLocalDate(filters.from) : "…"} – {filters.to ? formatLocalDate(filters.to) : "…"}
+                        </span>
+                      ) : (
+                        "Dates"
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="grid w-64 gap-3">
+                    <label className="grid gap-1 text-xs text-slate-500">
+                      From
+                      <Input
+                        type="date"
+                        value={filters.from ?? ""}
+                        max={filters.to ?? undefined}
+                        onChange={(event) => setFilter({ from: event.target.value || null })}
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs text-slate-500">
+                      To
+                      <Input
+                        type="date"
+                        value={filters.to ?? ""}
+                        min={filters.from ?? undefined}
+                        onChange={(event) => setFilter({ to: event.target.value || null })}
+                      />
+                    </label>
+                  </PopoverContent>
+                </Popover>
+                {filtered ? (
+                  <Button
+                    variant="ghost"
+                    className="h-11"
+                    onClick={() => {
+                      setHistory([]);
+                      router.replace(pathname, { scroll: false });
+                    }}
+                  >
+                    Clear filters
+                    <X className="size-4" aria-hidden="true" />
+                  </Button>
+                ) : null}
+              </div>
             </div>
             {rangeError ? (
               <p className="text-sm font-medium text-red-700" role="alert">
                 {rangeError}
               </p>
             ) : (
-              <p className="text-sm text-slate-500">{rangeCaption(filters)}</p>
+              <p className="text-xs text-slate-500">{rangeCaption(filters)}</p>
             )}
 
             {list.error && listData && !offline ? (
@@ -498,10 +500,11 @@ function ProductsNotAssessed({ status }: { status: ChangeStatusResponse }) {
   const items = productReadiness(status);
   if (!items.length) return null;
   return (
-    <details className="group rounded-xl border border-slate-200 bg-white">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700 sm:px-5 [&::-webkit-details-marker]:hidden">
+    <details className="group overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 sm:px-5 [&::-webkit-details-marker]:hidden">
         <span>
-          Products not yet assessed <span className="text-slate-500">({formatCount(items.length)})</span>
+          Products not yet assessed{" "}
+          <span className="font-mono font-normal text-slate-500">{formatCount(items.length)}</span>
         </span>
         <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
@@ -568,18 +571,40 @@ function ChangeList({
         />
       </Card>
     );
+  const groups = CHANGE_GROUPS.map((group) => ({
+    ...group,
+    items: data.items.filter((change) => changeGroup(change.type) === group.id),
+  })).filter((group) => group.items.length);
   return (
-    <Card
+    <div
       aria-busy={stale}
-      className={`overflow-hidden motion-safe:transition-opacity ${stale ? "opacity-60" : ""}`}
+      className={`overflow-hidden rounded-lg border border-slate-200 bg-white motion-safe:transition-opacity ${stale ? "opacity-60" : ""}`}
     >
-      <ul className="divide-y divide-slate-100">
-        {data.items.map((change) => (
-          <li key={change.id}>
-            <ChangeEntry change={change} timezone={data.timezone} />
-          </li>
-        ))}
-      </ul>
+      {groups.map((group) => (
+        <section key={group.id} aria-labelledby={`group-${group.id}`} className="border-b border-slate-200 last:border-b-0">
+          <div
+            className={`grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 border-b border-slate-200 bg-slate-50 px-4 py-2.5 sm:px-5 ${LEDGER_COLUMNS}`}
+          >
+            <h3 id={`group-${group.id}`} className="text-sm font-semibold text-slate-950">
+              {group.title}
+            </h3>
+            <span aria-hidden="true" className={`hidden text-xs text-slate-500 sm:block ${group.id === "stock" ? "" : "text-right"}`}>
+              Was
+            </span>
+            <span aria-hidden="true" className={`hidden text-xs text-slate-500 sm:block ${group.id === "stock" ? "" : "text-right"}`}>
+              Now
+            </span>
+            <span className="text-right text-xs text-slate-500 sm:col-start-4">{group.cadence}</span>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {group.items.map((change) => (
+              <li key={change.id}>
+                <ChangeEntry change={change} timezone={data.timezone} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
       {hasPrevious || data.nextCursor ? (
         <nav
           aria-label="Change pages"
@@ -600,6 +625,6 @@ function ChangeList({
           </div>
         </nav>
       ) : null}
-    </Card>
+    </div>
   );
 }

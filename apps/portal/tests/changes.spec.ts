@@ -129,6 +129,8 @@ const ARCHIVED_CHANGE = change({
   priority: 4,
   headline: "Seasonal muffin is selling slower",
   summary: "4 units were recorded in the last 7 days, against a usual 15.",
+  before: [{ key: "usual", label: "Usual units per week", value: 15, unit: "units" }],
+  after: [{ key: "recent", label: "Units in the last 7 days", value: 4, unit: "units" }],
   consequence: null,
   suggestedAction: "Check whether planned stock still matches recorded sales.",
 });
@@ -436,53 +438,50 @@ test("Change Intelligence stays in the navigation and explains itself when unava
 
 // ------------------------------------------------------------- list
 
-test("the list leads with the change, its consequence and the saved before/after values", async ({ page }, info) => {
+test("the list is a ledger: stock and sales sections, saved before/now values, one sentence of counts", async ({ page }, info) => {
   await setup(page);
   await page.goto("/analytics/changes");
   await expect(main(page).getByRole("heading", { level: 1, name: "Changes" })).toBeVisible();
-  await expect(
-    main(page).getByText(
-      "See what changed in your recorded activity and how it affects your stock and sales outlook.",
-      { exact: true },
-    ),
-  ).toBeVisible();
-  await expect(main(page).getByText("Stock updates hourly. Sales trends update once a day.", { exact: true })).toBeVisible();
+  // One sentence of saved counts; the analysis time sits beside Refresh.
+  await expect(main(page).locator("[data-summary]")).toHaveText("4 active changes. 2 products need a stock review.");
+  await expect(main(page).getByText("25 Oct 2026, 01:00", { exact: true })).toBeVisible();
 
-  const summary = main(page).locator("dl").first();
-  await expect(summary.getByText("Active changes")).toBeVisible();
-  await expect(summary.locator("dd")).toHaveText(["4", "2", "25 Oct 2026, 01:00"]);
+  // Sections follow the analysis paces: stock hourly, sales trends daily.
+  await expect(list(page).getByRole("heading", { level: 3 })).toHaveText(["Stock", "Sales trends"]);
+  await expect(list(page).getByText("Updates hourly")).toBeVisible();
+  await expect(list(page).getByText("Updates daily")).toBeVisible();
 
-  const demand = entry(page, "Cappuccino is selling faster");
-  await expect(demand.getByText("42 units were recorded in the last 7 days, against a usual 28.")).toBeVisible();
-  await expect(demand.locator("[data-value-key]")).toHaveText(["28 units", "9 days", "42 units", "6 days"]);
-  await expect(
-    demand.getByText("Stock is now expected to reach its minimum in about 6 days instead of 9. Review replenishment for the coming week."),
-  ).toBeVisible();
-  await expect(demand.getByText("Detected 25 Oct 2026, 01:00 · Based on 18–24 Oct 2026")).toBeVisible();
-  await expect(demand.getByText("Selling faster", { exact: true })).toBeVisible();
-  await expect(demand.getByText("Active", { exact: true })).toBeVisible();
-  await expect(demand.getByRole("link", { name: "View explanation" })).toHaveAttribute(
-    "href",
-    `/analytics/changes/${DEMAND_ID}`,
-  );
-
-  // Priority order from the API is kept; only stock problems carry a warning.
-  await expect(list(page).getByRole("heading", { level: 3 })).toHaveText([
+  // API priority order is kept within and across sections.
+  await expect(list(page).getByRole("heading", { level: 4 })).toHaveText([
     STOCK.headline,
     DEMAND.headline,
     LONG.headline,
     ARCHIVED_CHANGE.headline,
   ]);
+
+  // A stock row adds its saved summary; values are the first saved before/now pair.
   const stock = entry(page, STOCK.headline);
+  await expect(stock.getByText(STOCK.summary)).toBeVisible();
   await expect(stock.locator("[data-value-key]")).toHaveText(["May reach minimum soon", "At or below minimum"]);
-  await expect(entry(page, ARCHIVED_CHANGE.headline).getByText("Archived or unavailable")).toBeVisible();
+  await expect(stock.getByRole("link", { name: STOCK.headline })).toHaveAttribute("href", `/analytics/changes/${STOCK_ID}`);
+
+  // A sales row is one line: the headline already names the product and direction.
+  const demand = entry(page, DEMAND.headline);
+  await expect(demand.locator("[data-value-key]")).toHaveText(["28 units", "42 units"]);
+  await expect(demand.getByText(DEMAND.summary)).toHaveCount(0);
+  await expect(demand.getByRole("link", { name: DEMAND.headline })).toHaveAttribute(
+    "href",
+    `/analytics/changes/${DEMAND_ID}`,
+  );
+  await expect(entry(page, ARCHIVED_CHANGE.headline).getByText("Product archived or unavailable.")).toBeVisible();
+  await expect(entry(page, ARCHIVED_CHANGE.headline).locator("[data-value-key]")).toHaveText(["15 units", "4 units"]);
   await expect(entry(page, LONG.headline).locator("[data-value-key]")).toHaveText(["987,654 units", "1,234,567 units"]);
 
   await noDiagnostics(page);
   await noHorizontalScroll(page);
   // Long names and large values wrap instead of clipping.
   const clipped = await entry(page, LONG.headline).evaluate((el) =>
-    [...el.querySelectorAll("h3, dd, p")].some((node) => node.scrollWidth > node.clientWidth + 1),
+    [...el.querySelectorAll("h4, p")].some((node) => node.scrollWidth > node.clientWidth + 1),
   );
   expect(clipped).toBe(false);
   await page.screenshot({ path: `${SHOTS}/list-${info.project.name}.png`, fullPage: true });
@@ -497,7 +496,7 @@ test("filters live in the address, survive a reload, and Clear filters resets th
   await main(page).getByRole("combobox", { name: "Change type" }).click();
   await page.getByRole("option", { name: "Stock problems" }).click();
   await expect(page).toHaveURL(/\/analytics\/changes\?type=stock$/);
-  await expect(list(page).getByRole("heading", { level: 3 })).toHaveText([STOCK.headline]);
+  await expect(list(page).getByRole("heading", { level: 4 })).toHaveText([STOCK.headline]);
   expect(listRequests(backend).at(-1)).toContain("type=stock");
 
   await main(page).getByRole("radio", { name: "All" }).click();
@@ -507,16 +506,18 @@ test("filters live in the address, survive a reload, and Clear filters resets th
   await page.reload();
   await expect(main(page).getByRole("combobox", { name: "Change type" })).toContainText("Stock problems");
   await expect(main(page).getByRole("radio", { name: "All" })).toHaveAttribute("aria-checked", "true");
-  await expect(list(page).getByRole("heading", { level: 3 })).toHaveText([STOCK.headline]);
+  await expect(list(page).getByRole("heading", { level: 4 })).toHaveText([STOCK.headline]);
 
-  await main(page).getByLabel("From", { exact: true }).fill("2026-10-01");
-  await main(page).getByLabel("To", { exact: true }).fill("2026-10-25");
+  await main(page).getByRole("button", { name: "Dates" }).click();
+  await page.getByLabel("From", { exact: true }).fill("2026-10-01");
+  await page.getByLabel("To", { exact: true }).fill("2026-10-25");
+  await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/from=2026-10-01&to=2026-10-25/);
   await expect(main(page).getByText("Showing changes updated 1 Oct 2026 to 25 Oct 2026.")).toBeVisible();
 
   await main(page).getByRole("group", { name: "Change filters" }).getByRole("button", { name: "Clear filters" }).click();
   await expect(page).toHaveURL(/\/analytics\/changes$/);
-  await expect(list(page).getByRole("heading", { level: 3 })).toHaveCount(4);
+  await expect(list(page).getByRole("heading", { level: 4 })).toHaveCount(4);
 });
 
 test("a filter with no matches is distinct from no detected changes", async ({ page }, info) => {
@@ -600,28 +601,31 @@ test("a change's details are directly linkable, survive a refresh and match the 
   await page.reload();
   await expect(main(page).getByRole("heading", { level: 1, name: "Cappuccino is selling faster" })).toBeVisible();
 
+  // One lead sentence under the headline; no repeated product name or kind badges.
+  await expect(main(page).getByText(DEMAND.summary)).toHaveCount(1);
+  await expect(main(page).getByRole("navigation", { name: "Analytics views" })).toHaveCount(0);
+
   await expect(main(page).getByRole("heading", { level: 2 })).toHaveText([
     "What changed",
     "Suggested action",
-    "Before and after",
     "Why this change appeared",
-    "How this was calculated",
     "Source information",
+    "How this was calculated",
   ]);
+  // The comparison as two figures, then the weeks as bars from oldest to the last 7 days.
   const what = main(page).getByRole("region", { name: "What changed" });
-  await expect(what.getByText("42 units", { exact: true })).toBeVisible();
-  await expect(what.getByText("28 units", { exact: true })).toBeVisible();
-  await expect(what.getByRole("row")).toHaveCount(5);
-  await expect(what.getByRole("row").nth(1)).toHaveText(/11–17 Oct 2026\s*27 units/);
+  await expect(what.locator("dl dd").filter({ hasText: /units$/ })).toHaveText(["28 units", "42 units"]);
+  const weeks = what.getByRole("table").getByRole("row");
+  await expect(weeks).toHaveCount(6);
+  await expect(weeks.nth(1)).toHaveText(/20–26 Sept 2026\s*30 units/);
+  await expect(weeks.nth(5)).toHaveText(/Last 7 days\s*18–24 Oct 2026\s*42 units/);
 
+  // Readings as a ledger: changed rows show was and now; unchanged rows say so.
   const impact = main(page).getByRole("region", { name: "Why this change appeared" }).getByRole("listitem");
   await expect(impact).toHaveCount(3);
   await expect(impact.nth(1)).toContainText("Days until minimum stock");
-  await expect(impact.nth(1)).toContainText(/9 days\s*to\s*6 days/);
+  await expect(impact.nth(1)).toContainText(/9 days[\s\S]*6 days/);
   await expect(impact.nth(2)).toContainText("Unchanged");
-
-  const beforeAfter = main(page).getByRole("region", { name: "Before and after" });
-  await expect(beforeAfter.locator("[data-value-key]")).toHaveText(["28 units", "9 days", "42 units", "6 days"]);
 
   const action = main(page).getByRole("region", { name: "Suggested action" });
   await expect(action.getByText("Review replenishment for the coming week.")).toBeVisible();
@@ -646,8 +650,9 @@ test("a change's details are directly linkable, survive a refresh and match the 
   await expect(how).not.toContainText("2.5");
 
   const source = main(page).getByRole("region", { name: "Source information" });
-  await expect(source.getByText("31 sales")).toBeVisible();
-  await expect(source.getByText("9 sales · live or test not recorded")).toBeVisible();
+  await expect(source.getByText("31 sales", { exact: true })).toBeVisible();
+  await expect(source.getByText("9 sales", { exact: true })).toBeVisible();
+  await expect(source.getByText("Cash sales do not record whether they were live or test.")).toBeVisible();
 
   await noDiagnostics(page);
   await noHorizontalScroll(page);
@@ -978,7 +983,7 @@ test("keyboard users reach every control, with accessible names and 44 px target
     expect(target.width, `${target.name} width`).toBeGreaterThanOrEqual(44);
   }
 
-  const link = entry(page, DEMAND.headline).getByRole("link", { name: "View explanation" });
+  const link = entry(page, DEMAND.headline).getByRole("link", { name: DEMAND.headline });
   await link.focus();
   const outline = await link.evaluate((el) => getComputedStyle(el).boxShadow);
   expect(outline).not.toBe("none");
@@ -1009,9 +1014,12 @@ test("no horizontal page scroll on the Analytics pages", async ({ page }) => {
     await expect(main(page).getByRole("heading", { level: 1 })).toBeVisible();
     await page.waitForLoadState("networkidle");
     // The shared navigation always fits, scrolling its tabs rather than overflowing.
-    const nav = await main(page).getByRole("navigation", { name: "Analytics views" }).boundingBox();
-    const width = await page.evaluate(() => document.documentElement.clientWidth);
-    expect((nav?.x ?? 0) + (nav?.width ?? 0)).toBeLessThanOrEqual(width);
+    // A change's detail page has no tabs; the breadcrumb and Back to Changes lead out.
+    if (!path.endsWith(LONG_ID)) {
+      const nav = await main(page).getByRole("navigation", { name: "Analytics views" }).boundingBox();
+      const width = await page.evaluate(() => document.documentElement.clientWidth);
+      expect((nav?.x ?? 0) + (nav?.width ?? 0)).toBeLessThanOrEqual(width);
+    }
     // General analytics' own charts overflow at 375 px before this work
     // (general-analytics.spec "a year of daily bars…" fails the same way).
     if (path !== "/analytics/general") await noHorizontalScroll(page);

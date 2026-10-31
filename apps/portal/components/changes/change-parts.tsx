@@ -2,25 +2,20 @@
 
 import type { ChangeCaseSummary, ChangeValue } from "@repo/shared";
 import { Alert } from "@repo/ui/alert";
-import { Badge } from "@repo/ui/badge";
 import { cn } from "@repo/ui/cn";
 import {
-  ArrowRight,
+  ChevronRight,
   CircleAlert,
   CircleCheck,
-  CircleDot,
   Clock,
   Info,
-  PackageX,
-  TrendingDown,
-  TrendingUp,
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import {
   RESOLUTION_LABELS,
-  changeKind,
+  changeGroup,
   formatChangeValue,
   formatDateTime,
   formatLocalDate,
@@ -57,110 +52,6 @@ export function NoticeBox({ notice, action }: { notice: Notice; action?: React.R
   );
 }
 
-const KIND_ICON: Partial<Record<ChangeCaseSummary["type"], LucideIcon>> = {
-  unit_demand_increase: TrendingUp,
-  transaction_velocity_increase: TrendingUp,
-  unit_demand_decrease: TrendingDown,
-  transaction_velocity_decrease: TrendingDown,
-};
-
-/** What kind of change, in words and an icon, never colour alone. */
-export function KindBadge({ change }: { change: ChangeCaseSummary }) {
-  const kind = changeKind(change);
-  const Icon =
-    KIND_ICON[change.type] ??
-    (kind.label === "Out of stock" ? PackageX : kind.tone === "warning" ? TriangleAlert : Info);
-  return (
-    <Badge tone={kind.tone} className="gap-1">
-      <Icon className="size-3.5" aria-hidden="true" />
-      {kind.label}
-    </Badge>
-  );
-}
-
-export function StateBadge({ change }: { change: ChangeCaseSummary }) {
-  return change.status === "active" ? (
-    <Badge tone="neutral" className="gap-1 bg-white ring-1 ring-slate-200">
-      <CircleDot className="size-3.5" aria-hidden="true" />
-      Active
-    </Badge>
-  ) : (
-    <Badge tone="success" className="gap-1">
-      <CircleCheck className="size-3.5" aria-hidden="true" />
-      Resolved
-    </Badge>
-  );
-}
-
-export function ProductLabel({ change }: { change: ChangeCaseSummary }) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <span className="[overflow-wrap:anywhere]">{change.productName ?? "Product no longer listed"}</span>
-      {change.productId && !change.productAvailable ? (
-        <Badge tone="neutral">Archived or unavailable</Badge>
-      ) : null}
-    </span>
-  );
-}
-
-/** Saved before/after values side by side, each with its own label and unit. */
-export function BeforeAfter({
-  before,
-  after,
-  size = "compact",
-}: {
-  before: ChangeValue[];
-  after: ChangeValue[];
-  size?: "compact" | "full";
-}) {
-  if (!before.length && !after.length) return null;
-  const column = (title: string, values: ChangeValue[]) => (
-    <div className="min-w-0">
-      <p
-        className={cn(
-          "font-medium text-slate-500",
-          size === "compact" ? "text-xs" : "text-sm",
-        )}
-      >
-        {title}
-      </p>
-      {values.length ? (
-        <dl className="mt-1 grid gap-1.5">
-          {values.map((value) => (
-            <div key={value.key} className="min-w-0">
-              <dt className="text-xs text-slate-500">{value.label}</dt>
-              <dd
-                className={cn(
-                  "text-slate-950 [overflow-wrap:anywhere]",
-                  typeof value.value === "number" && "font-mono tabular-nums",
-                  size === "compact" ? "text-sm" : "text-base font-semibold",
-                )}
-                data-value-key={value.key}
-              >
-                {formatChangeValue(value)}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="mt-1 text-sm text-slate-500">No earlier reading</p>
-      )}
-    </div>
-  );
-  return (
-    <div
-      className={cn(
-        "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 rounded-lg bg-slate-50",
-        size === "compact" ? "p-3" : "p-4",
-      )}
-    >
-      {column("Before", before)}
-      <ArrowRight className="mt-6 size-4 text-slate-400" aria-hidden="true" />
-      {column("Now", after)}
-    </div>
-  );
-}
-
 /** When it was detected and which recorded period it is based on. */
 export function ChangeTiming({ change, timezone }: { change: ChangeCaseSummary; timezone: string }) {
   const parts = [
@@ -180,43 +71,100 @@ export function ChangeTiming({ change, timezone }: { change: ChangeCaseSummary; 
   return <p className="text-xs text-slate-500">{parts.join(" · ")}</p>;
 }
 
-/** One entry of the Changes list (§3.3). */
+/** Ledger columns from `sm` up: headline · Was · Now · age. The list's column header uses the same. */
+export const LEDGER_COLUMNS = "sm:grid-cols-[minmax(0,1fr)_9rem_9rem_6.5rem]";
+
+const relative = new Intl.RelativeTimeFormat("en-GB", { numeric: "auto", style: "short" });
+function age(iso: string): string {
+  const ms = Date.parse(iso) - Date.now();
+  const days = Math.round(ms / 86_400_000);
+  if (days === 0) return relative.format(Math.round(ms / 3_600_000), "hour");
+  return Math.abs(days) < 14 ? relative.format(days, "day") : relative.format(Math.round(days / 7), "week");
+}
+
+/** One saved value cell. Figures in mono and right-aligned; words left-aligned. */
+function LedgerValue({ label, value, emphasis }: { label: string; value?: ChangeValue; emphasis?: "now" | "urgent" }) {
+  const numeric = typeof value?.value === "number";
+  return (
+    <p className={cn("min-w-0 text-sm", numeric && "sm:text-right")}>
+      <span className="mr-1.5 text-xs text-slate-500 sm:sr-only">{label}</span>
+      {value ? (
+        <span
+          data-value-key={value.key}
+          className={cn(
+            "[overflow-wrap:anywhere]",
+            numeric && "font-mono tabular-nums",
+            !emphasis && "text-slate-500",
+            emphasis === "now" && "font-medium text-slate-950",
+            emphasis === "urgent" && "font-semibold text-red-700",
+          )}
+        >
+          {formatChangeValue(value)}
+        </span>
+      ) : (
+        <span className="text-slate-400">None recorded</span>
+      )}
+    </p>
+  );
+}
+
+/**
+ * One line of the Changes ledger (§3.3): the headline (which already names the
+ * product and direction), the first saved before/now pair, and how long ago.
+ * A second line appears only when it adds something: a stock summary, an
+ * archived product, a resolution or a stale check. The whole row opens the
+ * explanation.
+ */
 export function ChangeEntry({ change, timezone }: { change: ChangeCaseSummary; timezone: string }) {
   const headingId = `change-${change.id}`;
+  const resolved = change.status === "resolved";
+  const when = resolved && change.resolvedAt ? change.resolvedAt : change.lastChangedAt;
+  const note = [
+    changeGroup(change.type) === "stock" ? change.summary : null,
+    change.productId && !change.productAvailable ? "Product archived or unavailable." : null,
+    resolved && change.resolution ? `Resolved: ${RESOLUTION_LABELS[change.resolution]}.` : null,
+    change.notRecheckedSince ? `Not re-checked since ${formatLocalDate(change.notRecheckedSince)}.` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <article aria-labelledby={headingId} className="grid gap-3 px-4 py-4 sm:px-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="min-w-0 text-sm font-medium text-slate-600">
-          <ProductLabel change={change} />
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <KindBadge change={change} />
-          <StateBadge change={change} />
+    <article aria-labelledby={headingId}>
+      <Link
+        href={`/analytics/changes/${change.id}`}
+        aria-labelledby={headingId}
+        className={cn(
+          "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-6 gap-y-1.5 px-4 py-3.5 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 sm:items-baseline sm:px-5",
+          LEDGER_COLUMNS,
+        )}
+      >
+        <div className="min-w-0">
+          <h4
+            id={headingId}
+            className={cn("text-sm font-medium [overflow-wrap:anywhere]", resolved ? "text-slate-600" : "text-slate-950")}
+          >
+            {change.headline}
+          </h4>
+          {note ? <p className="mt-0.5 text-sm text-slate-500">{note}</p> : null}
         </div>
-      </div>
-      <div className="grid gap-1">
-        <h3 id={headingId} className="text-base font-semibold text-slate-950 [overflow-wrap:anywhere]">
-          {change.headline}
-        </h3>
-        {change.summary ? <p className="text-sm text-slate-600">{change.summary}</p> : null}
-      </div>
-      <BeforeAfter before={change.before} after={change.after} />
-      {change.consequence || change.suggestedAction ? (
-        <p className="text-sm text-slate-800">
-          {[change.consequence, change.suggestedAction].filter(Boolean).join(" ")}
+        <div className="col-span-2 row-start-2 flex flex-wrap gap-x-6 gap-y-1 sm:contents">
+          <LedgerValue label="Was" value={change.before[0]} />
+          <LedgerValue
+            label="Now"
+            value={change.after[0]}
+            emphasis={!resolved && change.priority <= 2 ? "urgent" : "now"}
+          />
+        </div>
+        <p className="col-start-2 row-start-1 flex items-baseline justify-end gap-2 sm:col-start-4">
+          <time
+            dateTime={when}
+            title={formatDateTime(when, timezone)}
+            className="whitespace-nowrap font-mono text-xs text-slate-500"
+          >
+            {age(when)}
+          </time>
+          <ChevronRight className="size-4 self-center text-slate-400" aria-hidden="true" />
         </p>
-      ) : null}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <ChangeTiming change={change} timezone={timezone} />
-        <Link
-          href={`/analytics/changes/${change.id}`}
-          aria-describedby={headingId}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-        >
-          View explanation
-          <ArrowRight size={16} aria-hidden="true" />
-        </Link>
-      </div>
+      </Link>
     </article>
   );
 }

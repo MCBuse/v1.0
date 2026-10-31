@@ -183,6 +183,6 @@ test("9.5.source-to-resolution: a sale opens a stock case end to end, and a rest
   await expect(main.getByRole("article", { name: headline })).toHaveCount(0);
   await page.goto("/analytics/changes?status=resolved");
   const closed = main.getByRole("article", { name: `${PRODUCT} stock is back to normal` });
-  await expect(closed.getByText(/Resolved .* · Stock back to normal/)).toBeVisible();
-  await expect(closed.getByRole("link", { name: "View explanation" })).toHaveAttribute("href", `/analytics/changes/${opened.id}`);
+  await expect(closed.getByText("Stock back to normal")).toBeVisible();
+  await expect(closed.getByRole("link", { name: `${PRODUCT} stock is back to normal` })).toHaveAttribute("href", `/analytics/changes/${opened.id}`);
 });

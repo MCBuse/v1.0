@@ -2,6 +2,7 @@ import type { ChangeCaseSummary, ChangeStatusResponse } from "@repo/shared";
 import { describe, expect, it } from "vitest";
 import {
   announcement,
+  changeGroup,
   changeKind,
   changesListPath,
   dateRangeError,
@@ -18,6 +19,7 @@ import {
   processingNotice,
   productReadiness,
   readinessNotices,
+  summaryCounts,
   withUnit,
 } from "./changes";
 
@@ -329,5 +331,26 @@ describe("products not yet assessed (§3.8)", () => {
   it("lists nothing during a recording gap or when every product is assessed", () => {
     expect(productReadiness(readiness([]))).toEqual([]);
     expect(productReadiness({ ...readiness([candy]), recordingGap: true })).toEqual([]);
+  });
+});
+
+describe("list groups and header summary", () => {
+  it("files stock, sales and correction changes under their own section", () => {
+    expect(changeGroup("stock_risk")).toBe("stock");
+    expect(changeGroup("stock_threshold_change")).toBe("stock");
+    expect(changeGroup("unit_demand_decrease")).toBe("sales");
+    expect(changeGroup("transaction_velocity_increase")).toBe("sales");
+    expect(changeGroup("historical_correction")).toBe("corrections");
+  });
+
+  it("states saved counts in words, singular and plural, and nothing at zero", () => {
+    const text = (activeChanges: number, productsNeedingStockReview: number) =>
+      summaryCounts({ activeChanges, productsNeedingStockReview })
+        .map(([n, words]) => `${n} ${words}`)
+        .join(" ");
+    expect(text(4, 2)).toBe("4 active changes. 2 products need a stock review.");
+    expect(text(1, 1)).toBe("1 active change. 1 product needs a stock review.");
+    expect(text(3, 0)).toBe("3 active changes.");
+    expect(text(0, 0)).toBe("");
   });
 });

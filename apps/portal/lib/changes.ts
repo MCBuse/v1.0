@@ -40,6 +40,45 @@ export type ChangeFilters = {
   to: string | null;
 };
 
+// ------------------------------------------------------------------ list groups
+
+/** The list's sections, in display order. Stock and sales trends are analysed at different paces. */
+export const CHANGE_GROUPS = [
+  { id: "stock", title: "Stock", cadence: "Updates hourly" },
+  { id: "sales", title: "Sales trends", cadence: "Updates daily" },
+  { id: "corrections", title: "Corrections to earlier sales", cadence: null },
+] as const;
+export type ChangeGroupId = (typeof CHANGE_GROUPS)[number]["id"];
+
+const GROUP_OF: Record<ChangeCaseSummary["type"], ChangeGroupId> = {
+  stock_risk: "stock",
+  stock_threshold_change: "stock",
+  unit_demand_increase: "sales",
+  unit_demand_decrease: "sales",
+  transaction_velocity_increase: "sales",
+  transaction_velocity_decrease: "sales",
+  historical_correction: "corrections",
+};
+export const changeGroup = (type: ChangeCaseSummary["type"]): ChangeGroupId => GROUP_OF[type];
+
+/**
+ * The header's one-sentence summary as [count, words] pairs, so the page can
+ * set each count in mono. Saved counts only; nothing is derived. Empty = none.
+ */
+export function summaryCounts(summary: ChangeStatusResponse["summary"]): Array<[number, string]> {
+  const parts: Array<[number, string]> = [];
+  if (summary.activeChanges)
+    parts.push([summary.activeChanges, summary.activeChanges === 1 ? "active change." : "active changes."]);
+  if (summary.productsNeedingStockReview)
+    parts.push([
+      summary.productsNeedingStockReview,
+      summary.productsNeedingStockReview === 1
+        ? "product needs a stock review."
+        : "products need a stock review.",
+    ]);
+  return parts;
+}
+
 export const DEFAULT_RANGE_DAYS = 30;
 export const MAX_RANGE_DAYS = 366;
 export const PAGE_SIZE = 25;
