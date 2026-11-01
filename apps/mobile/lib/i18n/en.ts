@@ -13,8 +13,6 @@ export const en = {
     online: 'Online',
     poor: 'Poor connection',
     offline: 'Offline',
-    noInternet: 'No internet connection',
-    syncing: 'Syncing…',
   },
   payment: {
     send: 'Send',
@@ -27,11 +25,5 @@ export const en = {
     syncing: 'Syncing',
     settled: 'Settled',
     failed: 'Failed',
-  },
-  demo: {
-    title: 'Demo Mode',
-    enabled: 'Demo mode active',
-    toggleConnectivity: 'Connectivity',
-    seedData: 'Load demo data',
   },
 } as const;
