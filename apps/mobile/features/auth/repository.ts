@@ -5,11 +5,11 @@ import {
   type ForgotPasswordRequest,
   type LoginPhoneRequest,
   type LoginRequest,
-  type PrivyLoginRequest,
   type ResetPasswordRequest,
   type SendOtpRequest,
   type SignupRequest,
   type TokenPairResponse,
+  type VerifyEmailOtpRequest,
   type VerifyOtpRequest,
 } from './models';
 
@@ -36,11 +36,6 @@ export const authRepository = {
     return tokenPairResponse.parse(raw);
   },
 
-  async privyLogin(input: PrivyLoginRequest): Promise<TokenPairResponse> {
-    const raw = await http.post<unknown>('/auth/privy-login', input);
-    return tokenPairResponse.parse(raw);
-  },
-
   async logout(): Promise<void> {
     const tokens = authSession.get();
     try {
@@ -60,6 +55,15 @@ export const authRepository = {
 
   async verifyPhoneOtp(input: VerifyOtpRequest): Promise<void> {
     await http.post('/auth/phone/verify-otp', input);
+  },
+
+  /** Sends a code to the signed-in user's stored email (bearer auth). */
+  async sendEmailOtp(): Promise<void> {
+    await http.post('/auth/email/send-otp');
+  },
+
+  async verifyEmailOtp(input: VerifyEmailOtpRequest): Promise<void> {
+    await http.post('/auth/email/verify-otp', input);
   },
 
   async forgotPassword(input: ForgotPasswordRequest): Promise<void> {

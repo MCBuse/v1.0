@@ -281,6 +281,20 @@
       "when": 1799733000011,
       "tag": "0039_change_update_now_requester",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1799733000012,
+      "tag": "0040_email_verification_codes",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1799733000013,
+      "tag": "0041_remove_privy",
+      "breakpoints": true
     }
   ]
 }

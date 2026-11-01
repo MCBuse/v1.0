@@ -447,6 +447,10 @@ try {
   );
   payerUserId = payerRow.rows[0]?.id;
   if (!payerUserId) throw new Error('Temporary payer was not persisted.');
+  // Email sign-ups start unverified; the payer hits VerifiedEmailGuard routes.
+  await query('update users set is_email_verified = true where id = $1', [
+    payerUserId,
+  ]);
   const walletRows = await query('select id from wallets where user_id = $1', [
     payerUserId,
   ]);

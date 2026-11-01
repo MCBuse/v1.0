@@ -31,7 +31,6 @@ export function realEnv() {
       SOLANA_KEYPAIR_ENCRYPTION_KEY: "5f1c0e7a9b3d48c6a2e4f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b",
       // Required at boot; never contacted by this path.
       MOONPAY_SECRET_KEY: "unused",
-      PRIVY_APP_ID: "unused",
       SOLANA_RPC_URL: "http://127.0.0.1:1",
       SOLANA_USDC_MINT: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
       STRIPE_SECRET_KEY: "sk_test_unused",

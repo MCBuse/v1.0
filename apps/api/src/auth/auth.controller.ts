@@ -12,6 +12,9 @@ import {
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
+  ApiNoContentResponse,
+  ApiBadRequestResponse,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -23,10 +26,10 @@ import { SignupDto } from './dto/signup.dto';
 import { IssuerSignupDto } from './dto/issuer-signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginPhoneDto } from './dto/login-phone.dto';
-import { PrivyLoginDto } from './dto/privy-login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { VerifyEmailOtpDto } from './dto/verify-email-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
@@ -85,22 +88,6 @@ export class AuthController {
   }
 
   @Public()
-  @Post('privy-login')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Sign in via Privy (verifies Privy access token, upserts user + wallet)',
-  })
-  @ApiOkResponse({ description: 'Returns access and refresh tokens' })
-  privyLogin(@Body() dto: PrivyLoginDto) {
-    return this.authService.privyLogin({
-      privyAccessToken: dto.privyAccessToken,
-      solanaPubkey: dto.solanaPubkey,
-      email: dto.email,
-      phone: dto.phone,
-    });
-  }
-
-  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Rotate refresh token and issue new token pair' })
@@ -113,10 +100,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Revoke refresh token' })
-  logout(
-    @CurrentUser() user: { id: string },
-    @Body() dto: RefreshTokenDto,
-  ) {
+  logout(@CurrentUser() user: { id: string }, @Body() dto: RefreshTokenDto) {
     return this.authService.logout(user.id, dto.refreshToken);
   }
 
@@ -126,14 +110,19 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Request a password reset code via email or phone' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword({ email: dto.email, phone: dto.phone });
+    return this.authService.forgotPassword({
+      email: dto.email,
+      phone: dto.phone,
+    });
   }
 
   @Public()
   @Post('reset-password')
   @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Reset password using a previously issued reset code' })
+  @ApiOperation({
+    summary: 'Reset password using a previously issued reset code',
+  })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword({
       email: dto.email,
@@ -148,10 +137,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Send OTP to phone number' })
-  sendOtp(
-    @CurrentUser() user: { id: string },
-    @Body() dto: SendOtpDto,
-  ) {
+  sendOtp(@CurrentUser() user: { id: string }, @Body() dto: SendOtpDto) {
     return this.authService.sendOtp(user.id, dto.phone);
   }
 
@@ -160,10 +146,43 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Verify OTP and mark phone as verified' })
-  verifyOtp(
-    @CurrentUser() user: { id: string },
-    @Body() dto: VerifyOtpDto,
-  ) {
+  verifyOtp(@CurrentUser() user: { id: string }, @Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(user.id, dto.phone, dto.code);
+  }
+
+  @Post('email/send-otp')
+  @Throttle(AUTH_THROTTLE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: "Email a 6-digit verification code to the user's email",
+  })
+  @ApiNoContentResponse({
+    description: 'Code sent (valid 15 minutes; newest code only)',
+  })
+  @ApiBadRequestResponse({
+    description: 'No email on the account, or already verified',
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'More than 5 codes requested in the last hour',
+  })
+  sendEmailOtp(@CurrentUser() user: { id: string }) {
+    return this.authService.sendEmailOtp(user.id);
+  }
+
+  @Post('email/verify-otp')
+  @Throttle(AUTH_THROTTLE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Verify the emailed code and mark the email as verified',
+  })
+  @ApiNoContentResponse({ description: 'Email verified' })
+  @ApiBadRequestResponse({ description: 'Invalid or expired code' })
+  verifyEmailOtp(
+    @CurrentUser() user: { id: string },
+    @Body() dto: VerifyEmailOtpDto,
+  ) {
+    return this.authService.verifyEmailOtp(user.id, dto.code);
   }
 }

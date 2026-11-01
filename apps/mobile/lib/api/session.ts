@@ -10,6 +10,9 @@ type Listener = (tokens: AuthTokens | null) => void;
 
 let current: AuthTokens | null = null;
 let hydrated = false;
+// False while a sign-in awaits email verification: those tokens live in
+// memory only, so killing the app mid-verification leaves nothing to resume.
+let persisted = true;
 const listeners = new Set<Listener>();
 
 export const authSession = {
@@ -30,12 +33,28 @@ export const authSession = {
 
   async set(tokens: AuthTokens): Promise<void> {
     current = tokens;
+    persisted = true;
     await tokenStorage.save(tokens);
+    for (const fn of listeners) fn(current);
+  },
+
+  /** Unverified sign-in: usable for requests, never written to storage. */
+  setTransient(tokens: AuthTokens): void {
+    current = tokens;
+    persisted = false;
+    for (const fn of listeners) fn(current);
+  },
+
+  /** Refresh-token rotation: keeps the session's persisted/transient mode. */
+  async rotate(tokens: AuthTokens): Promise<void> {
+    current = tokens;
+    if (persisted) await tokenStorage.save(tokens);
     for (const fn of listeners) fn(current);
   },
 
   async clear(): Promise<void> {
     current = null;
+    persisted = true;
     await tokenStorage.clear();
     for (const fn of listeners) fn(null);
   },

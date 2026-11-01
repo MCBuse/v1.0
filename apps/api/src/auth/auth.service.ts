@@ -6,6 +6,8 @@ import {
   BadRequestException,
   NotFoundException,
   ConflictException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -21,14 +23,15 @@ import { OTP_PROVIDER } from '../otp/otp-provider.interface';
 import { WalletsService } from '../wallets/wallets.service';
 import { SignupDto } from './dto/signup.dto';
 import { IssuerSignupDto } from './dto/issuer-signup.dto';
-import { PrivyJwtService } from './privy/privy-jwt.service';
+import { MailService } from '../mail/mail.service';
 
 const BCRYPT_ROUNDS = 12;
-const RESET_CODE_TTL_MINUTES = 15;
-// A 6-digit code is only safe if guesses are capped: 5 guesses per code and 5
-// codes per user per hour bound an attacker to ~25 guesses/hour out of 900k.
-const RESET_CODE_MAX_ATTEMPTS = 5;
-const RESET_CODES_PER_HOUR = 5;
+const CODE_TTL_MINUTES = 15;
+// Password reset and email verification codes. A 6-digit code is only safe if
+// guesses are capped: 5 guesses per code and 5 codes per user per hour bound
+// an attacker to ~25 guesses/hour out of 900k.
+const CODE_MAX_ATTEMPTS = 5;
+const CODES_PER_HOUR = 5;
 
 export interface AuthTokens {
   accessToken: string;
@@ -46,7 +49,7 @@ export class AuthService {
     private readonly config: ConfigService,
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     @Inject(OTP_PROVIDER) private readonly otpProvider: OtpProvider,
-    private readonly privyJwt: PrivyJwtService,
+    private readonly mail: MailService,
   ) {}
 
   async signup(dto: SignupDto): Promise<AuthTokens> {
@@ -157,82 +160,6 @@ export class AuthService {
     return this.issueTokens(user.id, user.email);
   }
 
-  /**
-   * Sign in via Privy. The mobile client has already completed Privy auth and
-   * holds an embedded Solana wallet; we verify their access token, upsert the
-   * local user + wallet rows, and return our own session tokens.
-   */
-  async privyLogin(input: {
-    privyAccessToken: string;
-    solanaPubkey: string;
-    email?: string;
-    phone?: string;
-  }): Promise<AuthTokens> {
-    const claims = await this.privyJwt.verify(input.privyAccessToken);
-    const privyUserId = claims.sub;
-
-    // Upsert by privyUserId. Username is auto-generated on first login; users
-    // can change it via the profile screen later.
-    const userId = await this.db.transaction(async (tx) => {
-      const existing = await tx
-        .select({ id: schema.users.id })
-        .from(schema.users)
-        .where(eq(schema.users.privyUserId, privyUserId))
-        .limit(1);
-
-      if (existing[0]) {
-        // Refresh the email/phone if Privy now has values we didn't have before.
-        const patch: Partial<typeof schema.users.$inferInsert> = { updatedAt: new Date() };
-        if (input.email) patch.email = input.email;
-        if (input.phone) patch.phone = input.phone;
-        await tx.update(schema.users).set(patch).where(eq(schema.users.id, existing[0].id));
-        return existing[0].id;
-      }
-
-      // Auto-generate `user_<8-hex>`; retry on the (vanishingly rare) collision.
-      let username = '';
-      for (let i = 0; i < 5; i++) {
-        const candidate = 'user_' + randomUUID().replace(/-/g, '').slice(0, 8);
-        const clash = await tx
-          .select({ id: schema.users.id })
-          .from(schema.users)
-          .where(eq(schema.users.username, candidate))
-          .limit(1);
-        if (!clash[0]) {
-          username = candidate;
-          break;
-        }
-      }
-      if (!username) throw new Error('Failed to generate a unique username');
-
-      const inserted = await tx
-        .insert(schema.users)
-        .values({
-          privyUserId,
-          username,
-          email: input.email ?? null,
-          phone: input.phone ?? null,
-        })
-        .returning({ id: schema.users.id });
-      return inserted[0].id;
-    });
-
-    // Upsert wallet row keyed by Solana pubkey. No keypair stored — Privy holds it.
-    await this.db
-      .insert(schema.wallets)
-      .values({
-        userId,
-        type: 'routine',
-        solanaPubkey: input.solanaPubkey,
-        privyWalletId: privyUserId,
-      })
-      .onConflictDoNothing({ target: schema.wallets.solanaPubkey });
-
-    this.logger.log('Privy login resolved user: ' + userId);
-    return this.issueTokens(userId, input.email ?? null);
-  }
-
-
   async refresh(rawRefreshToken: string): Promise<AuthTokens> {
     let payload: { sub: string; email: string; jti: string };
     try {
@@ -338,14 +265,14 @@ export class AuthService {
       );
     // Silent, like the unknown-identifier case: each new code is a fresh set
     // of guesses, so issuance has to be capped per user, not just per IP.
-    if (recent >= RESET_CODES_PER_HOUR) {
+    if (recent >= CODES_PER_HOUR) {
       this.logger.warn('Password reset issuance cap hit for user: ' + user.id);
       return;
     }
 
     const code = String(randomInt(100000, 1000000));
     const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
-    const expiresAt = new Date(Date.now() + RESET_CODE_TTL_MINUTES * 60_000);
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60_000);
     const channel: 'email' | 'phone' = input.email ? 'email' : 'phone';
 
     await this.db.transaction(async (tx) => {
@@ -380,13 +307,22 @@ export class AuthService {
       }
     }
 
-    // Email delivery is not yet wired. Log the code in non-production so the
-    // dev flow is testable end-to-end. Production should integrate an email
-    // provider here.
-    if (channel === 'email' && process.env.NODE_ENV !== 'production') {
-      this.logger.log(
-        '[DEV] Password reset code for ' + (input.email ?? '') + ': ' + code,
-      );
+    if (channel === 'email' && input.email) {
+      // MailService logs the code instead of sending when SMTP is unset (dev).
+      try {
+        await this.mail.send({
+          to: input.email,
+          subject: 'Your MCBuse password reset code',
+          text:
+            `Your MCBuse password reset code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes.\n\n` +
+            "If you didn't ask to reset your password, you can ignore this email.",
+        });
+      } catch (err) {
+        this.logger.error(
+          'Failed to deliver password reset email for user: ' + user.id,
+          err instanceof Error ? err.stack : undefined,
+        );
+      }
     }
 
     this.logger.log('Password reset code issued for user: ' + user.id);
@@ -433,7 +369,7 @@ export class AuthService {
     }
 
     // Claim a guess BEFORE comparing. The conditional UPDATE is atomic, so even
-    // parallel requests can't get more than RESET_CODE_MAX_ATTEMPTS compares.
+    // parallel requests can't get more than CODE_MAX_ATTEMPTS compares.
     const claimed = await this.db
       .update(schema.passwordResetCodes)
       .set({ attempts: sql`${schema.passwordResetCodes.attempts} + 1` })
@@ -441,7 +377,7 @@ export class AuthService {
         and(
           eq(schema.passwordResetCodes.id, candidate.id),
           isNull(schema.passwordResetCodes.consumedAt),
-          lt(schema.passwordResetCodes.attempts, RESET_CODE_MAX_ATTEMPTS),
+          lt(schema.passwordResetCodes.attempts, CODE_MAX_ATTEMPTS),
         ),
       )
       .returning({ id: schema.passwordResetCodes.id });
@@ -494,6 +430,105 @@ export class AuthService {
     });
 
     this.logger.log('Password reset completed for user: ' + user.id);
+  }
+
+  /** Email a 6-digit code that proves the user owns their stored email. */
+  async sendEmailOtp(userId: string): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.email)
+      throw new BadRequestException('No email address on this account');
+    if (user.isEmailVerified)
+      throw new BadRequestException('Email is already verified');
+
+    const codes = schema.emailVerificationCodes;
+    const [{ recent }] = await this.db
+      .select({ recent: count() })
+      .from(codes)
+      .where(
+        and(
+          eq(codes.userId, userId),
+          gte(codes.createdAt, new Date(Date.now() - 60 * 60_000)),
+        ),
+      );
+    // Each code is a fresh set of guesses, so issuance is capped per user.
+    if (recent >= CODES_PER_HOUR) {
+      throw new HttpException(
+        'Too many codes requested. Try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const code = String(randomInt(100000, 1000000));
+    const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60_000);
+
+    await this.db.transaction(async (tx) => {
+      // Only the newest code is ever valid.
+      await tx
+        .update(codes)
+        .set({ consumedAt: new Date() })
+        .where(and(eq(codes.userId, userId), isNull(codes.consumedAt)));
+      await tx.insert(codes).values({ userId, codeHash, expiresAt });
+    });
+
+    await this.mail.send({
+      to: user.email,
+      subject: 'Your MCBuse verification code',
+      text: `Your MCBuse verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes.`,
+    });
+    this.logger.log('Email verification code issued for user: ' + userId);
+  }
+
+  async verifyEmailOtp(userId: string, code: string): Promise<void> {
+    const codes = schema.emailVerificationCodes;
+    const invalid = () => new BadRequestException('Invalid or expired code');
+
+    const [candidate] = await this.db
+      .select()
+      .from(codes)
+      .where(
+        and(
+          eq(codes.userId, userId),
+          isNull(codes.consumedAt),
+          gt(codes.expiresAt, new Date()),
+        ),
+      )
+      .orderBy(desc(codes.createdAt))
+      .limit(1);
+    if (!candidate) throw invalid();
+
+    // Claim a guess BEFORE comparing; the conditional UPDATE is atomic, so
+    // parallel requests can't get more than CODE_MAX_ATTEMPTS compares.
+    const claimed = await this.db
+      .update(codes)
+      .set({ attempts: sql`${codes.attempts} + 1` })
+      .where(
+        and(
+          eq(codes.id, candidate.id),
+          isNull(codes.consumedAt),
+          lt(codes.attempts, CODE_MAX_ATTEMPTS),
+        ),
+      )
+      .returning({ id: codes.id });
+    if (claimed.length === 0) throw invalid();
+
+    if (!(await bcrypt.compare(code, candidate.codeHash))) throw invalid();
+
+    await this.db.transaction(async (tx) => {
+      const consumed = await tx
+        .update(codes)
+        .set({ consumedAt: new Date() })
+        .where(and(eq(codes.id, candidate.id), isNull(codes.consumedAt)))
+        .returning({ id: codes.id });
+      if (consumed.length === 0) throw invalid();
+
+      await tx
+        .update(schema.users)
+        .set({ isEmailVerified: true, updatedAt: new Date() })
+        .where(eq(schema.users.id, userId));
+    });
+    this.logger.log('Email verified for user: ' + userId);
   }
 
   async verifyOtp(userId: string, phone: string, code: string): Promise<void> {

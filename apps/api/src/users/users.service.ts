@@ -142,7 +142,10 @@ export class UsersService {
           firstName: data.firstName,
           lastName: data.lastName,
           phone: data.phone ?? null,
-          isEmailVerified: true,
+          // ponytail: phone-only users stay auto-verified until SMS OTP ships;
+          // otherwise VerifiedEmailGuard locks them out of every money route.
+          // Email users prove the address via POST /auth/email/verify-otp.
+          isEmailVerified: !data.email,
         })
         .returning({
           id: schema.users.id,

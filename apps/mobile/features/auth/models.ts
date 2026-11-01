@@ -57,13 +57,10 @@ export const resetPasswordRequest = z
   });
 export type ResetPasswordRequest = z.infer<typeof resetPasswordRequest>;
 
-export const privyLoginRequest = z.object({
-  privyAccessToken: z.string().min(20),
-  solanaPubkey:     z.string().min(32),
-  email:            z.string().email().optional(),
-  phone:            z.string().min(1).optional(),
+export const verifyEmailOtpRequest = z.object({
+  code: z.string().regex(/^\d{6}$/),
 });
-export type PrivyLoginRequest = z.infer<typeof privyLoginRequest>;
+export type VerifyEmailOtpRequest = z.infer<typeof verifyEmailOtpRequest>;
 
 // ── Responses ───────────────────────────────────────────────────────────────
 

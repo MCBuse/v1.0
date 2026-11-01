@@ -24,7 +24,7 @@ export class VerifiedEmailGuard implements CanActivate {
     const fullUser = await this.usersService.findById(user.id);
     if (!fullUser?.isEmailVerified) {
       throw new ForbiddenException(
-        'Email verification required. Check your inbox for a verification link.',
+        'Email verification required. Verify the code sent to your email.',
       );
     }
     return true;

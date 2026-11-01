@@ -25,7 +25,7 @@ export interface ResolvedWallet {
   type: string;
   account: AccountName;
   solanaPubkey: string;
-  encryptedKeypair: string | null;
+  encryptedKeypair: string;
   encryptionKeyVersion: string;
   userId: string;
 }

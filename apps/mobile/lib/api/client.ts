@@ -51,7 +51,7 @@ async function performRefresh(): Promise<string | null> {
     );
     // A refresh started before logout must not restore the cleared session.
     if (authSession.get() !== tokens) return null;
-    await authSession.set({
+    await authSession.rotate({
       accessToken: res.data.accessToken,
       refreshToken: res.data.refreshToken,
     });

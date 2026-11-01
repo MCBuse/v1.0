@@ -67,18 +67,5 @@ module.exports = (() => {
         sourceExts: [...resolver.sourceExts, "svg"],
     };
 
-    // Privy ships `jose` with broken package.exports; force the browser build.
-    const upstreamResolveRequest = config.resolver.resolveRequest;
-    config.resolver.resolveRequest = (context, moduleName, platform) => {
-        if (moduleName === 'jose') {
-            return context.resolveRequest(
-                { ...context, unstable_conditionNames: ['browser'] },
-                moduleName,
-                platform,
-            );
-        }
-        return (upstreamResolveRequest || context.resolveRequest)(context, moduleName, platform);
-    };
-
     return config;
 })();

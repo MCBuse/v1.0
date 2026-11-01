@@ -170,13 +170,6 @@ export default function ProfileScreen() {
                 onPress={() => router.push('/(flows)/scoin-store/issuer-profile' as never)}
               />
             )}
-            {demo.isDemoMode && demo.userRole === 'merchant' && (
-              <Button
-                label="Merchant Tools"
-                variant="secondary"
-                onPress={() => router.push('/(flows)/offline-pay/merchant-receive' as never)}
-              />
-            )}
             <Button
               label="Edit Profile"
               variant="secondary"

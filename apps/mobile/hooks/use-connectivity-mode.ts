@@ -1,7 +1,7 @@
 import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 import { useEffect, useRef, useState } from 'react';
 
-import type { ConnectivityMode } from '@/features/offline/models';
+export type ConnectivityMode = 'online' | 'poor' | 'offline';
 
 let demoModeOverride: ConnectivityMode | null = null;
 const demoListeners = new Set<(mode: ConnectivityMode | null) => void>();
