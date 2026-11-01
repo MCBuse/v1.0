@@ -46,8 +46,7 @@
     "test:clean": "node scripts/clean-test-data.mjs",
     "analytics:load": "ts-node -T src/data-capture/analytics/general-analytics.load.ts",
     "perf:payment": "ts-node -T src/data-capture/payment-api.perf.ts",
-    "credit:provision": "ts-node src/credit-assessment/provision-credit.ts",
-    "db:seed:dev": "ts-node --transpile-only src/database/seed-issuers.ts"
+    "credit:provision": "ts-node src/credit-assessment/provision-credit.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.1.0",

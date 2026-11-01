@@ -16,7 +16,6 @@ const MODES: { key: ConnectivityMode; label: string; color: string }[] = [
 
 const ROLES: { key: UserRole; label: string; color: string }[] = [
   { key: 'consumer', label: 'Consumer', color: '#3B82F6' },
-  { key: 'issuer', label: 'Issuer', color: '#8B5CF6' },
   { key: 'merchant', label: 'Merchant', color: '#10B981' },
 ];
 

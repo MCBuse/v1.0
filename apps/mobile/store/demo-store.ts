@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 import { setDemoConnectivityMode, type ConnectivityMode } from '@/hooks/use-connectivity-mode';
 
-export type UserRole = 'consumer' | 'issuer' | 'merchant';
+export type UserRole = 'consumer' | 'merchant';
 
 interface DemoState {
   isDemoMode: boolean;
