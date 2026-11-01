@@ -55,7 +55,9 @@ export function useCommitPendingAuth() {
 
   return useCallback(async () => {
     if (!pending) return false;
-    await completeAuth(pending.tokens);
+    // A refresh during verification rotates the tokens; persist the live pair,
+    // not the (now revoked) one parked in the pending store.
+    await completeAuth(authSession.get() ?? pending.tokens);
     return true;
   }, [pending, completeAuth]);
 }
@@ -65,8 +67,9 @@ export function useCommitPendingAuth() {
  *   phone → straight in (SMS OTP not shipped yet).
  *   email → straight in if already verified, otherwise park the tokens in the
  *           pending store, send an email code and go to the OTP screen.
- * Tokens go into `authSession` first so the profile / send-otp calls carry
- * the bearer; on failure the session is cleared again and the error rethrown.
+ * Email tokens go into `authSession` as a transient (memory-only) session so
+ * the profile / send-otp calls carry the bearer; they are persisted only once
+ * the code is verified. On failure the session is cleared and the error rethrown.
  */
 export function useFinishSignIn() {
   const completeAuth = useCompleteAuth();
@@ -78,7 +81,7 @@ export function useFinishSignIn() {
   ) => {
     if (ctx.channel === 'email') {
       try {
-        await authSession.set(tokens);
+        authSession.setTransient(tokens);
         const profile = await usersRepository.getProfile();
         if (!profile.isEmailVerified) {
           setPending({ tokens, ...ctx });
@@ -90,7 +93,7 @@ export function useFinishSignIn() {
           return;
         }
       } catch (err) {
-        await authSession.clear();
+        await authRepository.logout(); // revokes the refresh token, clears the session
         throw err;
       }
     }

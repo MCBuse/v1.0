@@ -10,7 +10,8 @@ import {
   useVerifyEmailOtp,
 } from '@/features/auth/hooks';
 import { usePendingAuthStore } from '@/features/auth/pending-store';
-import { ApiError, authSession } from '@/lib/api';
+import { authRepository } from '@/features/auth/repository';
+import { ApiError } from '@/lib/api';
 
 import type { Theme } from '@/theme';
 import { OtpInput } from '@/components/auth/OtpInput';
@@ -26,7 +27,6 @@ export default function OtpScreen() {
     flow: 'login' | 'register';
   }>();
 
-  const clearPending  = usePendingAuthStore((s) => s.clear);
   const commitPending = useCommitPendingAuth();
   const sendOtp       = useSendEmailOtp();
   const verifyOtp     = useVerifyEmailOtp();
@@ -42,6 +42,15 @@ export default function OtpScreen() {
   // successful verify clears the pending store, which must not bounce us.
   useEffect(() => {
     if (!usePendingAuthStore.getState().pending) router.replace('/(guest)/auth/login');
+  }, []);
+
+  // Leaving unverified (header back, swipe, "change email") abandons the
+  // sign-in: revoke the refresh token server-side and drop the memory-only
+  // session. After a successful verify the pending store is already empty.
+  useEffect(() => () => {
+    if (!usePendingAuthStore.getState().pending) return;
+    usePendingAuthStore.getState().clear();
+    void authRepository.logout();
   }, []);
 
   useEffect(() => {
@@ -89,13 +98,8 @@ export default function OtpScreen() {
     if (error) setError(false);
   };
 
-  // Tokens were written to the session so the OTP calls carry a bearer;
-  // drop them too so an unverified session is not resumed on next launch.
-  const handleBack = async () => {
-    clearPending();
-    await authSession.clear();
-    router.back();
-  };
+  // The unmount cleanup above revokes and drops the unverified session.
+  const handleBack = () => router.back();
 
   const maskedIdentifier = identifier.replace(/(.{2}).+(@.+)/, '$1•••$2');
 
