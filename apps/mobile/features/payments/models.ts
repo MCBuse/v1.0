@@ -18,6 +18,8 @@ export const createPaymentRequestInput = z.object({
   description: z.string().max(100).optional(),
   lineItems: lineItem.array().min(1).max(50).optional(),
   expiresInSeconds: z.number().optional(),
+  /** Only this MCBuse user may pay; allows expiry up to 7 days. */
+  payerUsername: z.string().optional(),
 });
 export type CreatePaymentRequestInput = z.infer<
   typeof createPaymentRequestInput
@@ -68,8 +70,37 @@ export const paymentRequest = z.object({
   expiresAt: z.string().nullable().optional(),
   createdAt: z.string(),
   qrString: z.string().optional(),
+  payerUsername: z.string().nullable().optional(),
 });
 export type PaymentRequest = z.infer<typeof paymentRequest>;
+
+/** Expiry choices for an invoice sent to a username (the creator picks). */
+export const ADDRESSED_EXPIRY_OPTIONS = [
+  { seconds: 3600, label: '1 hour' },
+  { seconds: 86400, label: '24 hours' },
+  { seconds: 604800, label: '7 days' },
+] as const;
+export type AddressedExpirySeconds = (typeof ADDRESSED_EXPIRY_OPTIONS)[number]['seconds'];
+
+/** Same shape the API accepts: 3–30 letters, digits or underscores, optional leading @. */
+export function isPayerUsername(value: string): boolean {
+  return /^@?[A-Za-z0-9_]{3,30}$/.test(value.trim());
+}
+
+/** "@Kofi " → "kofi"; empty input → undefined (a QR anyone can pay). */
+export function normalizePayerUsername(value: string): string | undefined {
+  const cleaned = value.trim().replace(/^@/, '').toLowerCase();
+  return cleaned || undefined;
+}
+
+/** An invoice someone sent to me by username, waiting for me to pay it. */
+export const incomingRequest = paymentRequest.extend({
+  invoiceNumber: z.string().nullable(),
+  displayAmountMinor: z.string().nullable(),
+  displayCurrency: z.string().nullable(),
+  from: z.object({ username: z.string(), displayName: z.string() }),
+});
+export type IncomingRequest = z.infer<typeof incomingRequest>;
 
 export const resolveResponse = paymentRequest.extend({
   creatorWallet: z.object({

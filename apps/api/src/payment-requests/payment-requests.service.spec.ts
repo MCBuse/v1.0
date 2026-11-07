@@ -1,4 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PaymentRequestsService } from './payment-requests.service';
 
 const USER_ID = '11111111-1111-1111-1111-111111111111';
@@ -6,6 +10,7 @@ const ROUTINE_WALLET_ID = '22222222-2222-2222-2222-222222222222';
 const PR_ID = '33333333-3333-3333-3333-333333333333';
 const LEDGER_ID = '44444444-4444-4444-4444-444444444444';
 const NOW = new Date('2026-05-11T12:00:00.000Z');
+const PAYER_ID = '66666666-6666-6666-6666-666666666666';
 
 function paymentRequest(overrides: Record<string, unknown> = {}) {
   return {
@@ -62,13 +67,17 @@ function createService(dbOverrides: Record<string, unknown> = {}) {
     cancelInvoiceByPaymentRequestId: jest.fn().mockResolvedValue(undefined),
     expireInvoice: jest.fn().mockResolvedValue(true),
   };
+  const usersService = {
+    findPayer: jest.fn().mockResolvedValue({ id: PAYER_ID, username: 'kofi' }),
+  };
   const db = dbOverrides;
   const service = new PaymentRequestsService(
     db as never,
     walletsService as never,
     merchantInventory as never,
+    usersService as never,
   );
-  return { service, db, walletsService, merchantInventory };
+  return { service, db, walletsService, merchantInventory, usersService };
 }
 
 describe('PaymentRequestsService', () => {
@@ -203,7 +212,7 @@ describe('PaymentRequestsService', () => {
       select: jest.fn(() => selects.shift()),
     });
 
-    await expect(service.resolve(pr.nonce)).resolves.toMatchObject({
+    await expect(service.resolve(pr.nonce, USER_ID)).resolves.toMatchObject({
       id: PR_ID,
       recipient: {
         username: 'ama_shop',
@@ -239,7 +248,7 @@ describe('PaymentRequestsService', () => {
       select: jest.fn(() => selects.shift()),
     });
 
-    await expect(service.resolve(pr.nonce)).resolves.toMatchObject({
+    await expect(service.resolve(pr.nonce, USER_ID)).resolves.toMatchObject({
       merchantId,
       recipient: {
         username: 'ama_shop',
@@ -260,7 +269,9 @@ describe('PaymentRequestsService', () => {
       update: jest.fn(() => update),
     });
 
-    await expect(service.resolve(stale.nonce)).rejects.toThrow('expired');
+    await expect(service.resolve(stale.nonce, USER_ID)).rejects.toThrow(
+      'expired',
+    );
   });
 
   it('expires an itemised merchant invoice through inventory so stock is released', async () => {
@@ -272,7 +283,9 @@ describe('PaymentRequestsService', () => {
       select: jest.fn(() => selectChain([stale])),
     });
 
-    await expect(service.resolve(stale.nonce)).rejects.toThrow('expired');
+    await expect(service.resolve(stale.nonce, USER_ID)).rejects.toThrow(
+      'expired',
+    );
     expect(merchantInventory.expireInvoice).toHaveBeenCalledWith(PR_ID);
   });
 
@@ -316,5 +329,140 @@ describe('PaymentRequestsService', () => {
     await expect(
       service.markCompleted(PR_ID, LEDGER_ID),
     ).resolves.toBeUndefined();
+  });
+
+  describe('invoices addressed to a username', () => {
+    function captureInsert() {
+      const captured: { value?: Record<string, unknown> } = {};
+      const returning = jest.fn(() =>
+        Promise.resolve([paymentRequest(captured.value ?? {})]),
+      );
+      const values = jest.fn((value: unknown) => {
+        captured.value = asRecord(value);
+        return { returning };
+      });
+      return { captured, insert: jest.fn(() => ({ values })) };
+    }
+
+    it('records the payer and allows a seven-day expiry', async () => {
+      const { captured, insert } = captureInsert();
+      const { service, usersService } = createService({ insert });
+
+      const result = await service.create(USER_ID, {
+        type: 'dynamic',
+        amount: '1250000',
+        currency: 'USDC',
+        payerUsername: '@Kofi',
+        expiresInSeconds: 604_800,
+      });
+
+      expect(usersService.findPayer).toHaveBeenCalledWith('@Kofi', USER_ID);
+      expect(captured.value?.payerUserId).toBe(PAYER_ID);
+      expect((captured.value?.expiresAt as Date).toISOString()).toBe(
+        '2026-05-18T12:00:00.000Z',
+      );
+      expect(result.payerUsername).toBe('kofi');
+    });
+
+    it('keeps bearer QR codes to at most 24 hours', async () => {
+      const { insert } = captureInsert();
+      const { service } = createService({ insert });
+
+      await expect(
+        service.create(USER_ID, {
+          type: 'dynamic',
+          amount: '1250000',
+          currency: 'USDC',
+          expiresInSeconds: 604_800,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('passes payer lookup failures through without creating anything', async () => {
+      const { insert } = captureInsert();
+      const { service, usersService } = createService({ insert });
+      usersService.findPayer.mockRejectedValueOnce(
+        new NotFoundException('No MCBuse user @ghost'),
+      );
+
+      await expect(
+        service.create(USER_ID, {
+          type: 'dynamic',
+          amount: '1250000',
+          currency: 'USDC',
+          payerUsername: 'ghost',
+        }),
+      ).rejects.toThrow('No MCBuse user @ghost');
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('refuses to resolve an addressed invoice for anyone but the payer', async () => {
+      const pr = paymentRequest({ payerUserId: PAYER_ID });
+      const { service } = createService({
+        select: jest.fn(() => selectChain([pr])),
+      });
+
+      await expect(service.resolve(pr.nonce, USER_ID)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(service.resolve(pr.nonce, null)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(
+        service.resolveForExecution(pr.nonce, USER_ID),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('resolves an addressed invoice for its payer', async () => {
+      const pr = paymentRequest({ payerUserId: PAYER_ID });
+      const selects = [
+        selectChain([pr]),
+        selectChain([
+          {
+            walletId: ROUTINE_WALLET_ID,
+            solanaPubkey: 'pubkey',
+            walletType: 'routine',
+            username: 'ama',
+            firstName: 'Ama',
+            lastName: 'Mensah',
+          },
+        ]),
+      ];
+      const { service } = createService({
+        select: jest.fn(() => selects.shift()),
+      });
+
+      await expect(service.resolve(pr.nonce, PAYER_ID)).resolves.toMatchObject({
+        id: PR_ID,
+        recipient: { username: 'ama' },
+      });
+    });
+
+    it('lists pending, unexpired invoices addressed to the caller', async () => {
+      const chain = selectChain([
+        {
+          request: paymentRequest({ payerUserId: PAYER_ID }),
+          creatorUsername: 'ama',
+          creatorFirstName: 'Ama',
+          creatorLastName: 'Mensah',
+          merchantName: null,
+        },
+      ]);
+      chain.leftJoin = jest.fn(() => chain);
+      const { service } = createService({ select: jest.fn(() => chain) });
+
+      const result = await service.listIncoming(PAYER_ID);
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          id: PR_ID,
+          nonce: paymentRequest().nonce,
+          amount: '500000',
+          currency: 'USDC',
+          from: { username: 'ama', displayName: 'Ama Mensah' },
+        }),
+      ]);
+    });
   });
 });

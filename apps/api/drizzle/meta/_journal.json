@@ -302,6 +302,13 @@
       "when": 1799733000014,
       "tag": "0042_remove_issuers",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1799733000015,
+      "tag": "0043_payment_request_payer",
+      "breakpoints": true
     }
   ]
 }

@@ -15,7 +15,7 @@ import {
   Wallet2,
   type Icon as IconType,
 } from "iconsax-react-native";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   FlatList,
   Pressable,
@@ -31,6 +31,7 @@ import { Box, Text } from "@/components/ui";
 import { useTransactions } from "@/features/transactions";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import type { LedgerEntry } from "@/features/transactions";
+import { useIncomingRequests, type IncomingRequest } from "@/features/payments";
 import { useProfile } from "@/features/users";
 import { useWallets } from "@/features/wallets";
 import {
@@ -41,6 +42,8 @@ import {
 } from "@/lib/currency";
 import {
   formatAmount,
+  formatEurMinor,
+  formatTimeLeft,
   formatRelativeTime,
   greetingForTime,
 } from "@/lib/format";
@@ -141,11 +144,13 @@ export default function HomeScreen() {
   const walletsQuery = useWallets();
   const profileQuery = useProfile();
   const txQuery = useTransactions({ limit: 5 });
+  const incomingQuery = useIncomingRequests();
 
   const { refreshing, onRefresh } = usePullToRefresh(
     walletsQuery.reload,
     profileQuery.reload,
     txQuery.reload,
+    incomingQuery.reload,
   );
 
   const accountCards = useMemo<AccountCardData[]>(() => {
@@ -284,6 +289,11 @@ export default function HomeScreen() {
             )
           }
         />
+
+        {/* ── Invoices sent to me by username ───────────────────────────── */}
+        {incomingQuery.data?.length ? (
+          <IncomingRequests requests={incomingQuery.data} />
+        ) : null}
 
         {/* ── Quick actions ────────────────────────────────────────────── */}
         <Box
@@ -579,6 +589,77 @@ function AccountCard({
   );
 }
 
+function IncomingRequests({ requests }: { requests: IncomingRequest[] }) {
+  const { colors } = useTheme<Theme>();
+  return (
+    <Box paddingHorizontal="2xl" marginBottom="xl" gap="s">
+      <Box flexDirection="row" alignItems="center" gap="s">
+        <Text variant="h3">Requests for you</Text>
+        <Box
+          paddingHorizontal="s"
+          borderRadius="full"
+          backgroundColor="brand"
+          minWidth={22}
+          alignItems="center"
+        >
+          <Text variant="label" color="textInverse" style={styles.countBadge}>
+            {requests.length}
+          </Text>
+        </Box>
+      </Box>
+      {requests.map((request) => {
+        const amount =
+          request.displayAmountMinor && request.displayCurrency === "EUR"
+            ? formatEurMinor(request.displayAmountMinor)
+            : formatAmount(request.amount ?? "0", request.currency ?? undefined);
+        const detail = [
+          request.invoiceNumber,
+          request.description,
+          request.expiresAt ? `due in ${formatTimeLeft(request.expiresAt)}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return (
+          <Pressable
+            key={request.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Pay ${amount} to ${request.from.displayName}`}
+            onPress={() =>
+              router.push({ pathname: "/(flows)/scan", params: { nonce: request.nonce } })
+            }
+            style={({ pressed }) => [
+              styles.requestRow,
+              {
+                backgroundColor: colors.bgSecondary,
+                borderColor: colors.borderSubtle,
+                opacity: pressed ? 0.72 : 1,
+              },
+            ]}
+          >
+            <Box style={[styles.requestIcon, { backgroundColor: colors.bgPrimary }]}>
+              <ReceiptText size={20} color={colors.textPrimary} variant="Linear" />
+            </Box>
+            <Box flex={1}>
+              <Text variant="bodyMedium" numberOfLines={1}>
+                {request.from.displayName}
+              </Text>
+              <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                {detail}
+              </Text>
+            </Box>
+            <Box alignItems="flex-end" gap="xs">
+              <Text variant="bodySemibold">{amount}</Text>
+              <Text variant="captionMedium" color="textBrand">
+                Pay
+              </Text>
+            </Box>
+          </Pressable>
+        );
+      })}
+    </Box>
+  );
+}
+
 function EmptyTransactions() {
   const { colors } = useTheme<Theme>();
   return (
@@ -732,6 +813,24 @@ const styles = StyleSheet.create({
   avatarLetter: { fontSize: 14 },
 
   txRow: { borderBottomWidth: StyleSheet.hairlineWidth },
+  requestRow: {
+    minHeight: 68,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  requestIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countBadge: { lineHeight: 18 },
   statusBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,

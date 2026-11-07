@@ -9,15 +9,18 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, lt, desc, isNull } from 'drizzle-orm';
+import { eq, and, lt, desc, gt, isNull, or } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { WalletsService } from '../wallets/wallets.service';
 import { CreatePaymentRequestDto } from './dto/create-payment-request.dto';
 import { MerchantInventoryService } from '../data-capture/merchant-inventory.service';
+import { UsersService } from '../users/users.service';
 
 const DEFAULT_EXPIRY_SECONDS = 300; // 5 minutes for dynamic QR
+/** A QR anyone can pay stays short-lived; only addressed invoices may run longer. */
+export const MAX_BEARER_EXPIRY_SECONDS = 86_400;
 const BASE_UNITS_PER_CENT = 10_000n; // USDC/EURC use 6 decimals: 0.01 = 10_000
 const QR_VERSION = '1';
 const QR_SCHEME = 'mcbuse://pay';
@@ -31,6 +34,7 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     private readonly walletsService: WalletsService,
     private readonly merchantInventory: MerchantInventoryService,
+    private readonly usersService: UsersService,
   ) {}
 
   onModuleInit() {
@@ -77,6 +81,21 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
       computedAmount = this.parseCentAmount(dto.amount, 'amount');
     }
 
+    if (dto.payerUsername && dto.type !== 'dynamic') {
+      throw new BadRequestException('payerUsername requires type=dynamic');
+    }
+    if (
+      !dto.payerUsername &&
+      (dto.expiresInSeconds ?? 0) > MAX_BEARER_EXPIRY_SECONDS
+    ) {
+      throw new BadRequestException(
+        'Only invoices sent to a username can stay open longer than 24 hours',
+      );
+    }
+    const payer = dto.payerUsername
+      ? await this.usersService.findPayer(dto.payerUsername, userId)
+      : null;
+
     // P2P payments land in the routine wallet
     const wallets = await this.walletsService.findByUserId(userId);
     const routine = wallets['routine'];
@@ -104,6 +123,7 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
         nonce,
         status: 'pending',
         expiresAt,
+        payerUserId: payer?.id ?? null,
       })
       .returning();
 
@@ -114,18 +134,69 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
       `Payment request created: ${pr.id} type=${pr.type} nonce=${nonce}`,
     );
 
-    return { ...this.sanitize(pr), qrString };
+    return {
+      ...this.sanitize(pr),
+      qrString,
+      payerUsername: payer?.username ?? null,
+    };
   }
 
-  async resolve(nonce: string) {
-    return this.resolveInternal(nonce, false);
+  /**
+   * `viewerUserId` is who is asking (null for unauthenticated callers such as
+   * NFC taps). An invoice addressed to a username only answers its payer.
+   */
+  async resolve(nonce: string, viewerUserId: string | null) {
+    return this.resolveInternal(nonce, viewerUserId, false);
   }
 
-  async resolveForExecution(nonce: string) {
-    return this.resolveInternal(nonce, true);
+  async resolveForExecution(nonce: string, payerUserId: string) {
+    return this.resolveInternal(nonce, payerUserId, true);
   }
 
-  private async resolveInternal(nonce: string, allowProcessing: boolean) {
+  /** Pending, unexpired invoices addressed to this user, newest first. */
+  async listIncoming(userId: string) {
+    const pr = schema.paymentRequests;
+    const rows = await this.db
+      .select({
+        request: pr,
+        creatorUsername: schema.users.username,
+        creatorFirstName: schema.users.firstName,
+        creatorLastName: schema.users.lastName,
+        merchantName: schema.merchants.businessName,
+      })
+      .from(pr)
+      .innerJoin(schema.wallets, eq(schema.wallets.id, pr.creatorWalletId))
+      .innerJoin(schema.users, eq(schema.users.id, schema.wallets.userId))
+      .leftJoin(schema.merchants, eq(schema.merchants.id, pr.merchantId))
+      .where(
+        and(
+          eq(pr.payerUserId, userId),
+          eq(pr.status, 'pending'),
+          or(isNull(pr.expiresAt), gt(pr.expiresAt, new Date())),
+        ),
+      )
+      .orderBy(desc(pr.createdAt))
+      .limit(50);
+
+    return rows.map((row) => ({
+      ...this.sanitize(row.request),
+      invoiceNumber: row.request.invoiceNumber,
+      displayAmountMinor: row.request.displayAmountMinor?.toString() ?? null,
+      displayCurrency: row.request.displayCurrency,
+      from: {
+        username: row.creatorUsername,
+        displayName:
+          row.merchantName ??
+          `${row.creatorFirstName} ${row.creatorLastName}`.trim(),
+      },
+    }));
+  }
+
+  private async resolveInternal(
+    nonce: string,
+    viewerUserId: string | null,
+    allowProcessing: boolean,
+  ) {
     const rows = await this.db
       .select()
       .from(schema.paymentRequests)
@@ -134,6 +205,10 @@ export class PaymentRequestsService implements OnModuleInit, OnModuleDestroy {
 
     const pr = rows[0];
     if (!pr) throw new NotFoundException('Payment request not found');
+    // Checked before status and expiry so nobody else learns anything about it.
+    if (pr.payerUserId && pr.payerUserId !== viewerUserId) {
+      throw new ForbiddenException('This invoice is for someone else');
+    }
     if (
       pr.status !== 'pending' &&
       !(allowProcessing && pr.status === 'processing')

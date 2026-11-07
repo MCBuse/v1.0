@@ -68,7 +68,8 @@ export class NfcService {
    * screen before the user approves execution.
    */
   async resolveSession(nonce: string) {
-    const resolved = await this.paymentRequestsService.resolve(nonce);
+    // Public endpoint: no viewer, so invoices addressed to a username stay hidden.
+    const resolved = await this.paymentRequestsService.resolve(nonce, null);
     const nfcPayload = this.buildNfcPayload(
       nonce,
       resolved.amount ?? undefined,
@@ -88,7 +89,11 @@ export class NfcService {
    * URI record (TNF=0x03, type="U"). No base64 encoding needed at API level —
    * the SDK handles NDEF framing.
    */
-  private buildNfcPayload(nonce: string, amount?: string, currency?: string): string {
+  private buildNfcPayload(
+    nonce: string,
+    amount?: string,
+    currency?: string,
+  ): string {
     const params = new URLSearchParams({ nonce, v: NFC_VERSION });
     if (amount) params.set('amount', amount);
     if (currency) params.set('currency', currency);

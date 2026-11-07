@@ -63,6 +63,7 @@ export const merchantInvoice = z.object({
   status: z.enum(['pending', 'processing', 'completed', 'expired', 'cancelled', 'failed']),
   expiresAt: z.string(),
   qrPayload: z.string(),
+  payerUsername: z.string().nullable().optional(),
   completedAt: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -81,6 +82,8 @@ const customLineInput = z.object({ type: z.literal('custom'), name: z.string().m
 export const createMerchantInvoiceInput = z.object({
   lines: z.union([productLineInput, customLineInput]).array().min(1).max(50),
   description: z.string().max(140).optional(),
-  expiresInSeconds: z.union([z.literal(900), z.literal(3600), z.literal(86400)]).optional(),
+  expiresInSeconds: z.union([z.literal(900), z.literal(3600), z.literal(86400), z.literal(604800)]).optional(),
+  /** Only this MCBuse user may pay; allows a 7-day expiry. */
+  payerUsername: z.string().optional(),
 });
 export type CreateMerchantInvoiceInput = z.infer<typeof createMerchantInvoiceInput>;

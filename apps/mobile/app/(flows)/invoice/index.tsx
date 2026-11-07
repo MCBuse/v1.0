@@ -16,8 +16,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 
 import { Box, Button, Input, Text } from '@/components/ui';
-import { useCancelPaymentRequest, useCreatePaymentRequest, usePaymentRequest } from '@/features/payments';
-import type { LineItem, PaymentRequest } from '@/features/payments';
+import {
+  ADDRESSED_EXPIRY_OPTIONS,
+  isPayerUsername,
+  normalizePayerUsername,
+  useCancelPaymentRequest,
+  useCreatePaymentRequest,
+  usePaymentRequest,
+} from '@/features/payments';
+import type { AddressedExpirySeconds, LineItem, PaymentRequest } from '@/features/payments';
 import { formatAmount, toBaseUnits } from '@/lib/format';
 import type { Theme } from '@/theme';
 
@@ -84,6 +91,8 @@ export default function InvoiceScreen() {
   const [mode, setMode]               = useState<InvoiceMode>('total');
   const [currency, setCurrency]       = useState<Currency>('USDC');
   const [description, setDescription] = useState('');
+  const [payer, setPayer]             = useState('');
+  const [payerExpiry, setPayerExpiry] = useState<AddressedExpirySeconds>(86400);
   const [totalAmount, setTotalAmount] = useState('');
   const [items, setItems]             = useState<DraftItem[]>(() => [newDraft()]);
   const [paymentReq, setPaymentReq]   = useState<PaymentRequest | null>(null);
@@ -114,13 +123,17 @@ export default function InvoiceScreen() {
     return items.reduce((sum, it) => sum + parseUnit(it.unitDecimal) * BigInt(it.quantity), 0n);
   }, [items, mode, totalBase]);
 
+  const hasPayer = payer.trim().length > 0;
+  const payerInvalid = hasPayer && !isPayerUsername(payer);
+
   const canGenerate = useMemo(() => {
+    if (payerInvalid) return false;
     if (mode === 'total') return isCentAmount(totalBase);
     if (items.length === 0) return false;
     return items.every(
       (it) => it.name.trim().length > 0 && it.quantity >= 1 && isCentAmount(parseUnit(it.unitDecimal)),
     );
-  }, [items, mode, totalBase]);
+  }, [items, mode, payerInvalid, totalBase]);
 
   // ── Item mutators ─────────────────────────────────────────────────────────
 
@@ -153,7 +166,8 @@ export default function InvoiceScreen() {
         currency,
         description:      description.trim() || undefined,
         lineItems:        mode === 'items' ? lineItems : undefined,
-        expiresInSeconds: QR_EXPIRY,
+        payerUsername:    normalizePayerUsername(payer),
+        expiresInSeconds: hasPayer ? payerExpiry : QR_EXPIRY,
       });
       setPaymentReq(req);
       setStep('qr');
@@ -161,7 +175,7 @@ export default function InvoiceScreen() {
       const msg = err instanceof Error ? err.message : 'Could not create invoice. Please try again.';
       Alert.alert('Error', msg);
     }
-  }, [canGenerate, create, currency, description, items, mode, subtotalBase]);
+  }, [canGenerate, create, currency, description, hasPayer, items, mode, payer, payerExpiry, subtotalBase]);
 
   const handleShare = useCallback(async () => {
     if (!currentPaymentReq) return;
@@ -173,6 +187,7 @@ export default function InvoiceScreen() {
     setTotalAmount('');
     setItems([newDraft()]);
     setDescription('');
+    setPayer('');
     setPaymentReq(null);
   }, []);
 
@@ -258,7 +273,9 @@ export default function InvoiceScreen() {
                 ? 'This QR can no longer be paid.'
                 : currentStatus === 'cancelled'
                   ? 'This invoice was cancelled.'
-                  : 'Expires in 5 minutes'}
+                  : currentPaymentReq.payerUsername
+                    ? `Sent to @${currentPaymentReq.payerUsername}. It's waiting in their app, and only they can pay it.`
+                    : 'Expires in 5 minutes'}
           </Text>
 
           {currentPaymentReq.lineItems && currentPaymentReq.lineItems.length > 0 && (
@@ -385,6 +402,35 @@ export default function InvoiceScreen() {
             ))}
           </Box>
 
+          {/* Bill to a specific user */}
+          <Box marginBottom="l">
+            <Input
+              label="Bill to (optional)"
+              prefix="@"
+              placeholder="username"
+              value={payer}
+              onChangeText={(value) => setPayer(value.replace(/\s/g, ''))}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={31}
+              error={payerInvalid ? 'Usernames are 3–30 letters, numbers or underscores' : undefined}
+              hint={hasPayer ? 'Only this person can pay. It shows up in their app.' : 'Leave empty for a QR code anyone can scan.'}
+            />
+            {hasPayer && (
+              <Box flexDirection="row" gap="s" marginTop="s" accessibilityRole="radiogroup">
+                {ADDRESSED_EXPIRY_OPTIONS.map((option) => (
+                  <Button
+                    key={option.seconds}
+                    label={option.label}
+                    size="sm"
+                    variant={payerExpiry === option.seconds ? 'primary' : 'secondary'}
+                    onPress={() => setPayerExpiry(option.seconds)}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+
           {/* Description */}
           <Box marginBottom="l">
             <Input
@@ -462,7 +508,7 @@ export default function InvoiceScreen() {
           style={{ paddingBottom: insets.bottom + 12 }}
         >
           <Button
-            label={create.isPending ? 'Generating…' : 'Generate QR'}
+            label={create.isPending ? (hasPayer ? 'Sending…' : 'Generating…') : hasPayer ? 'Send invoice' : 'Generate QR'}
             loading={create.isPending}
             disabled={!canGenerate}
             onPress={handleGenerate}

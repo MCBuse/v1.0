@@ -72,8 +72,24 @@ export class CreateMerchantInvoiceDto {
   @MaxLength(140)
   description?: string;
 
-  @ApiPropertyOptional({ enum: [900, 3600, 86400], default: 3600 })
+  @ApiPropertyOptional({
+    enum: [900, 3600, 86400, 604800],
+    default: 3600,
+    description: '604800 (7 days) is only allowed with payerUsername.',
+  })
   @IsOptional()
-  @IsIn([900, 3600, 86400])
-  expiresInSeconds?: 900 | 3600 | 86400;
+  @IsIn([900, 3600, 86400, 604800])
+  expiresInSeconds?: 900 | 3600 | 86400 | 604800;
+
+  @ApiPropertyOptional({
+    description:
+      'MCBuse username (with or without @) of the only person allowed to pay.',
+    example: '@kofi',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^@?[A-Za-z0-9_]{3,30}$/, {
+    message: 'payerUsername must be a valid MCBuse username',
+  })
+  payerUsername?: string;
 }

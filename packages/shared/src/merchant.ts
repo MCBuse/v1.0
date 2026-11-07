@@ -187,6 +187,8 @@ export type MerchantInvoice = {
   status: MerchantPaymentRequestStatus;
   expiresAt: string;
   qrPayload: string;
+  /** Set when the invoice was sent to a specific MCBuse user; only they can pay it. */
+  payerUsername: string | null;
   completedAt: string | null;
   createdAt: string;
 };

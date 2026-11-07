@@ -52,6 +52,7 @@ import { MerchantEvidenceAttachmentService } from './merchant-evidence-attachmen
 import { MerchantInsightsService } from '../analytics-intelligence/merchant-insights.service';
 import { ConfigService } from '@nestjs/config';
 
+import { UsersService } from '../users/users.service';
 @ApiTags('merchants')
 @ApiBearerAuth('access-token')
 @Controller('merchants/me')
@@ -67,6 +68,7 @@ export class MerchantController {
     private readonly config: ConfigService,
     private readonly generalAnalytics: GeneralAnalyticsService,
     private readonly assessments: MerchantAssessmentService,
+    private readonly users: UsersService,
   ) {}
 
   @Get()
@@ -254,11 +256,14 @@ export class MerchantController {
 
   @Post('invoices')
   @ApiOperation({ summary: 'Create an itemised inventory invoice' })
-  createInvoice(
+  async createInvoice(
     @CurrentUser() user: { id: string },
     @Body() dto: CreateMerchantInvoiceDto,
   ) {
-    return this.inventory.createInvoice(user.id, dto);
+    const payer = dto.payerUsername
+      ? await this.users.findPayer(dto.payerUsername, user.id)
+      : null;
+    return this.inventory.createInvoice(user.id, dto, payer);
   }
 
   @Get('invoices/:id')
@@ -458,7 +463,8 @@ export class MerchantController {
     @Body() body: { modelId?: string } = {},
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    if (!idempotencyKey?.trim() || idempotencyKey.length > 128) throw new BadRequestException('A valid Idempotency-Key is required');
+    if (!idempotencyKey?.trim() || idempotencyKey.length > 128)
+      throw new BadRequestException('A valid Idempotency-Key is required');
     return this.assessments.run(user.id, body?.modelId, idempotencyKey);
   }
 
@@ -609,12 +615,19 @@ export class MerchantController {
     @Body() dto: CreateMerchantFinancePackageDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.finance.createPackage(user.id, dto.periodDays ?? 30, dto.demonstrationData ?? false, idempotencyKey ?? '', dto.assessmentId);
-
+    return this.finance.createPackage(
+      user.id,
+      dto.periodDays ?? 30,
+      dto.demonstrationData ?? false,
+      idempotencyKey ?? '',
+      dto.assessmentId,
+    );
   }
 
   @Get('finance-packages')
-  @ApiOperation({ summary: 'Packages this merchant has produced, newest first' })
+  @ApiOperation({
+    summary: 'Packages this merchant has produced, newest first',
+  })
   listFinancePackages(@CurrentUser() user: { id: string }) {
     return this.finance.listPackages(user.id);
   }

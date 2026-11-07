@@ -139,6 +139,7 @@ describe('customer to merchant payment (devnet)', () => {
       db,
       wallets,
       inventory,
+      new UsersService(db),
     );
     const events = new MerchantEventsService(db, config);
     payments = new PaymentsService(

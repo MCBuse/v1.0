@@ -41,7 +41,11 @@ export class PaymentRequestsController {
 
   @Get()
   @ApiOperation({ summary: 'List own payment requests' })
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'completed', 'expired', 'cancelled'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['pending', 'completed', 'expired', 'cancelled'],
+  })
   @ApiQuery({ name: 'type', required: false, enum: ['static', 'dynamic'] })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
@@ -57,18 +61,27 @@ export class PaymentRequestsController {
 
   @Get('resolve')
   @ApiOperation({ summary: 'Resolve a payment request by nonce (QR scan)' })
-  @ApiQuery({ name: 'nonce', required: true, description: 'Nonce from QR payload' })
-  resolve(@Query('nonce') nonce: string) {
-    return this.service.resolve(nonce);
+  @ApiQuery({
+    name: 'nonce',
+    required: true,
+    description: 'Nonce from QR payload',
+  })
+  resolve(@CurrentUser() user: { id: string }, @Query('nonce') nonce: string) {
+    return this.service.resolve(nonce, user.id);
+  }
+
+  @Get('incoming')
+  @ApiOperation({
+    summary: 'Pending invoices addressed to me by username',
+  })
+  incoming(@CurrentUser() user: { id: string }) {
+    return this.service.listIncoming(user.id);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a single payment request by ID' })
   @ApiParam({ name: 'id', description: 'Payment request UUID' })
-  findById(
-    @CurrentUser() user: { id: string },
-    @Param('id') id: string,
-  ) {
+  findById(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.service.findById(user.id, id);
   }
 
@@ -76,10 +89,7 @@ export class PaymentRequestsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cancel a pending payment request' })
   @ApiParam({ name: 'id', description: 'Payment request UUID' })
-  cancel(
-    @CurrentUser() user: { id: string },
-    @Param('id') id: string,
-  ) {
+  cancel(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.service.cancel(user.id, id);
   }
 }

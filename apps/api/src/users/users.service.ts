@@ -115,6 +115,23 @@ export class UsersService {
     return results[0] ?? null;
   }
 
+  /**
+   * The user an invoice is addressed to. Unknown and inactive users look the
+   * same from outside, so the error says nothing about which it was.
+   */
+  async findPayer(usernameInput: string, creatorUserId: string) {
+    const user = await this.findByUsername(usernameInput);
+    if (!user || !user.isActive) {
+      throw new NotFoundException(
+        `No MCBuse user @${this.normalizeUsername(usernameInput)}`,
+      );
+    }
+    if (user.id === creatorUserId) {
+      throw new BadRequestException('You cannot send an invoice to yourself');
+    }
+    return { id: user.id, username: user.username };
+  }
+
   async create(data: {
     email?: string;
     passwordHash: string;
