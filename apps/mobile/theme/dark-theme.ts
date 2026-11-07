@@ -48,6 +48,23 @@ const darkTheme = createTheme({
     btnDisabled:      palette.gray800,
     btnDisabledText:  palette.gray700,
 
+    // Account cards — primary flips to white, secondary is an elevated charcoal surface
+    cardPrimaryBg:          palette.white,
+    cardPrimaryText:        palette.black,
+    cardPrimaryMutedText:   'rgba(0,0,0,0.56)',
+    cardPrimaryDivider:     'rgba(0,0,0,0.12)',
+    cardSecondaryBg:        palette.gray900,
+    cardSecondaryText:      palette.white,
+    cardSecondaryMutedText: palette.gray600,
+    cardSecondaryBorder:    palette.gray800,
+
+    // Transaction status
+    positive:   '#22C55E',
+    positiveBg: 'rgba(34,197,94,0.14)',
+    negative:   '#F87171',
+    negativeBg: 'rgba(248,113,113,0.14)',
+    neutralBg:  'rgba(255,255,255,0.08)',
+
     // Numpad — white background in dark mode
     numpadBg:      palette.white,
     numpadText:    palette.black,

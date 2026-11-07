@@ -1,10 +1,10 @@
 import { useTheme } from "@shopify/restyle";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { CloseCircle, ScanBarcode, TickCircle } from "iconsax-react-native";
-import React, { useCallback, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Avatar, Box, Button, NumPad, Text } from "@/components/ui";
@@ -14,7 +14,7 @@ import {
 } from "@/features/payments";
 import type { ResolveResponse } from "@/features/payments";
 import { randomUUID } from "expo-crypto";
-import { formatAmount, toBaseUnits } from "@/lib/format";
+import { formatAmount, formatEurMinor, toBaseUnits } from "@/lib/format";
 import type { Theme } from "@/theme";
 
 type Currency = "USDC" | "EURC";
@@ -46,19 +46,13 @@ function isCentAmount(baseUnits: string): boolean {
   return amount >= CENT_BASE_UNITS && amount % CENT_BASE_UNITS === 0n;
 }
 
-function formatEurMinor(minor: string) {
-  return new Intl.NumberFormat('en-IE', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-  }).format(Number(BigInt(minor)) / 100);
-}
-
 export default function ScanScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
 
   const [permission, requestPermission] = useCameraPermissions();
+  // Opened from "Requests for you": the invoice is already known, so skip the camera.
+  const { nonce: nonceParam } = useLocalSearchParams<{ nonce?: string }>();
   const [step, setStep] = useState<Step>("scan");
   const [resolving, setResolving] = useState(false);
   const [paymentReq, setPaymentReq] = useState<ResolveResponse | null>(null);
@@ -92,11 +86,12 @@ export default function ScanScreen() {
           err instanceof Error
             ? err.message
             : "This QR code could not be recognised.";
-        Alert.alert("Invalid QR", message, [
+        Alert.alert(nonceParam ? "Can't open invoice" : "Invalid QR", message, [
           {
             text: "OK",
             onPress: () => {
-              scannedRef.current = false;
+              if (nonceParam) router.back();
+              else scannedRef.current = false;
             },
           },
         ]);
@@ -104,8 +99,16 @@ export default function ScanScreen() {
         setResolving(false);
       }
     },
-    [resolving, resolve],
+    [nonceParam, resolving, resolve],
   );
+
+  // Resolve the nonce we were opened with, once.
+  const openedNonceRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!nonceParam || openedNonceRef.current === nonceParam) return;
+    openedNonceRef.current = nonceParam;
+    void handleBarcode({ data: `mcbuse://pay?nonce=${nonceParam}` });
+  }, [handleBarcode, nonceParam]);
 
   const handlePay = useCallback(async () => {
     if (!paymentReq) return;
@@ -141,6 +144,11 @@ export default function ScanScreen() {
   }, [paymentReq, amount, currency, execute]);
 
   const resetScan = useCallback(() => {
+    // Opened for one known invoice: there is nothing to scan, so leave.
+    if (nonceParam) {
+      router.back();
+      return;
+    }
     scannedRef.current = false;
     setStep("scan");
     setPaymentReq(null);
@@ -149,7 +157,16 @@ export default function ScanScreen() {
     setAmount("0");
     resolve.reset();
     execute.reset();
-  }, [execute, resolve]);
+  }, [execute, nonceParam, resolve]);
+
+  if (nonceParam && step === "scan") {
+    return (
+      <View style={[styles.screen, styles.centeredScreen, { backgroundColor: colors.bgPrimary }]}>
+        <ActivityIndicator color={colors.textSecondary} />
+        <Text variant="caption" color="textSecondary">Opening invoice…</Text>
+      </View>
+    );
+  }
 
   if (!permission) return <View style={styles.dark} />;
 
@@ -553,6 +570,7 @@ export default function ScanScreen() {
 }
 
 const styles = StyleSheet.create({
+  centeredScreen: { alignItems: "center", justifyContent: "center", gap: 12 },
   screen: { flex: 1 },
   dark: { flex: 1, backgroundColor: "#000" },
   centered: {

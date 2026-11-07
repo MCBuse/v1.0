@@ -10,13 +10,14 @@ import {
   TickCircle,
 } from 'iconsax-react-native';
 import React, { useMemo } from 'react';
-import { Linking, Pressable, ScrollView, Share, StyleSheet } from 'react-native';
+import { Linking, Pressable, RefreshControl, ScrollView, Share, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Box, Button, Text } from '@/components/ui';
 import { useTransactions } from '@/features/transactions';
 import type { LedgerEntry } from '@/features/transactions';
 import { useWallets } from '@/features/wallets';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { displayCurrencySymbol, truncateAddress } from '@/lib/currency';
 import { formatAmount } from '@/lib/format';
 import type { Theme } from '@/theme';
@@ -48,9 +49,10 @@ function txLabel(type: LedgerEntry['type'], direction: Direction): string {
 }
 
 function TxIcon({ type, direction, size }: { type: LedgerEntry['type']; direction: Direction; size: number }) {
+  const { colors } = useTheme<Theme>();
   const credit = direction === 'credit';
-  const color = credit ? '#16A34A' : '#374151';
-  if (type === 'on_ramp')  return <ArrowCircleDown size={size} color="#16A34A" variant="Bold" />;
+  const color = credit ? colors.positive : colors.textSecondary;
+  if (type === 'on_ramp')  return <ArrowCircleDown size={size} color={colors.positive} variant="Bold" />;
   if (type === 'off_ramp') return <ArrowCircleUp size={size} color={color} variant="Bold" />;
   if (type === 'p2p') {
     return credit
@@ -73,18 +75,18 @@ function StatusBadge({ status, colors }: { status: string; colors: Theme['colors
       borderRadius="full"
       style={{
         backgroundColor: isCompleted
-          ? 'rgba(22,163,74,0.1)'
+          ? colors.positiveBg
           : isFailed
-            ? 'rgba(239,68,68,0.1)'
-            : 'rgba(0,0,0,0.05)',
+            ? colors.negativeBg
+            : colors.neutralBg,
       }}
     >
-      {isCompleted && <TickCircle size={14} color="#16A34A" variant="Bold" />}
-      {isFailed && <CloseCircle size={14} color="#EF4444" variant="Bold" />}
+      {isCompleted && <TickCircle size={14} color={colors.positive} variant="Bold" />}
+      {isFailed && <CloseCircle size={14} color={colors.negative} variant="Bold" />}
       <Text
         variant="captionMedium"
         style={{
-          color: isCompleted ? '#16A34A' : isFailed ? '#EF4444' : colors.textTertiary,
+          color: isCompleted ? colors.positive : isFailed ? colors.negative : colors.textTertiary,
           textTransform: 'capitalize',
         }}
       >
@@ -101,6 +103,7 @@ export default function ReceiptScreen() {
 
   const txQuery = useTransactions({ limit: 100 });
   const walletsQuery = useWallets();
+  const { refreshing, onRefresh } = usePullToRefresh(txQuery.reload, walletsQuery.reload);
 
   const entry = useMemo(
     () => txQuery.data?.data.find((e) => e.id === id) ?? null,
@@ -126,7 +129,7 @@ export default function ReceiptScreen() {
   const label = txLabel(entry.type, direction);
   const symbol = displayCurrencySymbol(entry.currency as 'USDC' | 'EURC');
   const prefix = direction === 'credit' ? '+' : direction === 'debit' ? '-' : '';
-  const amountColor = direction === 'credit' ? '#16A34A' : colors.textPrimary;
+  const amountColor = direction === 'credit' ? colors.positive : colors.textPrimary;
   const hasSig = Boolean(entry.solanaTxSignature) && !entry.solanaTxSignature?.startsWith('mock_');
   const explorerUrl = hasSig ? `${SOLANA_EXPLORER_BASE}/${entry.solanaTxSignature}?cluster=devnet` : null;
 
@@ -165,6 +168,9 @@ export default function ReceiptScreen() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 24, gap: 16 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textSecondary} />
+        }
       >
         {/* Hero */}
         <Box alignItems="center" gap="m" paddingVertical="xl">
@@ -175,7 +181,7 @@ export default function ReceiptScreen() {
             alignItems="center"
             justifyContent="center"
             style={{
-              backgroundColor: direction === 'credit' ? 'rgba(22,163,74,0.1)' : colors.bgSecondary,
+              backgroundColor: direction === 'credit' ? colors.positiveBg : colors.bgSecondary,
             }}
           >
             <TxIcon type={entry.type} direction={direction} size={32} />

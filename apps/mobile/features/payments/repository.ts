@@ -4,6 +4,7 @@ import { finishMoneyIntent, moneyIntent } from '@/lib/api/money-intent';
 import {
   cancelPaymentRequestResponse,
   executePaymentResponse,
+  incomingRequest,
   onRampResponse,
   paymentRequest,
   merchantReceipt,
@@ -13,6 +14,7 @@ import {
   type ExecutePaymentInput,
   type ExecutePaymentResponse,
   type ExecuteUsernamePaymentInput,
+  type IncomingRequest,
   type OnRampInput,
   type OnRampResponse,
   type PaymentRequest,
@@ -34,6 +36,11 @@ export const paymentRepository = {
   async cancelPaymentRequest(id: string): Promise<CancelPaymentRequestResponse> {
     const raw = await http.post<unknown>(`/payment-requests/${id}/cancel`);
     return cancelPaymentRequestResponse.parse(raw);
+  },
+
+  async listIncomingRequests(): Promise<IncomingRequest[]> {
+    const raw = await http.get<unknown>('/payment-requests/incoming');
+    return incomingRequest.array().parse(raw);
   },
 
   async resolveNonce(nonce: string): Promise<ResolveResponse> {

@@ -1,6 +1,18 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, desc, inArray, lte, or, sql, gte } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  desc,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  notInArray,
+  or,
+  sql,
+  gte,
+} from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.provider';
 import * as schema from '../database/schema';
 import { ListTransactionsDto } from './dto/list-transactions.dto';
@@ -47,6 +59,77 @@ export function resolveLedgerDirection(
   if (creditsOwnWallet && debitsOwnWallet) return 'neutral';
 
   return 'neutral';
+}
+
+type PendingOperationInput = Pick<
+  typeof schema.financialOperations.$inferSelect,
+  | 'id'
+  | 'kind'
+  | 'status'
+  | 'sourceWalletId'
+  | 'destinationWalletId'
+  | 'amountBaseUnits'
+  | 'currency'
+  | 'chainSignature'
+  | 'metadata'
+  | 'createdAt'
+>;
+
+/**
+ * Statuses that are not worth showing as activity yet: `created` is a
+ * transient instant before funds are reserved, and `collection_pending` is a
+ * card/bank checkout the person may simply have abandoned.
+ */
+const HIDDEN_OPERATION_STATUSES = [
+  'created',
+  'collection_pending',
+  'finalized',
+  'failed',
+  'reversed',
+];
+
+const OPERATION_ENTRY: Record<
+  string,
+  { type: 'on_ramp' | 'off_ramp' | 'internal'; direction: LedgerDirection }
+> = {
+  funding_card: { type: 'on_ramp', direction: 'credit' },
+  funding_bank: { type: 'on_ramp', direction: 'credit' },
+  internal_transfer: { type: 'internal', direction: 'neutral' },
+  merchant_dayend: { type: 'internal', direction: 'neutral' },
+  withdrawal_bank: { type: 'off_ramp', direction: 'debit' },
+  withdrawal_card: { type: 'off_ramp', direction: 'debit' },
+};
+
+/**
+ * An in-flight money movement, shaped like a ledger entry so activity lists
+ * can show it as pending. The real ledger entry only exists once the
+ * operation finalizes; until then this is the only trace of it.
+ */
+export function pendingOperationEntry(op: PendingOperationInput) {
+  const mapping = OPERATION_ENTRY[op.kind];
+  if (!mapping) return null;
+  if (HIDDEN_OPERATION_STATUSES.includes(op.status)) return null;
+
+  // Funding has no source wallet (treasury) and withdrawals no destination;
+  // fall back to the person's own wallet so both ids are always present.
+  const own = op.destinationWalletId ?? op.sourceWalletId;
+  if (!own) return null;
+
+  return {
+    id: op.id,
+    debitWalletId: op.sourceWalletId ?? own,
+    creditWalletId: op.destinationWalletId ?? own,
+    amount: op.amountBaseUnits.toString(),
+    currency: op.currency,
+    direction: mapping.direction,
+    type: mapping.type,
+    status: 'pending' as const,
+    solanaTxSignature: op.chainSignature,
+    paymentRequestId: null,
+    idempotencyKey: null,
+    metadata: op.metadata ?? null,
+    createdAt: op.createdAt,
+  };
 }
 
 @Injectable()
@@ -105,12 +188,55 @@ export class TransactionsService {
       .offset(offset);
 
     const walletIdSet = new Set(walletIds);
+    const settled = rows.map((r) => this.serialize(r, walletIdSet));
+
+    // In-flight movements lead the first page; later pages are settled history.
+    const pending =
+      offset === 0
+        ? await this.pendingOperations(userId, walletIds, query)
+        : [];
 
     return {
-      data: rows.map((r) => this.serialize(r, walletIdSet)),
+      data: [...pending, ...settled],
       limit,
       offset,
     };
+  }
+
+  private async pendingOperations(
+    userId: string,
+    walletIds: string[],
+    query: ListTransactionsDto,
+  ) {
+    const ops = schema.financialOperations;
+    const conditions = [
+      eq(ops.userId, userId),
+      notInArray(ops.status, HIDDEN_OPERATION_STATUSES),
+      ne(ops.kind, 'reversal'),
+      // A ledger entry already exists, so the settled list shows it.
+      isNull(ops.ledgerEntryId),
+      or(
+        inArray(ops.sourceWalletId, walletIds),
+        inArray(ops.destinationWalletId, walletIds),
+      )!,
+    ];
+    if (query.currency) {
+      conditions.push(eq(ops.currency, query.currency.toUpperCase()));
+    }
+    if (query.from) conditions.push(gte(ops.createdAt, new Date(query.from)));
+    if (query.to) conditions.push(lte(ops.createdAt, new Date(query.to)));
+
+    const rows = await this.db
+      .select()
+      .from(ops)
+      .where(and(...conditions))
+      .orderBy(desc(ops.createdAt))
+      .limit(20);
+
+    return rows
+      .map(pendingOperationEntry)
+      .filter((entry) => entry !== null)
+      .filter((entry) => !query.type || entry.type === query.type);
   }
 
   /**

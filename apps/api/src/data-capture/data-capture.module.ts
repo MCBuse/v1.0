@@ -32,8 +32,14 @@ import {
 } from '../change-intelligence/staff-change.service';
 import { ChangeJobTrigger } from '../change-intelligence/change-job-trigger';
 
+import { UsersModule } from '../users/users.module';
 @Module({
-  imports: [RatesModule, AnalyticsIntelligenceModule, ChangeIntelligenceModule],
+  imports: [
+    RatesModule,
+    AnalyticsIntelligenceModule,
+    ChangeIntelligenceModule,
+    UsersModule,
+  ],
   // ChangeController lives here because it needs MerchantService owner resolution.
   controllers: [
     MerchantController,

@@ -1,13 +1,15 @@
 import { useTheme } from '@shopify/restyle';
 import { Tabs } from 'expo-router';
-import { Clock, Home2, ProfileCircle } from 'iconsax-react-native';
+import { Clock, Home2, ProfileCircle, Shop } from 'iconsax-react-native';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
+import { useMerchantProfile } from '@/features/merchant';
 import type { Theme } from '@/theme';
 
 export default function TabLayout() {
   const { colors } = useTheme<Theme>();
+  const isMerchant = Boolean(useMerchantProfile().data);
 
   return (
     <Tabs
@@ -42,6 +44,17 @@ export default function TabLayout() {
           title: 'Activity',
           tabBarIcon: ({ color }) => (
             <Clock size={24} color={color as string} variant="Linear" />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="merchant"
+        options={{
+          title: 'Merchant',
+          // Hidden (and unroutable from the bar) unless the user has a merchant profile.
+          href: isMerchant ? undefined : null,
+          tabBarIcon: ({ color }) => (
+            <Shop size={24} color={color as string} variant="Linear" />
           ),
         }}
       />

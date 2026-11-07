@@ -6,6 +6,7 @@ import {
   type ExecutePaymentInput,
   type ExecutePaymentResponse,
   type ExecuteUsernamePaymentInput,
+  type IncomingRequest,
   type OnRampInput,
   type OnRampResponse,
   type PaymentRequest,
@@ -34,6 +35,15 @@ export function usePaymentRequest(id: string | undefined, enabled = true) {
   });
 }
 
+/** Invoices sent to me by username. Polls while the screen is mounted. */
+export function useIncomingRequests() {
+  return useDataScreen<IncomingRequest[]>({
+    queryKey:        ['incoming-requests'],
+    queryFn:         () => paymentRepository.listIncomingRequests(),
+    refetchInterval: 30_000,
+  });
+}
+
 export function useCancelPaymentRequest() {
   return useOperation<string, CancelPaymentRequestResponse>({
     mutationFn:     (id) => paymentRepository.cancelPaymentRequest(id),
@@ -50,7 +60,7 @@ export function useResolvePaymentRequest() {
 export function useExecutePayment() {
   return useOperation<ExecutePaymentInput, ExecutePaymentResponse>({
     mutationFn:     (input) => paymentRepository.executePayment(input),
-    invalidateKeys: [['wallets'], ['transactions']],
+    invalidateKeys: [['wallets'], ['transactions'], ['incoming-requests']],
   });
 }
 

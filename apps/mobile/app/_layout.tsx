@@ -23,6 +23,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ApiProvider } from '@/lib/api';
 import { theme, darkTheme } from '@/theme';
 import { useAppStore } from '@/store/app-store';
+import { resolveIsDark, useThemePreference } from '@/store/theme-preference-store';
 
 // Hold the splash until fonts are ready
 SplashScreen.preventAutoHideAsync();
@@ -51,7 +52,8 @@ function RootNavigator({ isDark }: { isDark: boolean }) {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const themeMode = useThemePreference((s) => s.mode);
+  const isDark = resolveIsDark(themeMode, colorScheme);
 
   const [fontsLoaded] = useFonts({
     IBMPlexSans_400Regular,

@@ -49,3 +49,22 @@ export function greetingForTime(): string {
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
 }
+
+/** EUR integer cents → "€12.50" (merchant invoice display totals). */
+export function formatEurMinor(minor: string): string {
+  return new Intl.NumberFormat('en-IE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+  }).format(Number(BigInt(minor)) / 100);
+}
+
+/** Time left until `isoDate`, rounded down: "45 min", "5 hours", "3 days"; "expired" once past. */
+export function formatTimeLeft(isoDate: string, now: number = Date.now()): string {
+  const minutes = Math.floor((new Date(isoDate).getTime() - now) / 60_000);
+  if (minutes <= 0) return 'expired';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours} hour${hours === 1 ? '' : 's'}`;
+  return `${Math.floor(hours / 24)} days`;
+}

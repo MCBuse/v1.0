@@ -18,11 +18,15 @@ const theme = createTheme({
     bgBrand: palette.black,
     bgOverlay: palette.overlay,
 
-    // Account cards stay dark in both themes for brand consistency
-    accountCardBg: palette.black,
-    accountCardText: palette.white,
-    accountCardMutedText: 'rgba(255,255,255,0.52)',
-    accountCardDivider: 'rgba(255,255,255,0.12)',
+    // Account cards — two-tone: primary (Routine) is inverse, secondary (Holding) is a soft surface
+    cardPrimaryBg: palette.black,
+    cardPrimaryText: palette.white,
+    cardPrimaryMutedText: 'rgba(255,255,255,0.56)',
+    cardPrimaryDivider: 'rgba(255,255,255,0.14)',
+    cardSecondaryBg: palette.gray50,
+    cardSecondaryText: palette.black,
+    cardSecondaryMutedText: palette.gray700,
+    cardSecondaryBorder: palette.gray200,
 
     // Text
     textPrimary: palette.black,
@@ -55,6 +59,13 @@ const theme = createTheme({
     error: palette.red,
     warning: palette.orange,
     info: palette.blue,
+
+    // Transaction status — money in/out, readable in both themes
+    positive: '#16A34A',
+    positiveBg: 'rgba(22,163,74,0.1)',
+    negative: '#EF4444',
+    negativeBg: 'rgba(239,68,68,0.1)',
+    neutralBg: 'rgba(0,0,0,0.05)',
 
     // Numpad — black background, white keys
     numpadBg: palette.black,
