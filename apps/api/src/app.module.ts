@@ -30,7 +30,6 @@ import { TreasuryModule } from './treasury/treasury.module';
 import { FinancialOperationsModule } from './financial-operations/financial-operations.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { MerchantEventsModule } from './merchant-events/merchant-events.module';
-import { IssuersModule } from './issuers/issuers.module';
 
 @Module({
   imports: [
@@ -74,7 +73,6 @@ import { IssuersModule } from './issuers/issuers.module';
     DataCaptureModule,
     AccountsModule,
     MerchantEventsModule,
-    IssuersModule,
   ],
   controllers: [AppController],
   providers: [

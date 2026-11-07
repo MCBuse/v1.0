@@ -57,8 +57,6 @@ module.exports = (() => {
         blockList: blockList(config, [
             path.join(workspaceRoot, "apps", "api", "node_modules"),
             path.join(workspaceRoot, "apps", "portal", "node_modules"),
-            path.join(workspaceRoot, "apps", "issuers-dashboard", "node_modules"),
-            path.join(workspaceRoot, "apps", "admin-dashboard", "node_modules"),
             path.join(workspaceRoot, "packages", "eslint-config", "node_modules"),
             path.join(workspaceRoot, "packages", "shared", "node_modules"),
             path.join(workspaceRoot, "packages", "typescript-config", "node_modules"),

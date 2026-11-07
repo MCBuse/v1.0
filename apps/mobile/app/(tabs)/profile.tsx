@@ -1,25 +1,20 @@
 import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
-import { Copy, Edit2, ProfileCircle, Wallet } from 'iconsax-react-native';
+import { Copy, Edit2, ProfileCircle } from 'iconsax-react-native';
 import React from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, Button, Text } from '@/components/ui';
-import { DemoPanel } from '@/components/ui/DemoPanel';
 import { useSignOut } from '@/features/auth';
 import { useProfile } from '@/features/users';
-import { useWallets } from '@/features/wallets';
-import { displayCurrencyLabel, truncateAddress } from '@/lib/currency';
-import { useDemoStore } from '@/store/demo-store';
+import { displayCurrencyLabel } from '@/lib/currency';
 import type { Theme } from '@/theme';
 
 export default function ProfileScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
   const profile = useProfile();
-  const wallets = useWallets();
   const signOut = useSignOut();
-  const demo = useDemoStore();
   const user = profile.data;
 
   const handleShare = async () => {
@@ -28,10 +23,6 @@ export default function ProfileScreen() {
       title: 'My MCBuse username',
       message: `Pay me on MCBuse: @${user.username}`,
     });
-  };
-
-  const handleCopyAddress = async (address: string) => {
-    await Share.share({ message: address });
   };
 
   const handleSignOut = () => {
@@ -125,51 +116,7 @@ export default function ProfileScreen() {
             </Box>
           </Box>
 
-          <Box backgroundColor="bgSecondary" borderRadius="xl" padding="l" gap="m">
-            <Box flexDirection="row" alignItems="center" gap="s">
-              <Wallet size={18} color={colors.textTertiary} variant="Linear" />
-              <Text variant="captionMedium" color="textTertiary">Wallets · Solana Devnet</Text>
-            </Box>
-
-            {wallets.data?.routine?.solanaPubkey && (
-              <>
-                <Box style={[styles.divider, { backgroundColor: colors.borderSubtle }]} />
-                <Pressable onPress={() => handleCopyAddress(wallets.data!.routine!.solanaPubkey)}>
-                  <Text variant="caption" color="textTertiary">Routine Account</Text>
-                  <Text variant="bodyMedium" style={styles.monoText}>
-                    {truncateAddress(wallets.data.routine.solanaPubkey, 8)}
-                  </Text>
-                </Pressable>
-              </>
-            )}
-
-            {wallets.data?.savings?.solanaPubkey && (
-              <>
-                <Box style={[styles.divider, { backgroundColor: colors.borderSubtle }]} />
-                <Pressable onPress={() => handleCopyAddress(wallets.data!.savings!.solanaPubkey)}>
-                  <Text variant="caption" color="textTertiary">Holding Account</Text>
-                  <Text variant="bodyMedium" style={styles.monoText}>
-                    {truncateAddress(wallets.data.savings.solanaPubkey, 8)}
-                  </Text>
-                </Pressable>
-              </>
-            )}
-
-            {!wallets.data?.routine && !wallets.data?.savings && !wallets.isLoading && (
-              <Text variant="caption" color="textTertiary">No wallets found</Text>
-            )}
-          </Box>
-
-          <DemoPanel />
-
           <Box gap="m">
-            {(!demo.isDemoMode || demo.userRole === 'issuer') && (
-              <Button
-                label="Issuer Portal"
-                variant="secondary"
-                onPress={() => router.push('/(flows)/scoin-store/issuer-profile' as never)}
-              />
-            )}
             <Button
               label="Edit Profile"
               variant="secondary"
@@ -203,9 +150,5 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-  },
-  monoText: {
-    fontFamily: 'IBMPlexSans-Regular',
-    letterSpacing: 0.5,
   },
 });
