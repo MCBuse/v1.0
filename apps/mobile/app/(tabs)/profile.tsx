@@ -2,13 +2,21 @@ import { useTheme } from '@shopify/restyle';
 import { router } from 'expo-router';
 import { Copy, Edit2, ProfileCircle } from 'iconsax-react-native';
 import React from 'react';
-import { Alert, Pressable, ScrollView, Share, StyleSheet } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, Share, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, Button, Text } from '@/components/ui';
 import { useSignOut } from '@/features/auth';
 import { useProfile } from '@/features/users';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { displayCurrencyLabel } from '@/lib/currency';
+import { useThemePreference, type ThemeMode } from '@/store/theme-preference-store';
 import type { Theme } from '@/theme';
+
+const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
 
 export default function ProfileScreen() {
   const { colors } = useTheme<Theme>();
@@ -16,6 +24,9 @@ export default function ProfileScreen() {
   const profile = useProfile();
   const signOut = useSignOut();
   const user = profile.data;
+  const { refreshing, onRefresh } = usePullToRefresh(profile.reload);
+  const themeMode = useThemePreference((s) => s.mode);
+  const setThemeMode = useThemePreference((s) => s.setMode);
 
   const handleShare = async () => {
     if (!user?.username) return;
@@ -58,6 +69,9 @@ export default function ProfileScreen() {
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 24, gap: 16 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textSecondary} />
+          }
         >
           <Box backgroundColor="bgSecondary" borderRadius="xl" padding="l" gap="m">
             <Box flexDirection="row" alignItems="center" gap="m">
@@ -116,6 +130,37 @@ export default function ProfileScreen() {
             </Box>
           </Box>
 
+          <Box backgroundColor="bgSecondary" borderRadius="xl" padding="l" gap="m">
+            <Text variant="caption" color="textTertiary">Appearance</Text>
+            <Box accessibilityRole="radiogroup">
+              {THEME_OPTIONS.map((option, i) => {
+                const checked = themeMode === option.value;
+                return (
+                  <React.Fragment key={option.value}>
+                    {i > 0 && <Box style={[styles.divider, { backgroundColor: colors.borderSubtle }]} />}
+                    <Pressable
+                      onPress={() => setThemeMode(option.value)}
+                      style={styles.radioRow}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked }}
+                      accessibilityLabel={`${option.label} theme`}
+                    >
+                      <Text variant="bodyMedium">{option.label}</Text>
+                      <Box
+                        style={[
+                          styles.radioRing,
+                          { borderColor: checked ? colors.borderStrong : colors.borderDefault },
+                        ]}
+                      >
+                        {checked && <Box style={[styles.radioDot, { backgroundColor: colors.textPrimary }]} />}
+                      </Box>
+                    </Pressable>
+                  </React.Fragment>
+                );
+              })}
+            </Box>
+          </Box>
+
           <Box gap="m">
             <Button
               label="Edit Profile"
@@ -150,5 +195,24 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: StyleSheet.hairlineWidth,
+  },
+  radioRow: {
+    minHeight:      48,
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+  },
+  radioRing: {
+    width:          20,
+    height:         20,
+    borderRadius:   10,
+    borderWidth:    2,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  radioDot: {
+    width:        10,
+    height:       10,
+    borderRadius: 5,
   },
 });

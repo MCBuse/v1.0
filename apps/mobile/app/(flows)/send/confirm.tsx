@@ -157,10 +157,10 @@ export default function SendConfirmScreen() {
           alignItems="center"
           gap="xs"
         >
-          <Text variant="caption" style={{ color: "rgba(255,255,255,0.55)" }}>
+          <Text variant="caption" color="textInverse" style={{ opacity: 0.55 }}>
             {"You're sending"}
           </Text>
-          <Text variant="display" style={{ color: "#fff" }}>
+          <Text variant="display" color="textInverse">
             {displayedAmount}
           </Text>
         </Box>

@@ -69,11 +69,11 @@ function isTerminalStatus(status: string): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
-function statusTone(status: string) {
-  if (status === 'completed') return { label: 'Paid', color: '#16A34A', backgroundColor: 'rgba(22,163,74,0.1)' };
-  if (status === 'expired') return { label: 'Expired', color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.1)' };
-  if (status === 'cancelled') return { label: 'Cancelled', color: '#6B7280', backgroundColor: 'rgba(107,114,128,0.12)' };
-  return { label: 'Awaiting payment', color: '#B45309', backgroundColor: 'rgba(245,158,11,0.12)' };
+function statusTone(status: string, colors: Theme['colors']) {
+  if (status === 'completed') return { label: 'Paid', color: colors.positive, backgroundColor: colors.positiveBg };
+  if (status === 'expired') return { label: 'Expired', color: colors.negative, backgroundColor: colors.negativeBg };
+  if (status === 'cancelled') return { label: 'Cancelled', color: colors.textSecondary, backgroundColor: colors.neutralBg };
+  return { label: 'Awaiting payment', color: colors.warning, backgroundColor: 'rgba(255,149,0,0.14)' };
 }
 
 export default function InvoiceScreen() {
@@ -102,7 +102,7 @@ export default function InvoiceScreen() {
     [paymentReq, statusQuery.data],
   );
   const currentStatus = currentPaymentReq?.status ?? 'pending';
-  const currentStatusTone = statusTone(currentStatus);
+  const currentStatusTone = statusTone(currentStatus, colors);
   const symbol = currency === 'EURC' ? '€' : '$';
 
   // ── Live subtotal ─────────────────────────────────────────────────────────

@@ -1,4 +1,7 @@
-import { resolveLedgerDirection } from './transactions.service';
+import {
+  pendingOperationEntry,
+  resolveLedgerDirection,
+} from './transactions.service';
 
 const USER_WALLET = '11111111-1111-1111-1111-111111111111';
 const OTHER_WALLET = '22222222-2222-2222-2222-222222222222';
@@ -126,5 +129,82 @@ describe('resolveLedgerDirection', () => {
         new Set([USER_WALLET]),
       ),
     ).toBe('credit');
+  });
+});
+
+describe('pendingOperationEntry', () => {
+  const op = (
+    overrides: Partial<Parameters<typeof pendingOperationEntry>[0]>,
+  ) => ({
+    id: '44444444-4444-4444-4444-444444444444',
+    kind: 'internal_transfer',
+    status: 'reserved',
+    sourceWalletId: SAVINGS_WALLET,
+    destinationWalletId: USER_WALLET,
+    amountBaseUnits: 5_000_000n,
+    currency: 'USDC',
+    chainSignature: null,
+    metadata: { from: 'savings', to: 'routine' },
+    createdAt: new Date('2026-11-07T09:30:00Z'),
+    ...overrides,
+  });
+
+  it('shows a reserved holding-to-routine move as a pending internal entry', () => {
+    expect(pendingOperationEntry(op({}))).toMatchObject({
+      id: '44444444-4444-4444-4444-444444444444',
+      type: 'internal',
+      direction: 'neutral',
+      status: 'pending',
+      amount: '5000000',
+      debitWalletId: SAVINGS_WALLET,
+      creditWalletId: USER_WALLET,
+    });
+  });
+
+  it.each(['chain_submitted', 'chain_confirmed', 'compensating'])(
+    'keeps showing it while %s',
+    (status) => {
+      expect(pendingOperationEntry(op({ status }))?.status).toBe('pending');
+    },
+  );
+
+  it.each(['created', 'collection_pending', 'finalized', 'failed', 'reversed'])(
+    'hides it when %s',
+    (status) => {
+      expect(pendingOperationEntry(op({ status }))).toBeNull();
+    },
+  );
+
+  it('maps funding to an on-ramp credit using the destination for both wallets', () => {
+    expect(
+      pendingOperationEntry(
+        op({
+          kind: 'funding_card',
+          status: 'collection_settled',
+          sourceWalletId: null,
+        }),
+      ),
+    ).toMatchObject({
+      type: 'on_ramp',
+      direction: 'credit',
+      debitWalletId: USER_WALLET,
+      creditWalletId: USER_WALLET,
+    });
+  });
+
+  it('maps withdrawals to an off-ramp debit', () => {
+    expect(
+      pendingOperationEntry(
+        op({ kind: 'withdrawal_bank', destinationWalletId: null }),
+      ),
+    ).toMatchObject({
+      type: 'off_ramp',
+      direction: 'debit',
+      creditWalletId: SAVINGS_WALLET,
+    });
+  });
+
+  it('ignores reversals', () => {
+    expect(pendingOperationEntry(op({ kind: 'reversal' }))).toBeNull();
   });
 });

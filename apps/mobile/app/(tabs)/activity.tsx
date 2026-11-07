@@ -21,6 +21,7 @@ import { Box, Text } from '@/components/ui';
 import { useTransactions } from '@/features/transactions';
 import type { LedgerEntry } from '@/features/transactions';
 import { useWallets } from '@/features/wallets';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { formatAmount, formatRelativeTime } from '@/lib/format';
 import type { Theme } from '@/theme';
 
@@ -67,11 +68,11 @@ function txLabel(entry: LedgerEntry, direction: Direction): string {
   }
 }
 
-function TxIcon({ type, direction }: { type: LedgerEntry['type']; direction: Direction }) {
+function TxIcon({ type, direction, colors }: { type: LedgerEntry['type']; direction: Direction; colors: RowColors }) {
   const size = 20;
   const credit = direction === 'credit';
-  const color = credit ? '#16A34A' : '#374151';
-  if (type === 'on_ramp')  return <ArrowCircleDown size={size} color="#16A34A" variant="Bold" />;
+  const color = credit ? colors.positive : colors.textSecondary;
+  if (type === 'on_ramp')  return <ArrowCircleDown size={size} color={colors.positive} variant="Bold" />;
   if (type === 'off_ramp') return <ArrowCircleUp   size={size} color={color}   variant="Bold" />;
   if (type === 'p2p') {
     return credit
@@ -87,17 +88,10 @@ function amountPrefix(direction: Direction): string {
   return '';
 }
 
-const STATUS_BG_COMPLETED = 'rgba(22,163,74,0.08)';
-const STATUS_BG_FAILED    = 'rgba(239,68,68,0.08)';
-const STATUS_BG_DEFAULT   = 'rgba(0,0,0,0.05)';
-const CREDIT_COLOR        = '#16A34A';
-const FAILED_COLOR        = '#EF4444';
-const CREDIT_ICON_BG      = 'rgba(22,163,74,0.1)';
-
-function statusBg(status: LedgerEntry['status']): string {
-  if (status === 'completed') return STATUS_BG_COMPLETED;
-  if (status === 'failed')    return STATUS_BG_FAILED;
-  return STATUS_BG_DEFAULT;
+function statusBg(status: LedgerEntry['status'], colors: RowColors): string {
+  if (status === 'completed') return colors.positiveBg;
+  if (status === 'failed')    return colors.negativeBg;
+  return colors.neutralBg;
 }
 
 // ── Memoized rows ──────────────────────────────────────────────────────────────
@@ -163,10 +157,16 @@ const TxSkeleton = memo(function TxSkeleton({ colors }: { colors: SkeletonColors
 });
 
 type RowColors = {
-  borderSubtle: string;
-  bgSecondary:  string;
-  textPrimary:  string;
-  textTertiary: string;
+  borderSubtle:  string;
+  bgSecondary:   string;
+  textPrimary:   string;
+  textSecondary: string;
+  textTertiary:  string;
+  positive:      string;
+  positiveBg:    string;
+  negative:      string;
+  negativeBg:    string;
+  neutralBg:     string;
 };
 
 const TxRow = memo(function TxRow({
@@ -186,22 +186,22 @@ const TxRow = memo(function TxRow({
     [colors],
   );
   const iconBgStyle = useMemo(
-    () => ({ backgroundColor: credit ? CREDIT_ICON_BG : colors.bgSecondary }),
+    () => ({ backgroundColor: credit ? colors.positiveBg : colors.bgSecondary }),
     [credit, colors],
   );
   const amountStyle = useMemo(
-    () => ({ color: credit ? CREDIT_COLOR : colors.textPrimary }),
+    () => ({ color: credit ? colors.positive : colors.textPrimary }),
     [credit, colors],
   );
   const badgeStyle = useMemo(
-    () => [styles.statusBadge, { backgroundColor: statusBg(entry.status) }],
-    [entry.status],
+    () => [styles.statusBadge, { backgroundColor: statusBg(entry.status, colors) }],
+    [entry.status, colors],
   );
   const statusTextStyle = useMemo(
     () => ({
       color:
-        entry.status === 'completed' ? CREDIT_COLOR
-        : entry.status === 'failed'  ? FAILED_COLOR
+        entry.status === 'completed' ? colors.positive
+        : entry.status === 'failed'  ? colors.negative
         : colors.textTertiary,
     }),
     [entry.status, colors],
@@ -224,7 +224,7 @@ const TxRow = memo(function TxRow({
         justifyContent="center"
         style={iconBgStyle}
       >
-        <TxIcon type={entry.type} direction={direction} />
+        <TxIcon type={entry.type} direction={direction} colors={colors} />
       </Box>
 
       <Box flex={1}>
@@ -255,7 +255,6 @@ export default function ActivityScreen() {
   const { colors } = useTheme<Theme>();
   const insets = useSafeAreaInsets();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  const [refreshing, setRefreshing] = useState(false);
 
   const query = typeFilter === 'all' ? { limit: 50 } : { type: typeFilter as LedgerEntry['type'], limit: 50 };
   const txQuery = useTransactions(query);
@@ -267,11 +266,7 @@ export default function ActivityScreen() {
     return new Set([wallets.savings?.id, wallets.routine?.id].filter(Boolean) as string[]);
   }, [walletsQuery.data]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([txQuery.reload(), walletsQuery.reload()]);
-    setRefreshing(false);
-  }, [txQuery, walletsQuery]);
+  const { refreshing, onRefresh } = usePullToRefresh(txQuery.reload, walletsQuery.reload);
 
   const filterColors = useMemo<FilterColors>(
     () => ({
@@ -286,10 +281,16 @@ export default function ActivityScreen() {
   );
   const rowColors = useMemo<RowColors>(
     () => ({
-      borderSubtle: colors.borderSubtle,
-      bgSecondary:  colors.bgSecondary,
-      textPrimary:  colors.textPrimary,
-      textTertiary: colors.textTertiary,
+      borderSubtle:  colors.borderSubtle,
+      bgSecondary:   colors.bgSecondary,
+      textPrimary:   colors.textPrimary,
+      textSecondary: colors.textSecondary,
+      textTertiary:  colors.textTertiary,
+      positive:      colors.positive,
+      positiveBg:    colors.positiveBg,
+      negative:      colors.negative,
+      negativeBg:    colors.negativeBg,
+      neutralBg:     colors.neutralBg,
     }),
     [colors],
   );

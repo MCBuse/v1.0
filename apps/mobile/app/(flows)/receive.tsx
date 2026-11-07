@@ -188,7 +188,7 @@ export default function ReceiveScreen() {
                 alignItems="center"
                 justifyContent="center"
               >
-                <Copy size={16} color={copied ? '#16A34A' : colors.textSecondary} variant="Linear" />
+                <Copy size={16} color={copied ? colors.positive : colors.textSecondary} variant="Linear" />
               </Box>
             </Pressable>
           </>
